@@ -114,21 +114,22 @@ class RateRNN_torch(torch.nn.Module):
         self.circuit_type = circuit_type
         self.n_e = int(n_neurons * frac_e)
         if circuit_type == 'basic':
+            neuron_types = torch.ones(n_neurons)
             self.n_i = n_neurons - self.n_e
-            self.neuron_types[self.n_e:] = -1.0
+            neuron_types[self.n_e:] = -1.0
         elif circuit_type == 'cmc':
-            # Divide inhibitory into PV, SST, VIP equally
             percentage_inhibitory = 0.33
-            self.n_pv = int(n_neurons * percentage_inhibitory * frac_e)
-            self.n_sst = int(n_neurons * percentage_inhibitory * frac_e)
-            self.n_vip = int(n_neurons * percentage_inhibitory * frac_e)
+            neuron_types = torch.ones(n_neurons)
+            self.n_pv = int(n_neurons * percentage_inhibitory * (1 - frac_e))
+            self.n_sst = int(n_neurons * percentage_inhibitory * (1 - frac_e))
+            self.n_vip = n_neurons - self.n_e - self.n_pv - self.n_sst
             self.n_i = self.n_pv + self.n_sst + self.n_vip
-            self.neuron_types[self.n_pv:] = -1.0
-            self.neuron_types[self.n_sst:] = -1.0
-            self.neuron_types[self.n_vip:] = -1.0
+            neuron_types[self.n_e:self.n_e+self.n_pv] = -1.0
+            neuron_types[self.n_e+self.n_pv:self.n_e+self.n_pv+self.n_sst] = -2.0
+            neuron_types[self.n_e+self.n_pv+self.n_sst:] = -3.0
         else:
             raise ValueError(f"Invalid circuit type: {circuit_type}")
-        self.register_buffer("neuron_types", self.neuron_types)
+        self.register_buffer("neuron_types", neuron_types)
 
         init_std = g / np.sqrt(n_neurons)
         w_raw = torch.abs(torch.randn(n_neurons, n_neurons) * init_std)
@@ -141,7 +142,8 @@ class RateRNN_torch(torch.nn.Module):
 
     @property
     def W(self):
-        return self.W_raw * self.neuron_types.unsqueeze(0)
+        # Sig of neuron type
+        return self.W_raw * torch.sign(self.neuron_types.unsqueeze(0))
 
     def firing_rate(self, x):
         """
