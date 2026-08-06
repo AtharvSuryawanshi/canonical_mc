@@ -130,11 +130,15 @@ class RateRNN_torch(torch.nn.Module):
         else:
             raise ValueError(f"Invalid circuit type: {circuit_type}")
         self.register_buffer("neuron_types", neuron_types)
-
-        init_std = g / np.sqrt(n_neurons)
-        w_raw = torch.abs(torch.randn(n_neurons, n_neurons) * init_std)
-        w_raw.fill_diagonal_(0.0)
-        self.W_raw = torch.nn.Parameter(w_raw)
+        if self.circuit_type == 'basic':
+            init_std = g / np.sqrt(n_neurons)
+            w_raw = torch.abs(torch.randn(n_neurons, n_neurons) * init_std)
+            w_raw.fill_diagonal_(0.0)
+            self.W_raw = torch.nn.Parameter(w_raw)
+        elif self.circuit_type == 'cmc':
+            # Separate weights for each neuron - neuron block matrix
+            # g for e-e, e-pv, 
+            pass 
         self.W_in = torch.nn.Parameter(torch.randn(n_neurons, input_dim) * 0.05 + 0.05)
         self.W_out = torch.nn.Parameter(torch.randn(output_dim, n_neurons) * 0.05)
         with torch.no_grad():
@@ -142,8 +146,14 @@ class RateRNN_torch(torch.nn.Module):
 
     @property
     def W(self):
-        # Sig of neuron type
-        return self.W_raw * torch.sign(self.neuron_types.unsqueeze(0))
+        if self.circuit_type == 'basic':
+            # Sig of neuron type
+            return self.W_raw * torch.sign(self.neuron_types.unsqueeze(0))
+        elif self.circuit_type == 'cmc':
+            # Each neuron subtype has different 
+            return self.W_raw * torch.sign(self.neuron_types.unsqueeze(0))
+        else:
+            raise ValueError(f"Invalid circuit type: {self.circuit_type}")
 
     def firing_rate(self, x):
         """
