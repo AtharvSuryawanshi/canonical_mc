@@ -2,85 +2,49 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 
-class RateRNN:
-    def __init__(self, n_neurons=10, frac_e=0.8, tau=10.0, dt=1.0, g=1.5, rate_max = 100, input_dim=1, output_dim=1):
-        """
-        n_neurons: Total number of neurons
-        frac_e: Fraction of excitatory neurons (e.g. 0.8 = 80% E, 20% I)
-        tau: Decay time constant (ms)
-        dt: Simulation time step (ms)
-        g: Synaptic gain factor (scales initial weight variance)
-        """
-        self.n_neurons = n_neurons
-        self.tau = tau
-        self.dt = dt
-        self.alpha = dt / tau  # Decay rate multiplier per step
-        self.input_dim = input_dim
-        self.output_dim = output_dim
-        
-        # Cell type assignment
-        self.n_e = int(n_neurons * frac_e)
-        self.n_i = n_neurons - self.n_e
-        self.neuron_types = np.ones(n_neurons)
-        self.neuron_types[self.n_e:] = -1.0  # Inhibitory mask
-        self.rate_max = rate_max
+from model_np import RateRNN
 
-        # 2. Dale's Law compliance: raw weights are non-negative
-        self.W_raw = np.abs(np.random.normal(0, g / np.sqrt(n_neurons), (n_neurons, n_neurons))) # chaotic regime of g/sqrt(N)
-        self.W_in = np.ones((n_neurons, input_dim)) # weighting of external input
-        self.W_out = np.ones((output_dim, n_neurons)) # weighting of output
-        # zero output for inhibitory neurons
-        self.W_out[self.n_e:, :] = 0.0
-        np.fill_diagonal(self.W_raw, 0.0)  # Remove self-loops
+CMC_LABELS = ("E", "PV", "SST", "VIP")
 
-    @property
-    def W(self):
-        """
-        Enforce Dale's Law:
-        Columns 0..N_e-1 are Excitatory (>= 0)
-        Columns N_e..N-1 are Inhibitory (<= 0)
-        """
-        return self.W_raw * self.neuron_types[None, :]
-    
+CMC_BLOCK_STRENGTH = {
+    f"{pre}→{post}": 0.4
+    for pre in CMC_LABELS
+    for post in CMC_LABELS
+}
 
-    @staticmethod
-    def activation(x, alpha=1.0):
-        """Supralinear activation: (ReLU(x))^2"""
-        return alpha * np.maximum(0.0, x) ** 2
+CMC_BLOCK_PROB = {
+    f"{pre}→{post}": 0.8
+    for pre in CMC_LABELS[1:]
+    for post in CMC_LABELS[1:]
+}
 
-    def simulate(self, input_matrix, x_init=None, time_steps=500, noise_level=0.0):
-        """
-        input_matrix: Shape (n_channels, time_steps) # Same for all neurons, weighting done in W_in
-        Returns states x and rates r over time.
-        """
-        if input_matrix.ndim == 1:
-            I_ext = np.tile(self.W_in * input_matrix, (time_steps, 1))
-        else:
-            I_ext = np.dot(self.W_in, input_matrix)
-            print(I_ext.shape)
+CMC_BLOCK_PROB_E = {
+    f"{pre}→{post}": 0.2
+    for pre in CMC_LABELS[0]
+    for post in CMC_LABELS[0]
+}
 
-        if x_init is None:
-            x = np.random.uniform(0, 0.1, self.n_neurons)
-        else:
-            x = x_init.copy()
-
-        x_hist = np.zeros((time_steps, self.n_neurons))
-        r_hist = np.zeros((time_steps, self.n_neurons))
-        output_matrix = np.zeros((time_steps, self.output_dim))
-
-        W = np.abs(self.W)  # Precompute effective weight matrix
-        
-        for t in range(time_steps):
-            r = self.activation(x, alpha=1)
-            r = np.clip(r, 0, self.rate_max)
-            I_rec = W @ r
-            # Update
-            dx = (-x + I_rec + I_ext[:,t]) * self.alpha + np.random.normal(0, noise_level, self.n_neurons) * np.sqrt(self.dt)
-            x += dx
-            x_hist[t] = x
-            r_hist[t] = r
-            output_matrix[t] = self.W_out @ r
-        return r_hist, x_hist, output_matrix
+def _build_cmc_w_raw(n_neurons, bounds):
+    """Build recurrent weights from 4x4 block strength / probability tables."""
+    w_raw = torch.zeros(n_neurons, n_neurons)
+    scale = 1.0 / np.sqrt(n_neurons)
+    for pre_idx, pre_label in enumerate(CMC_LABELS):
+        c0, c1 = bounds[pre_idx], bounds[pre_idx + 1]
+        if c1 <= c0:
+            continue
+        for post_idx, post_label in enumerate(CMC_LABELS):
+            r0, r1 = bounds[post_idx], bounds[post_idx + 1]
+            if r1 <= r0:
+                continue
+            key = f"{pre_label}→{post_label}"
+            strength = CMC_BLOCK_STRENGTH[key]
+            prob = CMC_BLOCK_PROB.get(key, CMC_BLOCK_PROB_E.get(key, 1.0))
+            block = torch.abs(torch.randn(r1 - r0, c1 - c0)) * strength * scale
+            if prob < 1.0:
+                block = block * (torch.rand_like(block) < prob).float()
+            w_raw[r0:r1, c0:c1] = block
+    w_raw.fill_diagonal_(0.0)
+    return w_raw
 
 class RateRNN_torch(torch.nn.Module):
     """
@@ -113,32 +77,44 @@ class RateRNN_torch(torch.nn.Module):
         self.act_gain = act_gain
         self.circuit_type = circuit_type
         self.n_e = int(n_neurons * frac_e)
-        if circuit_type == 'basic':
+        if self.circuit_type == 'basic':
             neuron_types = torch.ones(n_neurons)
             self.n_i = n_neurons - self.n_e
             neuron_types[self.n_e:] = -1.0
-        elif circuit_type == 'cmc':
+        elif self.circuit_type == 'cmc':
             percentage_inhibitory = 0.33
             neuron_types = torch.ones(n_neurons)
+            pop = torch.zeros(n_neurons, dtype=torch.long)
             self.n_pv = int(n_neurons * percentage_inhibitory * (1 - frac_e))
             self.n_sst = int(n_neurons * percentage_inhibitory * (1 - frac_e))
             self.n_vip = n_neurons - self.n_e - self.n_pv - self.n_sst
             self.n_i = self.n_pv + self.n_sst + self.n_vip
-            neuron_types[self.n_e:self.n_e+self.n_pv] = -1.0
-            neuron_types[self.n_e+self.n_pv:self.n_e+self.n_pv+self.n_sst] = -2.0
-            neuron_types[self.n_e+self.n_pv+self.n_sst:] = -3.0
+            neuron_types[self.n_e : self.n_e + self.n_pv] = -1.0
+            neuron_types[self.n_e + self.n_pv : self.n_e + self.n_pv + self.n_sst] = -2.0
+            neuron_types[self.n_e + self.n_pv + self.n_sst :] = -3.0
+            pop[self.n_e : self.n_e + self.n_pv] = 1
+            pop[self.n_e + self.n_pv : self.n_e + self.n_pv + self.n_sst] = 2
+            pop[self.n_e + self.n_pv + self.n_sst :] = 3
+            self.register_buffer("pop", pop)
         else:
             raise ValueError(f"Invalid circuit type: {circuit_type}")
         self.register_buffer("neuron_types", neuron_types)
+        # Weights 
         if self.circuit_type == 'basic':
             init_std = g / np.sqrt(n_neurons)
             w_raw = torch.abs(torch.randn(n_neurons, n_neurons) * init_std)
             w_raw.fill_diagonal_(0.0)
             self.W_raw = torch.nn.Parameter(w_raw)
         elif self.circuit_type == 'cmc':
-            # Separate weights for each neuron - neuron block matrix
-            # g for e-e, e-pv, 
-            pass 
+            bounds = [
+                0,
+                self.n_e,
+                self.n_e + self.n_pv,
+                self.n_e + self.n_pv + self.n_sst,
+                n_neurons,
+            ]
+            w_raw = _build_cmc_w_raw(n_neurons, bounds)
+            self.W_raw = torch.nn.Parameter(w_raw)
         self.W_in = torch.nn.Parameter(torch.randn(n_neurons, input_dim) * 0.05 + 0.05)
         self.W_out = torch.nn.Parameter(torch.randn(output_dim, n_neurons) * 0.05)
         with torch.no_grad():
@@ -150,8 +126,8 @@ class RateRNN_torch(torch.nn.Module):
             # Sig of neuron type
             return self.W_raw * torch.sign(self.neuron_types.unsqueeze(0))
         elif self.circuit_type == 'cmc':
-            # Each neuron subtype has different 
-            return self.W_raw * torch.sign(self.neuron_types.unsqueeze(0))
+            signs = torch.tensor([1.0, -1.0, -1.0, -1.0], device=self.W_raw.device, dtype=self.W_raw.dtype)
+            return self.W_raw * signs[self.pop].unsqueeze(0)
         else:
             raise ValueError(f"Invalid circuit type: {self.circuit_type}")
 
