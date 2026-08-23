@@ -46,7 +46,7 @@ def _build_cmc_w_raw(n_neurons, bounds):
     w_raw.fill_diagonal_(0.0)
     return w_raw
 
-class RateRNN_torch(torch.nn.Module):
+class RateRNN(torch.nn.Module):
     """
     Differentiable rate RNN with Dale's law, soft firing-rate saturation,
     and tanh readout. Task-agnostic: use with external task modules for
@@ -64,7 +64,7 @@ class RateRNN_torch(torch.nn.Module):
         act_gain=0.15,
         input_dim=3,
         output_dim=1,
-        circuit_type = 'basic'
+        circuit_type = 'basic_dale'
     ):
         super().__init__()
         self.n_neurons = n_neurons
@@ -77,7 +77,7 @@ class RateRNN_torch(torch.nn.Module):
         self.act_gain = act_gain
         self.circuit_type = circuit_type
         self.n_e = int(n_neurons * frac_e)
-        if self.circuit_type == 'basic':
+        if self.circuit_type == 'basic_dale':
             neuron_types = torch.ones(n_neurons)
             self.n_i = n_neurons - self.n_e
             neuron_types[self.n_e:] = -1.0
@@ -100,7 +100,7 @@ class RateRNN_torch(torch.nn.Module):
             raise ValueError(f"Invalid circuit type: {circuit_type}")
         self.register_buffer("neuron_types", neuron_types)
         # Weights 
-        if self.circuit_type == 'basic':
+        if self.circuit_type == 'basic_dale':
             init_std = g / np.sqrt(n_neurons)
             w_raw = torch.abs(torch.randn(n_neurons, n_neurons) * init_std)
             w_raw.fill_diagonal_(0.0)
@@ -122,7 +122,7 @@ class RateRNN_torch(torch.nn.Module):
 
     @property
     def W(self):
-        if self.circuit_type == 'basic':
+        if self.circuit_type == 'basic_dale':
             # Sig of neuron type
             return self.W_raw * torch.sign(self.neuron_types.unsqueeze(0))
         elif self.circuit_type == 'cmc':
@@ -130,6 +130,7 @@ class RateRNN_torch(torch.nn.Module):
             return self.W_raw * signs[self.pop].unsqueeze(0)
         else:
             raise ValueError(f"Invalid circuit type: {self.circuit_type}")
+
 
     def firing_rate(self, x):
         """
