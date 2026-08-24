@@ -24,6 +24,12 @@ CMC_BLOCK_PROB_E = {
     for post in CMC_LABELS[0]
 }
 
+def _inv_softplus(y, eps=1e-6):
+    """Stable inverse of softplus so init magnitudes survive the reparameterization."""
+    y = torch.clamp(y, min=eps)
+    return torch.log(torch.expm1(y))
+
+
 def _build_cmc_w_raw(n_neurons, bounds):
     """Build recurrent weights from 4x4 block strength / probability tables."""
     w_raw = torch.zeros(n_neurons, n_neurons)
@@ -99,12 +105,13 @@ class RateRNN(torch.nn.Module):
         else:
             raise ValueError(f"Invalid circuit type: {circuit_type}")
         self.register_buffer("neuron_types", neuron_types)
-        # Weights 
+        self.register_buffer("e_mask", (neuron_types > 0).float())
+        # Weights
         if self.circuit_type == 'basic_dale':
             init_std = g / np.sqrt(n_neurons)
-            w_raw = torch.abs(torch.randn(n_neurons, n_neurons) * init_std)
-            w_raw.fill_diagonal_(0.0)
-            self.W_raw = torch.nn.Parameter(w_raw)
+            w_mag = torch.abs(torch.randn(n_neurons, n_neurons) * init_std)
+            w_mag.fill_diagonal_(0.0)
+            self.W_raw = torch.nn.Parameter(_inv_softplus(w_mag))
         elif self.circuit_type == 'cmc':
             bounds = [
                 0,
@@ -113,8 +120,8 @@ class RateRNN(torch.nn.Module):
                 self.n_e + self.n_pv + self.n_sst,
                 n_neurons,
             ]
-            w_raw = _build_cmc_w_raw(n_neurons, bounds)
-            self.W_raw = torch.nn.Parameter(w_raw)
+            w_mag = _build_cmc_w_raw(n_neurons, bounds)
+            self.W_raw = torch.nn.Parameter(_inv_softplus(w_mag))
         self.W_in = torch.nn.Parameter(torch.randn(n_neurons, input_dim) * 0.05 + 0.05)
         self.W_out = torch.nn.Parameter(torch.randn(output_dim, n_neurons) * 0.05)
         with torch.no_grad():
@@ -122,12 +129,13 @@ class RateRNN(torch.nn.Module):
 
     @property
     def W(self):
+        mag = torch.nn.functional.softplus(self.W_raw)
+        mag = mag * (1.0 - torch.eye(self.n_neurons, device=mag.device, dtype=mag.dtype))
         if self.circuit_type == 'basic_dale':
-            # Sig of neuron type
-            return self.W_raw * torch.sign(self.neuron_types.unsqueeze(0))
+            return mag * torch.sign(self.neuron_types.unsqueeze(0))
         elif self.circuit_type == 'cmc':
             signs = torch.tensor([1.0, -1.0, -1.0, -1.0], device=self.W_raw.device, dtype=self.W_raw.dtype)
-            return self.W_raw * signs[self.pop].unsqueeze(0)
+            return mag * signs[self.pop].unsqueeze(0)
         else:
             raise ValueError(f"Invalid circuit type: {self.circuit_type}")
 
@@ -221,7 +229,7 @@ class RateRNN(torch.nn.Module):
 
             x_hist.append(x)
             r_hist.append(r)
-            output_hist.append(torch.tanh(torch.matmul(r, self.W_out.t())))
+            output_hist.append(torch.tanh(torch.matmul(r * self.e_mask, self.W_out.t())))
 
         x_hist = torch.stack(x_hist, dim=1)
         r_hist = torch.stack(r_hist, dim=1)
