@@ -65,12 +65,13 @@ class RateRNN(torch.nn.Module):
         frac_e=0.8,
         tau=10.0,
         dt=1.0,
-        g=0.4,
+        g=1.5,
         rate_max=30.0,
         act_gain=0.15,
         input_dim=3,
         output_dim=1,
-        circuit_type = 'basic_dale'
+        circuit_type = 'basic_dale',
+        bias_init=2.0,
     ):
         super().__init__()
         self.n_neurons = n_neurons
@@ -108,7 +109,7 @@ class RateRNN(torch.nn.Module):
         self.register_buffer("e_mask", (neuron_types > 0).float())
         # Weights
         if self.circuit_type == 'basic_dale':
-            init_std = g / np.sqrt(n_neurons)
+            init_std = g / np.sqrt(n_neurons) # scaling wrt sqrt(N)
             w_mag = torch.abs(torch.randn(n_neurons, n_neurons) * init_std)
             w_mag.fill_diagonal_(0.0)
             self.W_raw = torch.nn.Parameter(_inv_softplus(w_mag))
@@ -124,8 +125,30 @@ class RateRNN(torch.nn.Module):
             self.W_raw = torch.nn.Parameter(_inv_softplus(w_mag))
         self.W_in = torch.nn.Parameter(torch.randn(n_neurons, input_dim) * 0.05 + 0.05)
         self.W_out = torch.nn.Parameter(torch.randn(output_dim, n_neurons) * 0.05)
+        # Recurrent bias: small positive init helps units cross the squared-softplus
+        # threshold; bias=0 lets training collapse to a silent readout-only solution.
+        self.b = torch.nn.Parameter(torch.full((n_neurons,), float(bias_init)))
         with torch.no_grad():
             self.W_out[:, self.n_e:] = 0.0
+        self._g = g
+
+    def recurrent_spectral_radius(self):
+        """Largest |eigenvalue| of Dale-constrained W (init target ~ g)."""
+        with torch.no_grad():
+            eigvals = torch.linalg.eigvals(self.W)
+            return eigvals.abs().max().item()
+
+    def scale_recurrent_to_rho(self, target_rho):
+        """Uniformly rescale |W| so rho(W) == target_rho, preserving Dale signs."""
+        with torch.no_grad():
+            rho = self.recurrent_spectral_radius()
+            if rho <= 1e-8:
+                return rho
+            scale = target_rho / rho
+            eye = torch.eye(self.n_neurons, device=self.W_raw.device, dtype=self.W_raw.dtype)
+            mag = torch.nn.functional.softplus(self.W_raw) * (1.0 - eye)
+            self.W_raw.copy_(_inv_softplus(mag * scale))
+            return self.recurrent_spectral_radius()
 
     @property
     def W(self):
@@ -220,11 +243,13 @@ class RateRNN(torch.nn.Module):
 
         for t in range(time_steps):
             r = self.firing_rate(x)
-            i_rec = torch.matmul(r, w_rec.t()) / np.sqrt(self.n_neurons)
+            # W is init-scaled as g/sqrt(N); no extra 1/sqrt(N) here (that double-scaling
+            # drove rho(W_eff) ~ g/sqrt(N) << 1 and made the net nearly feedforward).
+            i_rec = torch.matmul(r, w_rec.t())
             noise = 0.0
             if noise_level > 0.0:
                 noise = torch.randn_like(x) * noise_level * np.sqrt(self.dt)
-            dx = (-x + i_rec + i_ext[:, :, t]) * self.alpha + noise
+            dx = (-x + i_rec + i_ext[:, :, t] + self.b) * self.alpha + noise
             x = x + dx
 
             x_hist.append(x)

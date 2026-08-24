@@ -250,3 +250,53 @@ def generate_trials(rule, config, batch_size, noise_on=True):
     if noise_on:
         trial.add_x_noise()
     return trial
+
+
+def pad_trial(trial, tdim):
+    """Pad trial arrays along time; padded steps get zero loss weight."""
+    if trial.tdim >= tdim:
+        return trial
+    pad = tdim - trial.tdim
+    trial.x = np.pad(trial.x, ((0, pad), (0, 0), (0, 0)))
+    trial.y = np.pad(trial.y, ((0, pad), (0, 0), (0, 0)), constant_values=0.05)
+    trial.y_loc = np.pad(trial.y_loc, ((0, pad), (0, 0)), constant_values=-1)
+    if trial.c_mask is not None:
+        trial.c_mask = np.pad(trial.c_mask, ((0, pad), (0, 0), (0, 0)))
+    trial.tdim = tdim
+    return trial
+
+
+def concat_trials(trials):
+    """Concatenate same-config trials along batch; pad to common ``tdim``."""
+    if len(trials) == 1:
+        return trials[0]
+    tdim = max(t.tdim for t in trials)
+    trials = [pad_trial(t, tdim) for t in trials]
+    merged = trials[0]
+    merged.x = np.concatenate([t.x for t in trials], axis=1)
+    merged.y = np.concatenate([t.y for t in trials], axis=1)
+    merged.y_loc = np.concatenate([t.y_loc for t in trials], axis=1)
+    merged.c_mask = np.concatenate([t.c_mask for t in trials], axis=1)
+    merged.batch_size = int(sum(t.batch_size for t in trials))
+    merged.rule = "mixed"
+    return merged
+
+
+def generate_mixed_trials(active_tasks, config, batch_size, noise_on=True):
+    """One batch with roughly equal counts from each task (mixed multitask batch)."""
+    active_tasks = tuple(active_tasks)
+    n_tasks = len(active_tasks)
+    if n_tasks == 0:
+        raise ValueError("active_tasks must be non-empty")
+    if n_tasks == 1:
+        return generate_trials(active_tasks[0], config, batch_size, noise_on=noise_on)
+
+    base = batch_size // n_tasks
+    rem = batch_size % n_tasks
+    sizes = [base + (1 if i < rem else 0) for i in range(n_tasks)]
+    trials = [
+        generate_trials(task, config, sz, noise_on=noise_on)
+        for task, sz in zip(active_tasks, sizes)
+        if sz > 0
+    ]
+    return concat_trials(trials)
