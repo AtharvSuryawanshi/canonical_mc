@@ -403,7 +403,8 @@ def parse_args():
     parser.add_argument(
         "--tasks",
         nargs="+",
-        default=["fdgo"],
+        # All tasks
+        default=tuple(rules_dict["all"]),
         choices=rules_dict["all"],
         help="Tasks to train.",
     )

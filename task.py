@@ -3,7 +3,18 @@
 import numpy as np
 
 rules_dict = {
-    "all": ["fdgo", "reactgo", "delaygo", "fdanti", "delayanti", "dm1"],
+    "all": [
+        "fdgo",
+        "reactgo",
+        "delaygo",
+        "fdanti",
+        "delayanti",
+        "dm1",
+        "dm2",
+        "contextdm1",
+        "multidm",
+        "dmsgo",
+    ],
 }
 
 rule_index_map = {
@@ -20,7 +31,7 @@ def default_config(n_eachring=32, seed=0, easy_task=True, **kwargs):
     # Match Yang multitask defaults (train.py get_default_hp)
     dt = 20
     tau = 100.0
-    num_ring = 1
+    num_ring = 2
     n_rule = len(rules_dict["all"])
     config = {
         "dt": dt,
@@ -82,16 +93,20 @@ class Trial:
             var = [var] * self.batch_size
         return var
 
-    def add(self, loc_type, locs=None, ons=None, offs=None, strengths=1):
+    def add(self, loc_type, locs=None, ons=None, offs=None, strengths=1, mods=1):
         ons = self.expand(ons)
         offs = self.expand(offs)
         strengths = self.expand(strengths)
+        mods = self.expand(mods)
 
         for i in range(self.batch_size):
             if loc_type == "fix_in":
                 self.x[ons[i] : offs[i], i, 0] = 1
             elif loc_type == "stim":
-                self.x[ons[i] : offs[i], i, 1 : 1 + self.n_neurons_per_ring] += (
+                mod = mods[i]
+                start = 1 + (mod - 1) * self.n_neurons_per_ring
+                end = 1 + mod * self.n_neurons_per_ring
+                self.x[ons[i] : offs[i], i, start:end] += (
                     self.add_x_loc(locs[i]) * strengths[i]
                 )
             elif loc_type == "fix_out":
@@ -257,8 +272,8 @@ def delayanti(config, batch_size):
     return _delaygo(config, batch_size, anti_response=True)
 
 
-def dm1(config, batch_size):
-    """Decision making 1: two simultaneous ring bumps; saccade to the stronger."""
+def _dm(config, batch_size, stim_mod=1):
+    """Decision making: two simultaneous bumps on one ring; saccade to the stronger."""
     dt = config["dt"]
     rng = config["rng"]
 
@@ -287,8 +302,22 @@ def dm1(config, batch_size):
 
     trial = Trial(config, tdim, batch_size)
     trial.add("fix_in", offs=fix_offs)
-    trial.add("stim", stim1_locs, ons=stim_ons, offs=fix_offs, strengths=stim1_strengths)
-    trial.add("stim", stim2_locs, ons=stim_ons, offs=fix_offs, strengths=stim2_strengths)
+    trial.add(
+        "stim",
+        stim1_locs,
+        ons=stim_ons,
+        offs=fix_offs,
+        strengths=stim1_strengths,
+        mods=stim_mod,
+    )
+    trial.add(
+        "stim",
+        stim2_locs,
+        ons=stim_ons,
+        offs=fix_offs,
+        strengths=stim2_strengths,
+        mods=stim_mod,
+    )
     trial.add("fix_out", offs=fix_offs)
     stim_locs = np.where(stim1_strengths > stim2_strengths, stim1_locs, stim2_locs)
     trial.add("out", stim_locs, ons=fix_offs)
@@ -301,6 +330,192 @@ def dm1(config, batch_size):
     return trial
 
 
+def dm1(config, batch_size):
+    """Decision making 1: compare two bumps on ring 1; saccade to the stronger."""
+    return _dm(config, batch_size, stim_mod=1)
+
+
+def dm2(config, batch_size):
+    """Decision making 2: same as dm1 but stimuli on ring 2."""
+    return _dm(config, batch_size, stim_mod=2)
+
+
+def _contextdm_genstim(batch_size, rng, stim_coh_range=None):
+    stim_mean = rng.uniform(0.8, 1.2, (batch_size,))
+    if stim_coh_range is None:
+        stim_coh_range = np.array([0.16, 0.32, 0.64])
+    stim_coh = rng.choice(stim_coh_range, (batch_size,))
+    stim_sign = rng.choice([1, -1], (batch_size,))
+    stim1_strengths = stim_mean + stim_coh * stim_sign
+    stim2_strengths = stim_mean - stim_coh * stim_sign
+    return stim1_strengths, stim2_strengths
+
+
+def _contextdm(config, batch_size, attend_mod):
+    """Context decision making: two bumps per ring; attend one modality or both."""
+    dt = config["dt"]
+    rng = config["rng"]
+
+    stim_dist = rng.uniform(0.5 * np.pi, 1.5 * np.pi, (batch_size,)) * rng.choice(
+        [-1, 1], (batch_size,)
+    )
+    stim1_locs = rng.uniform(0, 2 * np.pi, (batch_size,))
+    stim2_locs = (stim1_locs + stim_dist) % (2 * np.pi)
+
+    stim_coh_range = np.array([0.01, 0.02, 0.04, 0.08], dtype=np.float32)
+    if config.get("easy_task", True):
+        stim_coh_range = stim_coh_range * 10
+
+    if attend_mod in (1, 2):
+        stim1_mod1_strengths, stim2_mod1_strengths = _contextdm_genstim(
+            batch_size, rng, stim_coh_range
+        )
+        stim1_mod2_strengths, stim2_mod2_strengths = _contextdm_genstim(
+            batch_size, rng, stim_coh_range
+        )
+        if attend_mod == 1:
+            stim1_strengths, stim2_strengths = stim1_mod1_strengths, stim2_mod1_strengths
+        else:
+            stim1_strengths, stim2_strengths = stim1_mod2_strengths, stim2_mod2_strengths
+    else:
+        stim1_strengths, stim2_strengths = _contextdm_genstim(batch_size, rng, stim_coh_range)
+
+        stim1_mod12_diff = (
+            stim1_strengths
+            * rng.uniform(0.2, 0.8, (batch_size,))
+            * rng.choice([1, -1], (batch_size,))
+        )
+        stim1_mod1_strengths = stim1_strengths + stim1_mod12_diff / 2
+        stim1_mod2_strengths = stim1_strengths - stim1_mod12_diff / 2
+
+        stim2_mod12_diff = (
+            stim2_strengths
+            * rng.uniform(0.2, 0.8, (batch_size,))
+            * rng.choice([1, -1], (batch_size,))
+        )
+        stim2_mod1_strengths = stim2_strengths + stim2_mod12_diff / 2
+        stim2_mod2_strengths = stim2_strengths - stim2_mod12_diff / 2
+
+    stim_on = int(rng.uniform(100, 400) / dt)
+    stim_ons = stim_on
+    stim_dur = int(rng.choice([400, 800, 1600]) / dt)
+    stim_offs = stim_ons + stim_dur
+    fix_offs = stim_offs
+    tdim = stim_on + stim_dur + int(500 / dt)
+    check_ons = fix_offs + int(100 / dt)
+
+    if attend_mod == 1:
+        stim1_strengths, stim2_strengths = stim1_mod1_strengths, stim2_mod1_strengths
+    elif attend_mod == 2:
+        stim1_strengths, stim2_strengths = stim1_mod2_strengths, stim2_mod2_strengths
+    elif attend_mod == "both":
+        stim1_strengths = stim1_mod1_strengths + stim1_mod2_strengths
+        stim2_strengths = stim2_mod1_strengths + stim2_mod2_strengths
+
+    trial = Trial(config, tdim, batch_size)
+    trial.add("fix_in", offs=fix_offs)
+    trial.add(
+        "stim",
+        stim1_locs,
+        ons=stim_ons,
+        offs=stim_offs,
+        strengths=stim1_mod1_strengths,
+        mods=1,
+    )
+    trial.add(
+        "stim",
+        stim2_locs,
+        ons=stim_ons,
+        offs=stim_offs,
+        strengths=stim2_mod1_strengths,
+        mods=1,
+    )
+    trial.add(
+        "stim",
+        stim1_locs,
+        ons=stim_ons,
+        offs=stim_offs,
+        strengths=stim1_mod2_strengths,
+        mods=2,
+    )
+    trial.add(
+        "stim",
+        stim2_locs,
+        ons=stim_ons,
+        offs=stim_offs,
+        strengths=stim2_mod2_strengths,
+        mods=2,
+    )
+    trial.add("fix_out", offs=fix_offs)
+    stim_locs = np.where(stim1_strengths > stim2_strengths, stim1_locs, stim2_locs)
+    trial.add("out", stim_locs, ons=fix_offs)
+    trial.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
+    trial.epochs = {
+        "fix1": (None, stim_ons),
+        "stim1": (stim_ons, stim_offs),
+        "go1": (fix_offs, None),
+    }
+    return trial
+
+
+def contextdm1(config, batch_size):
+    """Context DM on ring 1: attend modality 1; ignore ring 2."""
+    return _contextdm(config, batch_size, attend_mod=1)
+
+
+def multidm(config, batch_size):
+    """Multi-modality decision making: integrate both rings; saccade to stronger total."""
+    return _contextdm(config, batch_size, attend_mod="both")
+
+
+def _dms(config, batch_size, matchnogo=False):
+    """Delay-match-to-sample: two sequential stimuli; go or nogo on match."""
+    dt = config["dt"]
+    rng = config["rng"]
+
+    stim1_mod = rng.choice([1, 2])
+    stim2_mod = rng.choice([1, 2])
+    matches = rng.choice([0, 1], (batch_size,))
+    stim_dist = rng.uniform(np.pi / 9, np.pi * 17.0 / 9.0, (batch_size,)) * rng.choice(
+        [-1, 1], (batch_size,)
+    )
+    stim1_locs = rng.uniform(0, 2 * np.pi, (batch_size,))
+    stim2_locs = (stim1_locs + stim_dist * (1 - matches)) % (2 * np.pi)
+
+    stim1_ons = int(rng.choice([200, 400, 600]) / dt)
+    stim1_offs = stim1_ons + int(rng.choice([200, 400, 600]) / dt)
+    stim2_ons = stim1_offs + int(rng.choice([200, 400, 800, 1600]) / dt)
+    tdim = stim2_ons + int(500 / dt)
+    check_ons = stim2_ons + int(100 / dt)
+
+    fix_out_offs = [stim2_ons] * batch_size
+    out_offs = [None] * batch_size
+    for i in range(batch_size):
+        if matches[i] == matchnogo:
+            fix_out_offs[i] = None
+            out_offs[i] = 0
+
+    trial = Trial(config, tdim, batch_size)
+    trial.add("fix_in")
+    trial.add("stim", stim1_locs, ons=stim1_ons, offs=stim1_offs, mods=stim1_mod)
+    trial.add("stim", stim2_locs, ons=stim2_ons, mods=stim2_mod)
+    trial.add("fix_out", offs=fix_out_offs)
+    trial.add("out", stim2_locs, ons=stim2_ons, offs=out_offs)
+    trial.add_c_mask(pre_offs=stim2_ons, post_ons=check_ons)
+    trial.epochs = {
+        "fix1": (None, stim1_ons),
+        "stim1": (stim1_ons, stim1_offs),
+        "delay1": (stim1_offs, stim2_ons),
+        "go1": (stim2_ons, None),
+    }
+    return trial
+
+
+def dmsgo(config, batch_size):
+    """Delay-match-to-sample go: saccade on match, hold fixation on non-match."""
+    return _dms(config, batch_size, matchnogo=False)
+
+
 rule_mapping = {
     "fdgo": fdgo,
     "reactgo": reactgo,
@@ -308,6 +523,10 @@ rule_mapping = {
     "fdanti": fdanti,
     "delayanti": delayanti,
     "dm1": dm1,
+    "dm2": dm2,
+    "contextdm1": contextdm1,
+    "multidm": multidm,
+    "dmsgo": dmsgo,
 }
 
 
