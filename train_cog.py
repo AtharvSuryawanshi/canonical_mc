@@ -1,4 +1,4 @@
-"""Train RateRNN on the scoped Yang 3-task battery (fdgo, dm1, delaygo)."""
+"""Train Yang LeakyRNN or Dale RateRNN on fdgo / delaygo."""
 
 import argparse
 import math
@@ -8,6 +8,7 @@ import numpy as np
 import torch
 
 from model import RateRNN
+from network import LeakyRNN
 from task import default_config, generate_trials, generate_mixed_trials, rules_dict
 
 
@@ -41,10 +42,14 @@ def rate_reg(r_hist):
     """L2 metabolic / rate cost, factored out so it can be reweighted later."""
     return r_hist.square().mean()
 
-def connectivity_reg(model):
-    return model.W_in.square().mean()
 
-def ring_prefs(n_eachring, device, dtype):
+def connectivity_reg(model):
+    w_in = getattr(model, "W_in", None) or getattr(model, "w_in", None)
+    return w_in.square().mean()
+
+
+def ring_prefs(config, device, dtype):
+    n_eachring = config.get("n_eachring", config["n_neurons_per_ring"])
     return torch.arange(n_eachring, device=device, dtype=dtype) * (2 * math.pi / n_eachring)
 
 
@@ -61,15 +66,7 @@ def circular_abs(delta):
 
 
 def batch_accuracy(output, y_loc, prefs, ang_thresh=math.pi / 5, fix_thresh=0.5):
-    """Per-trial metrics: hold fixation, then land within 36° after go.
-
-    Thresholds (defaults match Yang-style eval):
-    - ``ang_thresh``: π/5 rad ≈ 36° population-vector decode error on go period
-    - ``fix_thresh``: mean predicted fixation channel > 0.5 during fix period
-
-    Returns combined accuracy plus go-only / fix-only rates so early
-    training is not hidden by a strict AND.
-    """
+    """Per-trial metrics: hold fixation, then land within 36° after go."""
     pred_loc = decode_ring(output, prefs)
     go = y_loc >= 0
     fix = y_loc < 0
@@ -105,13 +102,36 @@ def evaluate_task(model, config, rule, batch_size, device, noise_level=0.0):
     with torch.no_grad():
         r_hist, x_hist, output = model.simulate(x, noise_level=noise_level)
         loss = masked_mse(output, y, c_mask).item()
-        prefs = ring_prefs(config["n_eachring"], output.device, output.dtype)
+        prefs = ring_prefs(config, output.device, output.dtype)
         acc = batch_accuracy(output, y_loc, prefs)
         activity = model.activity_stats(r_hist, x_hist)
     return {"loss": loss, "activity": activity, **acc}
 
 
-def make_model(config, n_neurons=64, frac_e=0.8, g=1.5, bias_init=1.0, device="cpu"):
+def make_yang_model(
+    config,
+    n_rnn=256,
+    activation="relu",
+    w_rec_init="randortho",
+    sigma_rec=0.05,
+    seed=0,
+    device="cpu",
+):
+    model = LeakyRNN(
+        n_input=config["n_input"],
+        n_rnn=n_rnn,
+        n_output=config["n_output"],
+        alpha=config["alpha"],
+        activation=activation,
+        w_rec_init=w_rec_init,
+        sigma_rec=sigma_rec,
+        seed=seed,
+    )
+    print(f"Yang LeakyRNN: n_rnn={n_rnn}  alpha={config['alpha']:.3f}  activation={activation}")
+    return model.to(device)
+
+
+def make_dale_model(config, n_neurons=64, frac_e=0.8, g=1.5, bias_init=1.0, device="cpu"):
     model = RateRNN(
         n_neurons=n_neurons,
         frac_e=frac_e,
@@ -125,19 +145,24 @@ def make_model(config, n_neurons=64, frac_e=0.8, g=1.5, bias_init=1.0, device="c
         readout_nonlinearity="tanh",
     )
     rho = model.scale_recurrent_to_rho(g)
-    # Ring inputs are O(1); scale W_in so ReLU^2 units sit in a responsive regime
-    # without saturating (bias_init=2 + scale 8 drove ~95% saturation).
     with torch.no_grad():
         model.W_in.mul_(4.0)
-        model.W_out[:, model.n_e:] = 0.0
-        # Seed fixation readout positive so fix_acc is learnable from step 1.
+        model.W_out[:, model.n_e :] = 0.0
         model.W_out[0, : model.n_e] = 0.15
-    print(f"recurrent init: g={g:.2f}  rho(W)={rho:.3f}")
+    print(f"Dale RateRNN: N={n_neurons}  g={g:.2f}  rho(W)={rho:.3f}")
     return model.to(device)
 
 
+def make_model(config, model_type="yang", device="cpu", **kwargs):
+    if model_type == "yang":
+        return make_yang_model(config, device=device, **kwargs)
+    if model_type == "dale":
+        return make_dale_model(config, device=device, **kwargs)
+    raise ValueError(f"Unknown model_type: {model_type}")
+
+
 def sample_input_drive(model, config, task="fdgo", batch_size=8, device="cpu", t_step=None):
-    """W_in @ x + b at one timestep (pre-recurrence drive) for init diagnostics."""
+    """W_in @ x + b at one timestep (pre-recurrence drive) for Dale model diagnostics."""
     device = torch.device(device)
     trial = generate_trials(task, config, batch_size, noise_on=False)
     x, _, _, _ = trial_to_tensors(trial, device)
@@ -152,7 +177,10 @@ def sample_input_drive(model, config, task="fdgo", batch_size=8, device="cpu", t
 
 
 def plot_preactivation_at_init(model, config, device="cpu", task="fdgo"):
-    """Histogram of input drive (W_in @ x + b) at init — flags sub-threshold units."""
+    """Histogram of input drive at init — Dale model only."""
+    if not hasattr(model, "firing_rate"):
+        print("plot_preactivation_at_init: skipped (Yang LeakyRNN has no Dale firing_rate)")
+        return None
     drive, t_step = sample_input_drive(model, config, task=task, device=device)
     rates = model.firing_rate(torch.as_tensor(drive, device=next(model.parameters()).device)).detach().cpu().numpy()
     silent_thresh = 0.05 * model.rate_max
@@ -174,8 +202,6 @@ def plot_preactivation_at_init(model, config, device="cpu", task="fdgo"):
     axes[1].grid(True, alpha=0.3)
     fig.tight_layout()
     plt.show()
-    frac_neg = float((drive < 0).mean())
-    print(f"pre-act: frac negative drive={frac_neg:.2f}, frac silent from drive alone={float((rates < silent_thresh).mean()):.2f}")
     return fig
 
 
@@ -262,7 +288,6 @@ def train(
 
     if plot_results:
         plot_training(history, active_tasks)
-        plot_example_runs(model, config, active_tasks)
     return history
 
 
@@ -272,35 +297,22 @@ def train_without_plots(*args, **kwargs):
 
 
 def plot_training(history, active_tasks):
-    """2x2: per-task loss/acc and population silent/saturation fractions vs step."""
+    """1x2: per-task loss and accuracy vs training step."""
     xs = history["eval_step"]
-    fig, axes = plt.subplots(2, 2, figsize=(10, 7))
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
     for task in active_tasks:
         metrics = history["per_task"][task]
-        axes[0, 0].plot(xs, metrics["loss"], marker="o", label=task)
-        axes[0, 1].plot(xs, metrics["acc"], marker="o", label=task)
-    axes[0, 0].set_xlabel("steps")
-    axes[0, 0].set_ylabel("loss")
-    axes[0, 0].set_title("Loss")
-    axes[0, 1].set_xlabel("steps")
-    axes[0, 1].set_ylabel("accuracy")
-    axes[0, 1].set_title("Accuracy")
-    axes[0, 1].set_ylim(-0.05, 1.05)
-
-    axes[1, 0].plot(xs, history["frac_silent"], marker="o", color="C3", label="frac silent")
-    axes[1, 0].set_xlabel("steps")
-    axes[1, 0].set_ylabel("fraction")
-    axes[1, 0].set_title("Silent units (r < 5% rate_max)")
-    axes[1, 0].set_ylim(-0.05, 1.05)
-    axes[1, 1].plot(xs, history["frac_saturated"], marker="o", color="C2", label="frac saturated")
-    axes[1, 1].set_xlabel("steps")
-    axes[1, 1].set_ylabel("fraction")
-    axes[1, 1].set_title("Saturated units (r > 95% rate_max)")
-    axes[1, 1].set_ylim(-0.05, 1.05)
-
-    for ax in axes.ravel():
-        if ax.get_legend_handles_labels()[1]:
-            ax.legend()
+        axes[0].plot(xs, metrics["loss"], marker="o", label=task)
+        axes[1].plot(xs, metrics["acc"], marker="o", label=task)
+    axes[0].set_xlabel("steps")
+    axes[0].set_ylabel("loss")
+    axes[0].set_title("Loss")
+    axes[1].set_xlabel("steps")
+    axes[1].set_ylabel("accuracy")
+    axes[1].set_title("Accuracy")
+    axes[1].set_ylim(-0.05, 1.05)
+    for ax in axes:
+        ax.legend()
         ax.grid(True, alpha=0.3)
     fig.tight_layout()
     plt.show()
@@ -320,11 +332,7 @@ def _example_trial(model, config, task):
 
 
 def plot_example_runs(model, config, active_tasks):
-    """One column per task: input traces + neuron-rate imshow, shared time axis.
-
-    Input layout (task.py): ch0 = fixation / go cue, ch1:rule_start = stimulus
-    ring, remaining = rule context. Cue is plotted as the go signal (1 - fix).
-    """
+    """One column per task: input traces + hidden activity imshow."""
     n_tasks = len(active_tasks)
     fig, axes = plt.subplots(
         2,
@@ -368,37 +376,41 @@ def plot_example_runs(model, config, active_tasks):
             vmax=rate_max,
             extent=(-0.5, r_np.shape[1] - 0.5, r_np.shape[0] - 0.5, -0.5),
         )
-        ax_r.axhline(model.n_e - 0.5, color="w", ls="--", lw=0.8)
+        if hasattr(model, "n_e"):
+            ax_r.axhline(model.n_e - 0.5, color="w", ls="--", lw=0.8)
         ax_r.set_xlabel("steps")
         if col == 0:
             ax_r.set_ylabel("neuron")
 
-    fig.colorbar(im, ax=axes[1, :].ravel().tolist(), fraction=0.025, pad=0.02, label="rate")
+    fig.colorbar(im, ax=axes[1, :].ravel().tolist(), fraction=0.025, pad=0.02, label="activity")
     plt.show()
     return fig
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Train RateRNN on fdgo / dm1 / delaygo")
+    parser = argparse.ArgumentParser(description="Train Yang LeakyRNN or Dale RateRNN on fdgo / delaygo")
+    parser.add_argument(
+        "--model",
+        choices=["yang", "dale"],
+        default="yang",
+        help="Model backend: Yang LeakyRNN (default) or Dale RateRNN.",
+    )
     parser.add_argument(
         "--tasks",
         nargs="+",
         default=["fdgo"],
         choices=rules_dict["all"],
-        help="Tasks to train. Default: fdgo-only smoke run.",
+        help="Tasks to train.",
     )
     parser.add_argument("--steps", type=int, default=1000)
     parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--n-neurons", type=int, default=128)
+    parser.add_argument("--n-rnn", type=int, default=256, help="Hidden units (Yang LeakyRNN).")
+    parser.add_argument("--n-neurons", type=int, default=128, help="Hidden units (Dale RateRNN).")
     parser.add_argument("--n-eachring", type=int, default=16)
     parser.add_argument("--frac-e", type=float, default=0.8)
-    parser.add_argument(
-        "--g",
-        type=float,
-        default=1.5,
-        help="Target spectral radius of W_rec at init (near-critical ~1.0–1.5).",
-    )
-    parser.add_argument("--lr", type=float, default=5e-4)
+    parser.add_argument("--g", type=float, default=1.5, help="Target rho(W) for Dale model.")
+    parser.add_argument("--sigma-rec", type=float, default=0.05, help="Recurrent noise (Yang model).")
+    parser.add_argument("--lr", type=float, default=1e-3, help="Adam learning rate.")
     parser.add_argument("--lambda-rate", type=float, default=0.0)
     parser.add_argument("--lambda-connectivity", type=float, default=0.0)
     parser.add_argument("--log-every", type=int, default=20)
@@ -411,15 +423,28 @@ def main():
     args = parse_args()
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     config = default_config(n_eachring=args.n_eachring, seed=args.seed, easy_task=True)
-    model = make_model(
-        config,
-        n_neurons=args.n_neurons,
-        frac_e=args.frac_e,
-        g=args.g,
-        device=device,
-    )
+
+    if args.model == "yang":
+        model = make_yang_model(
+            config,
+            n_rnn=args.n_rnn,
+            sigma_rec=args.sigma_rec,
+            seed=args.seed,
+            device=device,
+        )
+        size_str = f"n_rnn={args.n_rnn}"
+    else:
+        model = make_dale_model(
+            config,
+            n_neurons=args.n_neurons,
+            frac_e=args.frac_e,
+            g=args.g,
+            device=device,
+        )
+        size_str = f"N={args.n_neurons}"
+
     print(
-        f"device={device}  N={args.n_neurons}  frac_e={args.frac_e}  g={args.g}  "
+        f"model={args.model}  device={device}  {size_str}  "
         f"n_in={config['n_input']}  n_out={config['n_output']}  tasks={args.tasks}"
     )
     train(
@@ -431,7 +456,9 @@ def main():
         lr=args.lr,
         lambda_rate=args.lambda_rate,
         lambda_connectivity=args.lambda_connectivity,
+        noise_level=1.0 if args.model == "yang" else 0.0,
         log_every=args.log_every,
+        plot_results=True,
     )
 
 

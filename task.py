@@ -1,31 +1,38 @@
-"""Scoped Yang 2019 task battery: fdgo, dm1, delaygo (single ring, random mode)."""
+"""Scoped Yang 2019 task battery: fdgo, delaygo (single ring, random mode)."""
 
 import numpy as np
 
-rules_dict = {"all": ["fdgo", "dm1", "delaygo"]}
+rules_dict = {"all": ["fdgo", "delaygo"]}
 
 rule_index_map = {
     ruleset: {rule: ind for ind, rule in enumerate(rules)}
     for ruleset, rules in rules_dict.items()
 }
 
-def default_config(n_eachring=16, seed=0, easy_task=True):
+
+def default_config(n_eachring=32, seed=0, easy_task=True, **kwargs):
     """Hyperparameters shared by the task generators and the RNN."""
-    dt = 20.0
+    # Accept legacy kw alias n_neurons_per_ring
+    if "n_neurons_per_ring" in kwargs:
+        n_eachring = kwargs["n_neurons_per_ring"]
+    # Match Yang multitask defaults (train.py get_default_hp)
+    dt = 20
     tau = 100.0
     num_ring = 1
-    n_rules = len(rules_dict["all"])
+    n_rule = len(rules_dict["all"])
     config = {
         "dt": dt,
         "tau": tau,
         "alpha": dt / tau,
         "sigma_x": 0.01,
         "n_eachring": n_eachring,
+        "n_neurons_per_ring": n_eachring,
         "num_ring": num_ring,
-        "n_rules": n_rules,
+        "n_rule": n_rule,
+        "n_rules": n_rule,
         "ruleset": "all",
         "rule_start": 1 + n_eachring * num_ring,
-        "n_input": 1 + n_eachring * num_ring + n_rules,
+        "n_input": 1 + n_eachring * num_ring + n_rule,
         "n_output": 1 + n_eachring,
         "loss_type": "lsq",
         "easy_task": easy_task,
@@ -50,10 +57,11 @@ class Trial:
         self.float_type = "float32"
         self.config = config
         self.dt = config["dt"]
+        self.n_neurons_per_ring = config["n_neurons_per_ring"]
         self.n_eachring = config["n_eachring"]
         self.n_input = config["n_input"]
         self.n_output = config["n_output"]
-        self.pref = np.arange(0, 2 * np.pi, 2 * np.pi / self.n_eachring)
+        self.pref = np.arange(0, 2 * np.pi, 2 * np.pi / self.n_neurons_per_ring)
 
         self.batch_size = batch_size
         self.tdim = tdim
@@ -81,7 +89,7 @@ class Trial:
             if loc_type == "fix_in":
                 self.x[ons[i] : offs[i], i, 0] = 1
             elif loc_type == "stim":
-                self.x[ons[i] : offs[i], i, 1 : 1 + self.n_eachring] += (
+                self.x[ons[i] : offs[i], i, 1 : 1 + self.n_neurons_per_ring] += (
                     self.add_x_loc(locs[i]) * strengths[i]
                 )
             elif loc_type == "fix_out":
@@ -108,13 +116,20 @@ class Trial:
         pre_offs = self.expand(pre_offs)
         post_ons = self.expand(post_ons)
 
-        c_mask = np.zeros((self.tdim, self.batch_size, self.n_output), dtype=self.float_type)
-        for i in range(self.batch_size):
-            c_mask[post_ons[i] :, i, :] = 5.0
-            c_mask[pre_on : pre_offs[i], i, :] = 1.0
-        c_mask[:, :, 0] *= 2.0
-        c_mask /= c_mask.mean()
-        self.c_mask = c_mask
+        if self.config["loss_type"] == "lsq":
+            c_mask = np.zeros((self.tdim, self.batch_size, self.n_output), dtype=self.float_type)
+            for i in range(self.batch_size):
+                c_mask[post_ons[i] :, i, :] = 5.0
+                c_mask[pre_on : pre_offs[i], i, :] = 1.0
+            c_mask[:, :, 0] *= 2.0
+            self.c_mask = c_mask
+        else:
+            c_mask = np.zeros((self.tdim, self.batch_size), dtype=self.float_type)
+            for i in range(self.batch_size):
+                c_mask[post_ons[i] :, i] = 5.0
+                c_mask[pre_on : pre_offs[i], i] = 1.0
+            self.c_mask = c_mask.reshape((self.tdim * self.batch_size,))
+            self.c_mask /= self.c_mask.mean()
 
     def add_rule(self, rule, on=None, off=None, strength=1.0):
         if isinstance(rule, (int, np.integer)):
@@ -138,7 +153,7 @@ class Trial:
 
 
 def fdgo(config, batch_size):
-    """Delayed go: stimulus stays on; respond at its location after fixation offset."""
+    """Fixation-delayed go: stimulus on until go; saccade to its location."""
     dt = config["dt"]
     rng = config["rng"]
     stim_locs = rng.rand(batch_size) * 2 * np.pi
@@ -161,53 +176,8 @@ def fdgo(config, batch_size):
     return trial
 
 
-def dm1(config, batch_size):
-    """Perceptual decision-making: saccade to the stronger of two simultaneous stimuli."""
-    dt = config["dt"]
-    rng = config["rng"]
-    stim_dist = rng.uniform(0.5 * np.pi, 1.5 * np.pi, (batch_size,)) * rng.choice(
-        [-1, 1], (batch_size,)
-    )
-    stim1_locs = rng.uniform(0, 2 * np.pi, (batch_size,))
-    stim2_locs = (stim1_locs + stim_dist) % (2 * np.pi)
-
-    stims_mean = rng.uniform(0.8, 1.2, (batch_size,))
-    stim_coh_range = np.array([0.01, 0.02, 0.04, 0.08])
-    if config.get("easy_task", False):
-        stim_coh_range = stim_coh_range * 10
-    stims_coh = rng.choice(stim_coh_range, (batch_size,))
-    stims_sign = rng.choice([1, -1], (batch_size,))
-    stim1_strengths = stims_mean + stims_coh * stims_sign
-    stim2_strengths = stims_mean - stims_coh * stims_sign
-
-    stim_on = int(rng.uniform(100, 400) / dt)
-    stim_ons = (np.ones(batch_size) * stim_on).astype(int)
-    stim_dur = int(rng.choice([400, 800, 1600]) / dt)
-    fix_offs = (stim_ons + stim_dur).astype(int)
-    tdim = stim_on + stim_dur + int(500 / dt)
-    check_ons = fix_offs + int(100 / dt)
-
-    trial = Trial(config, tdim, batch_size)
-    trial.add("fix_in", offs=fix_offs)
-    trial.add("stim", stim1_locs, ons=stim_ons, offs=fix_offs, strengths=stim1_strengths)
-    trial.add("stim", stim2_locs, ons=stim_ons, offs=fix_offs, strengths=stim2_strengths)
-    trial.add("fix_out", offs=fix_offs)
-    stim_locs = [
-        stim1_locs[i] if stim1_strengths[i] > stim2_strengths[i] else stim2_locs[i]
-        for i in range(batch_size)
-    ]
-    trial.add("out", stim_locs, ons=fix_offs)
-    trial.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
-    trial.epochs = {
-        "fix1": (None, stim_on),
-        "stim1": (stim_on, None if np.isscalar(fix_offs) else int(fix_offs[0])),
-        "go1": (int(np.min(fix_offs)), None),
-    }
-    return trial
-
-
 def delaygo(config, batch_size):
-    """Working-memory go: stimulus is removed before the go cue."""
+    """Working-memory go: stimulus removed before go; saccade to remembered location."""
     dt = config["dt"]
     rng = config["rng"]
     stim_locs = rng.rand(batch_size) * 2 * np.pi
@@ -234,7 +204,6 @@ def delaygo(config, batch_size):
 
 rule_mapping = {
     "fdgo": fdgo,
-    "dm1": dm1,
     "delaygo": delaygo,
 }
 
