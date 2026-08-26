@@ -397,8 +397,8 @@ def parse_args():
     parser.add_argument(
         "--model",
         choices=["yang", "dale"],
-        default="yang",
-        help="Model backend: Yang LeakyRNN (default) or DaleRNN.",
+        default="dale",
+        help="Model backend: DaleRNN (default) or Yang LeakyRNN.",
     )
     parser.add_argument(
         "--tasks",

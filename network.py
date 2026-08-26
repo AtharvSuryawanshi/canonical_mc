@@ -177,6 +177,7 @@ class LeakyRNN(nn.Module):
             if noise_level > 0.0:
                 gate = gate + torch.randn_like(h) * (noise_level * self.sigma)
             h_new = self._cell_act(gate)
+            # Euler integration
             h = (1.0 - alpha) * h + alpha * h_new
             h_hist.append(h)
             y_hist.append(torch.sigmoid(h @ self.w_out + self.b_out))
@@ -208,7 +209,7 @@ class LeakyRNN(nn.Module):
         optimizer.step()
         return loss.detach()
 
-
+# For DaleRNN
 def _inv_softplus(mag):
     """Inverse softplus for nonnegative magnitudes."""
     mag = np.maximum(np.asarray(mag, dtype=np.float64), 1e-8)
@@ -273,7 +274,7 @@ class DaleRNN(nn.Module):
         n_rnn,
         n_output,
         alpha=0.1,
-        activation="power",
+        activation="relu",
         w_rec_init="randortho",
         sigma_rec=0.05,
         frac_e=0.8,

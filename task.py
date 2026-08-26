@@ -1,8 +1,10 @@
-"""Scoped Yang 2019 task battery: fdgo, delaygo, dm1 (single ring, random mode)."""
+"""Yang 2019 task battery (single ring, random mode)."""
 
 import numpy as np
 
-rules_dict = {"all": ["fdgo", "delaygo", "dm1"]}
+rules_dict = {
+    "all": ["fdgo", "reactgo", "delaygo", "fdanti", "delayanti", "dm1"],
+}
 
 rule_index_map = {
     ruleset: {rule: ind for ind, rule in enumerate(rules)}
@@ -152,8 +154,16 @@ class Trial:
         return y
 
 
-def fdgo(config, batch_size):
-    """Fixation-delayed go: stimulus on until go; saccade to its location."""
+def _response_locs(stim_locs, anti_response):
+    """Map stimulus locations to pro- or anti-saccade targets on the ring."""
+    stim_locs = np.asarray(stim_locs)
+    if not anti_response:
+        return stim_locs
+    return (stim_locs + np.pi) % (2 * np.pi)
+
+
+def _fdgo(config, batch_size, anti_response=False):
+    """Fixation-delayed go/anti: stimulus on until go; saccade pro or anti."""
     dt = config["dt"]
     rng = config["rng"]
     stim_locs = rng.rand(batch_size) * 2 * np.pi
@@ -161,12 +171,13 @@ def fdgo(config, batch_size):
     fix_offs = stim_ons + int(rng.uniform(500, 1500) / dt)
     tdim = int(500 / dt) + fix_offs
     check_ons = fix_offs + int(100 / dt)
+    response_locs = _response_locs(stim_locs, anti_response)
 
     trial = Trial(config, tdim, batch_size)
     trial.add("fix_in", offs=fix_offs)
     trial.add("stim", stim_locs, ons=stim_ons, offs=fix_offs)
     trial.add("fix_out", offs=fix_offs)
-    trial.add("out", stim_locs, ons=fix_offs)
+    trial.add("out", response_locs, ons=fix_offs)
     trial.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
     trial.epochs = {
         "fix1": (None, stim_ons),
@@ -176,8 +187,41 @@ def fdgo(config, batch_size):
     return trial
 
 
-def delaygo(config, batch_size):
-    """Working-memory go: stimulus removed before go; saccade to remembered location."""
+def fdgo(config, batch_size):
+    """Fixation-delayed go: stimulus on until go; saccade to its location."""
+    return _fdgo(config, batch_size, anti_response=False)
+
+
+def fdanti(config, batch_size):
+    """Fixation-delayed anti: stimulus on until go; saccade to opposite location."""
+    return _fdgo(config, batch_size, anti_response=True)
+
+
+def reactgo(config, batch_size):
+    """Reaction-time go: hold fixation until stimulus onset, then saccade immediately."""
+    dt = config["dt"]
+    rng = config["rng"]
+    stim_ons = int(rng.uniform(500, 2500) / dt)
+    tdim = int(500 / dt) + stim_ons
+    check_ons = stim_ons + int(100 / dt)
+    stim_locs = rng.uniform(0, 2 * np.pi, (batch_size,))
+    response_locs = _response_locs(stim_locs, anti_response=False)
+
+    trial = Trial(config, tdim, batch_size)
+    trial.add("fix_in", offs=stim_ons)
+    trial.add("stim", stim_locs, ons=stim_ons)
+    trial.add("fix_out", offs=stim_ons)
+    trial.add("out", response_locs, ons=stim_ons)
+    trial.add_c_mask(pre_offs=stim_ons, post_ons=check_ons)
+    trial.epochs = {
+        "fix1": (None, stim_ons),
+        "go1": (stim_ons, None),
+    }
+    return trial
+
+
+def _delaygo(config, batch_size, anti_response=False):
+    """Working-memory go/anti: brief stimulus, delay, then pro or anti saccade."""
     dt = config["dt"]
     rng = config["rng"]
     stim_locs = rng.rand(batch_size) * 2 * np.pi
@@ -186,12 +230,13 @@ def delaygo(config, batch_size):
     fix_offs = stim_offs + int(rng.choice([200, 400, 800, 1600]) / dt)
     tdim = fix_offs + int(500 / dt)
     check_ons = fix_offs + int(100 / dt)
+    response_locs = _response_locs(stim_locs, anti_response)
 
     trial = Trial(config, tdim, batch_size)
     trial.add("fix_in", offs=fix_offs)
     trial.add("stim", stim_locs, ons=stim_ons, offs=stim_offs)
     trial.add("fix_out", offs=fix_offs)
-    trial.add("out", stim_locs, ons=fix_offs)
+    trial.add("out", response_locs, ons=fix_offs)
     trial.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
     trial.epochs = {
         "fix1": (None, stim_ons),
@@ -200,6 +245,16 @@ def delaygo(config, batch_size):
         "go1": (fix_offs, None),
     }
     return trial
+
+
+def delaygo(config, batch_size):
+    """Working-memory go: stimulus removed before go; saccade to remembered location."""
+    return _delaygo(config, batch_size, anti_response=False)
+
+
+def delayanti(config, batch_size):
+    """Working-memory anti: stimulus removed before go; saccade to opposite location."""
+    return _delaygo(config, batch_size, anti_response=True)
 
 
 def dm1(config, batch_size):
@@ -248,7 +303,10 @@ def dm1(config, batch_size):
 
 rule_mapping = {
     "fdgo": fdgo,
+    "reactgo": reactgo,
     "delaygo": delaygo,
+    "fdanti": fdanti,
+    "delayanti": delayanti,
     "dm1": dm1,
 }
 
