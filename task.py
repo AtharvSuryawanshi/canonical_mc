@@ -1,8 +1,8 @@
-"""Scoped Yang 2019 task battery: fdgo, delaygo (single ring, random mode)."""
+"""Scoped Yang 2019 task battery: fdgo, delaygo, dm1 (single ring, random mode)."""
 
 import numpy as np
 
-rules_dict = {"all": ["fdgo", "delaygo"]}
+rules_dict = {"all": ["fdgo", "delaygo", "dm1"]}
 
 rule_index_map = {
     ruleset: {rule: ind for ind, rule in enumerate(rules)}
@@ -202,9 +202,54 @@ def delaygo(config, batch_size):
     return trial
 
 
+def dm1(config, batch_size):
+    """Decision making 1: two simultaneous ring bumps; saccade to the stronger."""
+    dt = config["dt"]
+    rng = config["rng"]
+
+    stim_dist = rng.uniform(0.5 * np.pi, 1.5 * np.pi, (batch_size,)) * rng.choice(
+        [-1, 1], (batch_size,)
+    )
+    stim1_locs = rng.uniform(0, 2 * np.pi, (batch_size,))
+    stim2_locs = (stim1_locs + stim_dist) % (2 * np.pi)
+
+    stims_mean = rng.uniform(0.8, 1.2, (batch_size,))
+    stim_coh_range = np.array([0.01, 0.02, 0.04, 0.08], dtype=np.float32)
+    if config.get("easy_task", True):
+        stim_coh_range = stim_coh_range * 10
+
+    stims_coh = rng.choice(stim_coh_range, (batch_size,))
+    stims_sign = rng.choice([1, -1], (batch_size,))
+    stim1_strengths = stims_mean + stims_coh * stims_sign
+    stim2_strengths = stims_mean - stims_coh * stims_sign
+
+    stim_on = int(rng.uniform(100, 400) / dt)
+    stim_ons = stim_on
+    stim_dur = int(rng.choice([400, 800, 1600]) / dt)
+    fix_offs = stim_ons + stim_dur
+    tdim = stim_on + stim_dur + int(500 / dt)
+    check_ons = fix_offs + int(100 / dt)
+
+    trial = Trial(config, tdim, batch_size)
+    trial.add("fix_in", offs=fix_offs)
+    trial.add("stim", stim1_locs, ons=stim_ons, offs=fix_offs, strengths=stim1_strengths)
+    trial.add("stim", stim2_locs, ons=stim_ons, offs=fix_offs, strengths=stim2_strengths)
+    trial.add("fix_out", offs=fix_offs)
+    stim_locs = np.where(stim1_strengths > stim2_strengths, stim1_locs, stim2_locs)
+    trial.add("out", stim_locs, ons=fix_offs)
+    trial.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
+    trial.epochs = {
+        "fix1": (None, stim_ons),
+        "stim1": (stim_ons, fix_offs),
+        "go1": (fix_offs, None),
+    }
+    return trial
+
+
 rule_mapping = {
     "fdgo": fdgo,
     "delaygo": delaygo,
+    "dm1": dm1,
 }
 
 

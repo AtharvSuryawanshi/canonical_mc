@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from model import RateRNN
+# from model import RateRNN
 from network import LeakyRNN
 from task import default_config, generate_trials, generate_mixed_trials, rules_dict
 
