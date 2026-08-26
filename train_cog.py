@@ -1,4 +1,4 @@
-"""Train Yang LeakyRNN or Dale RateRNN on fdgo / delaygo."""
+"""Train Yang LeakyRNN or DaleRNN on fdgo / delaygo."""
 
 import argparse
 import math
@@ -7,8 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-# from model import RateRNN
-from network import LeakyRNN
+from network import DaleRNN, LeakyRNN
 from task import default_config, generate_trials, generate_mixed_trials, rules_dict
 
 
@@ -131,25 +130,31 @@ def make_yang_model(
     return model.to(device)
 
 
-def make_dale_model(config, n_neurons=64, frac_e=0.8, g=1.5, bias_init=1.0, device="cpu"):
-    model = RateRNN(
-        n_neurons=n_neurons,
+def make_dale_model(
+    config,
+    n_neurons=128,
+    frac_e=0.8,
+    g=1.0,
+    activation="relu",
+    w_rec_init="randortho",
+    sigma_rec=0.05,
+    seed=0,
+    device="cpu",
+):
+    model = DaleRNN(
+        n_input=config["n_input"],
+        n_rnn=n_neurons,
+        n_output=config["n_output"],
+        alpha=config["alpha"],
+        activation=activation,
+        w_rec_init=w_rec_init,
+        sigma_rec=sigma_rec,
         frac_e=frac_e,
-        tau=config["tau"],
-        dt=config["dt"],
-        g=g,
-        input_dim=config["n_input"],
-        output_dim=config["n_output"],
-        circuit_type="basic_dale",
-        bias_init=bias_init,
-        readout_nonlinearity="tanh",
+        target_rho=g,
+        seed=seed,
     )
-    rho = model.scale_recurrent_to_rho(g)
-    with torch.no_grad():
-        model.W_in.mul_(4.0)
-        model.W_out[:, model.n_e :] = 0.0
-        model.W_out[0, : model.n_e] = 0.15
-    print(f"Dale RateRNN: N={n_neurons}  g={g:.2f}  rho(W)={rho:.3f}")
+    rho = model.recurrent_spectral_radius()
+    print(f"DaleRNN: N={n_neurons}  frac_e={frac_e}  rho(W)={rho:.3f}  activation={activation}")
     return model.to(device)
 
 
@@ -388,12 +393,12 @@ def plot_example_runs(model, config, active_tasks):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Train Yang LeakyRNN or Dale RateRNN on fdgo / delaygo")
+    parser = argparse.ArgumentParser(description="Train Yang LeakyRNN or DaleRNN on fdgo / delaygo")
     parser.add_argument(
         "--model",
         choices=["yang", "dale"],
         default="yang",
-        help="Model backend: Yang LeakyRNN (default) or Dale RateRNN.",
+        help="Model backend: Yang LeakyRNN (default) or DaleRNN.",
     )
     parser.add_argument(
         "--tasks",
@@ -405,10 +410,10 @@ def parse_args():
     parser.add_argument("--steps", type=int, default=1000)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--n-rnn", type=int, default=256, help="Hidden units (Yang LeakyRNN).")
-    parser.add_argument("--n-neurons", type=int, default=128, help="Hidden units (Dale RateRNN).")
+    parser.add_argument("--n-neurons", type=int, default=128, help="Hidden units (DaleRNN).")
     parser.add_argument("--n-eachring", type=int, default=16)
     parser.add_argument("--frac-e", type=float, default=0.8)
-    parser.add_argument("--g", type=float, default=1.5, help="Target rho(W) for Dale model.")
+    parser.add_argument("--g", type=float, default=1.0, help="Target rho(W) for DaleRNN.")
     parser.add_argument("--sigma-rec", type=float, default=0.05, help="Recurrent noise (Yang model).")
     parser.add_argument("--lr", type=float, default=1e-3, help="Adam learning rate.")
     parser.add_argument("--lambda-rate", type=float, default=0.0)
@@ -439,6 +444,7 @@ def main():
             n_neurons=args.n_neurons,
             frac_e=args.frac_e,
             g=args.g,
+            seed=args.seed,
             device=device,
         )
         size_str = f"N={args.n_neurons}"
