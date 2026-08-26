@@ -111,7 +111,7 @@ def evaluate_task(model, config, rule, batch_size, device, noise_level=0.0):
     return {"loss": loss, "activity": activity, **acc}
 
 
-def make_model(config, n_neurons=64, frac_e=0.8, g=1.2, bias_init=2.0, device="cpu"):
+def make_model(config, n_neurons=64, frac_e=0.8, g=1.5, bias_init=1.0, device="cpu"):
     model = RateRNN(
         n_neurons=n_neurons,
         frac_e=frac_e,
@@ -122,12 +122,16 @@ def make_model(config, n_neurons=64, frac_e=0.8, g=1.2, bias_init=2.0, device="c
         output_dim=config["n_output"],
         circuit_type="basic_dale",
         bias_init=bias_init,
+        readout_nonlinearity="tanh",
     )
     rho = model.scale_recurrent_to_rho(g)
-    # Decision-task init is tiny (W_in ~ 0.05). Ring inputs are O(1); scale up
-    # here so the cognitive tasks can drive rates without changing RateRNN defaults.
+    # Ring inputs are O(1); scale W_in so ReLU^2 units sit in a responsive regime
+    # without saturating (bias_init=2 + scale 8 drove ~95% saturation).
     with torch.no_grad():
-        model.W_in.mul_(8.0)
+        model.W_in.mul_(4.0)
+        model.W_out[:, model.n_e:] = 0.0
+        # Seed fixation readout positive so fix_acc is learnable from step 1.
+        model.W_out[0, : model.n_e] = 0.15
     print(f"recurrent init: g={g:.2f}  rho(W)={rho:.3f}")
     return model.to(device)
 
@@ -189,6 +193,7 @@ def train(
     log_every=10,
     eval_batch_size=64,
     mixed_batch=True,
+    plot_results=True,
 ):
     """Multitask training. By default each batch mixes all active tasks."""
     device = next(model.parameters()).device
@@ -255,9 +260,15 @@ def train(
             parts.append(f"sat:{act['frac_saturated']:.2f}; silent:{act['frac_silent']:.2f}")
             print(" | ".join(parts))
 
-    plot_training(history, active_tasks)
-    plot_example_runs(model, config, active_tasks)
+    if plot_results:
+        plot_training(history, active_tasks)
+        plot_example_runs(model, config, active_tasks)
     return history
+
+
+def train_without_plots(*args, **kwargs):
+    kwargs["plot_results"] = False
+    return train(*args, **kwargs)
 
 
 def plot_training(history, active_tasks):
@@ -384,7 +395,7 @@ def parse_args():
     parser.add_argument(
         "--g",
         type=float,
-        default=1.2,
+        default=1.5,
         help="Target spectral radius of W_rec at init (near-critical ~1.0–1.5).",
     )
     parser.add_argument("--lr", type=float, default=5e-4)

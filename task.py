@@ -2,14 +2,12 @@
 
 import numpy as np
 
-
 rules_dict = {"all": ["fdgo", "dm1", "delaygo"]}
 
 rule_index_map = {
     ruleset: {rule: ind for ind, rule in enumerate(rules)}
     for ruleset, rules in rules_dict.items()
 }
-
 
 def default_config(n_eachring=16, seed=0, easy_task=True):
     """Hyperparameters shared by the task generators and the RNN."""
@@ -115,6 +113,7 @@ class Trial:
             c_mask[post_ons[i] :, i, :] = 5.0
             c_mask[pre_on : pre_offs[i], i, :] = 1.0
         c_mask[:, :, 0] *= 2.0
+        c_mask /= c_mask.mean()
         self.c_mask = c_mask
 
     def add_rule(self, rule, on=None, off=None, strength=1.0):
@@ -150,7 +149,7 @@ def fdgo(config, batch_size):
 
     trial = Trial(config, tdim, batch_size)
     trial.add("fix_in", offs=fix_offs)
-    trial.add("stim", stim_locs, ons=stim_ons)
+    trial.add("stim", stim_locs, ons=stim_ons, offs=fix_offs)
     trial.add("fix_out", offs=fix_offs)
     trial.add("out", stim_locs, ons=fix_offs)
     trial.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)

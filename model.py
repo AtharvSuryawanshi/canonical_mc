@@ -67,11 +67,12 @@ class RateRNN(torch.nn.Module):
         dt=1.0,
         g=1.5,
         rate_max=30.0,
-        act_gain=0.15,
+        act_gain=1.0,
         input_dim=3,
         output_dim=1,
         circuit_type = 'basic_dale',
-        bias_init=2.0,
+        bias_init=1.0,
+        readout_nonlinearity="tanh",
     ):
         super().__init__()
         self.n_neurons = n_neurons
@@ -82,6 +83,7 @@ class RateRNN(torch.nn.Module):
         self.output_dim = output_dim
         self.rate_max = rate_max
         self.act_gain = act_gain
+        self.readout_nonlinearity = readout_nonlinearity
         self.circuit_type = circuit_type
         self.n_e = int(n_neurons * frac_e)
         if self.circuit_type == 'basic_dale':
@@ -165,12 +167,25 @@ class RateRNN(torch.nn.Module):
 
     def firing_rate(self, x):
         """
-        Smooth supralinear rate with a soft ceiling.
+        Yang-style supralinear rate: act_gain * ReLU(x)^2, hard-capped at rate_max.
 
-        softplus avoids a hard ReLU dead zone; tanh caps rates differentiably.
+        ReLU-squared (Song/Yang et al.) supports integration and working memory
+        better than the previous low-gain squared-softplus, which kept most units
+        sub-threshold or silent during training.
         """
-        raw = self.act_gain * torch.nn.functional.softplus(x).square()
-        return self.rate_max * torch.tanh(raw / self.rate_max)
+        raw = self.act_gain * torch.relu(x).square()
+        return torch.clamp(raw, max=self.rate_max)
+
+    def readout(self, r):
+        """Readout from E units. Tanh bounds outputs for lsq fix/ring targets in [0, ~1]."""
+        z = torch.matmul(r * self.e_mask, self.W_out.t())
+        if self.readout_nonlinearity == "linear":
+            return z
+        if self.readout_nonlinearity == "hybrid":
+            out = z.clone()
+            out[..., 0] = torch.tanh(z[..., 0])
+            return out
+        return torch.tanh(z)
 
     @staticmethod
     def activation(x, alpha=1.0):
@@ -254,7 +269,7 @@ class RateRNN(torch.nn.Module):
 
             x_hist.append(x)
             r_hist.append(r)
-            output_hist.append(torch.tanh(torch.matmul(r * self.e_mask, self.W_out.t())))
+            output_hist.append(self.readout(r))
 
         x_hist = torch.stack(x_hist, dim=1)
         r_hist = torch.stack(r_hist, dim=1)
