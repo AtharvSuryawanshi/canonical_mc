@@ -78,6 +78,9 @@ target/
 # Jupyter Notebook
 .ipynb_checkpoints
 
+# Trained model weights
+checkpoints/
+
 # IPython
 profile_default/
 ipython_config.py

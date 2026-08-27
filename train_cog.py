@@ -2,6 +2,7 @@
 
 import argparse
 import math
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -164,6 +165,81 @@ def make_model(config, model_type="yang", device="cpu", **kwargs):
     if model_type == "dale":
         return make_dale_model(config, device=device, **kwargs)
     raise ValueError(f"Unknown model_type: {model_type}")
+
+
+def _serialize_config(config):
+    """Task/config dict without the non-serializable RNG."""
+    return {k: v for k, v in config.items() if k != "rng"}
+
+
+def _restore_config(config_dict, seed=0):
+    """Rebuild config for trial generation, including a fresh RNG."""
+    config = dict(config_dict)
+    config["rng"] = np.random.RandomState(seed)
+    return config
+
+
+def save_checkpoint(
+    path,
+    model,
+    config,
+    model_type,
+    active_tasks,
+    *,
+    model_kwargs=None,
+    seed=0,
+    train_steps=None,
+    history=None,
+):
+    """Save trained weights plus metadata needed to reload and evaluate."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint = {
+        "version": 1,
+        "model_type": model_type,
+        "state_dict": model.state_dict(),
+        "config": _serialize_config(config),
+        "active_tasks": list(active_tasks),
+        "model_kwargs": dict(model_kwargs or {}),
+        "seed": seed,
+    }
+    if train_steps is not None:
+        checkpoint["train_steps"] = train_steps
+    if history is not None:
+        checkpoint["history"] = history
+    torch.save(checkpoint, path)
+    print(f"Saved checkpoint -> {path.resolve()}")
+    return path
+
+
+def load_checkpoint(path, device="cpu", eval_mode=True):
+    """Reload a model saved with ``save_checkpoint``.
+
+    Returns
+    -------
+    model, config, checkpoint
+    """
+    path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    device = torch.device(device)
+    checkpoint = torch.load(path, map_location=device, weights_only=False)
+    seed = checkpoint.get("seed", 0)
+    config = _restore_config(checkpoint["config"], seed=seed)
+    model = make_model(
+        config,
+        model_type=checkpoint["model_type"],
+        device=str(device),
+        **checkpoint.get("model_kwargs", {}),
+    )
+    model.load_state_dict(checkpoint["state_dict"])
+    if eval_mode:
+        model.eval()
+    print(
+        f"Loaded checkpoint <- {path.resolve()}  "
+        f"model={checkpoint['model_type']}  tasks={checkpoint.get('active_tasks')}"
+    )
+    return model, config, checkpoint
 
 
 def sample_input_drive(model, config, task="fdgo", batch_size=8, device="cpu", t_step=None):
@@ -422,39 +498,59 @@ def parse_args():
     parser.add_argument("--log-every", type=int, default=20)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--device", type=str, default=None)
+    parser.add_argument(
+        "--save-path",
+        type=str,
+        default=None,
+        help="Path to save trained weights after training (e.g. checkpoints/dale_all.pt).",
+    )
+    parser.add_argument(
+        "--load-path",
+        type=str,
+        default=None,
+        help="Load weights from a checkpoint before training (optional resume / eval-only).",
+    )
     return parser.parse_args()
+
+
+def _model_kwargs_from_args(args):
+    if args.model == "yang":
+        return {"n_rnn": args.n_rnn, "sigma_rec": args.sigma_rec, "seed": args.seed}
+    return {
+        "n_neurons": args.n_neurons,
+        "frac_e": args.frac_e,
+        "g": args.g,
+        "sigma_rec": args.sigma_rec,
+        "seed": args.seed,
+    }
 
 
 def main():
     args = parse_args()
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
-    config = default_config(n_eachring=args.n_eachring, seed=args.seed, easy_task=True)
+    model_kwargs = _model_kwargs_from_args(args)
 
-    if args.model == "yang":
-        model = make_yang_model(
-            config,
-            n_rnn=args.n_rnn,
-            sigma_rec=args.sigma_rec,
-            seed=args.seed,
-            device=device,
+    if args.load_path:
+        model, config, _ = load_checkpoint(args.load_path, device=device, eval_mode=False)
+        size_str = (
+            f"n_rnn={model.n_rnn}"
+            if args.model == "yang"
+            else f"N={model.n_rnn}"
         )
-        size_str = f"n_rnn={args.n_rnn}"
     else:
-        model = make_dale_model(
-            config,
-            n_neurons=args.n_neurons,
-            frac_e=args.frac_e,
-            g=args.g,
-            seed=args.seed,
-            device=device,
-        )
-        size_str = f"N={args.n_neurons}"
+        config = default_config(n_eachring=args.n_eachring, seed=args.seed, easy_task=True)
+        if args.model == "yang":
+            model = make_yang_model(config, device=device, **model_kwargs)
+            size_str = f"n_rnn={args.n_rnn}"
+        else:
+            model = make_dale_model(config, device=device, **model_kwargs)
+            size_str = f"N={args.n_neurons}"
 
     print(
         f"model={args.model}  device={device}  {size_str}  "
         f"n_in={config['n_input']}  n_out={config['n_output']}  tasks={args.tasks}"
     )
-    train(
+    history = train(
         model,
         config,
         active_tasks=tuple(args.tasks),
@@ -467,6 +563,19 @@ def main():
         log_every=args.log_every,
         plot_results=True,
     )
+
+    if args.save_path:
+        save_checkpoint(
+            args.save_path,
+            model,
+            config,
+            args.model,
+            args.tasks,
+            model_kwargs=model_kwargs,
+            seed=args.seed,
+            train_steps=args.steps,
+            history=history,
+        )
 
 
 if __name__ == "__main__":
