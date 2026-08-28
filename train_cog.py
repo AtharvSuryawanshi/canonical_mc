@@ -7,7 +7,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-
+from tqdm import tqdm
 from network import DaleRNN, LeakyRNN
 from task import default_config, generate_trials, generate_mixed_trials, rules_dict
 
@@ -317,7 +317,7 @@ def train(
         },
     }
 
-    for step in range(1, n_steps + 1):
+    for step in tqdm(range(1, n_steps + 1)):
         if mixed_batch and len(active_tasks) > 1:
             trial = generate_mixed_trials(active_tasks, config, batch_size, noise_on=True)
         else:
@@ -365,7 +365,7 @@ def train(
             history["frac_silent"].append(act["frac_silent"])
             history["frac_saturated"].append(act["frac_saturated"])
             parts.append(f"sat:{act['frac_saturated']:.2f}; silent:{act['frac_silent']:.2f}")
-            print(" | ".join(parts))
+            # print(" | ".join(parts))
 
     if plot_results:
         plot_training(history, active_tasks)
@@ -498,6 +498,7 @@ def parse_args():
     parser.add_argument("--log-every", type=int, default=20)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--device", type=str, default=None)
+    parser.add_argument("--plot-results", type=bool, default=False)
     parser.add_argument(
         "--save-path",
         type=str,
@@ -561,7 +562,7 @@ def main():
         lambda_connectivity=args.lambda_connectivity,
         noise_level=1.0 if args.model == "yang" else 0.0,
         log_every=args.log_every,
-        plot_results=True,
+        plot_results=args.plot_results,
     )
 
     if args.save_path:
