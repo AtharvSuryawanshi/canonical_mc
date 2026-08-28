@@ -127,7 +127,7 @@ class LeakyRNN(nn.Module):
         return self.kernel[: self.n_input, :]
 
     @property
-    def w_rec(self):
+    def w_recurrent(self):
         return self.kernel[self.n_input :, :]
 
     def _normalize_input(self, input_matrix):
@@ -235,8 +235,8 @@ def _recurrent_magnitude_base(n_rnn, w_rec_init, rng, w_rec_start=0.5):
     return w_mag.astype(np.float32)
 
 
-def _spectral_radius_np(w_rec):
-    eigvals = np.linalg.eigvals(w_rec)
+def _spectral_radius_np(w_recurrent):
+    eigvals = np.linalg.eigvals(w_recurrent)
     return float(np.abs(eigvals).max())
 
 
@@ -317,20 +317,20 @@ class DaleRNN(nn.Module):
     def _effective_w_rec(self):
         # Dale: softplus magnitudes, presynaptic sign on rows, no autapses
         w_mag = torch.nn.functional.softplus(self.w_raw)
-        w_rec = w_mag * self.sign_vector[:, None]
-        return w_rec * self.no_autapse
+        w_recurrent = w_mag * self.sign_vector[:, None]
+        return w_recurrent * self.no_autapse
 
     def recurrent_spectral_radius(self):
         """Largest |eigenvalue| of Dale-constrained W_rec."""
         with torch.no_grad():
-            w_rec = self._effective_w_rec().detach().cpu().numpy()
-            return _spectral_radius_np(w_rec)
+            w_recurrent = self._effective_w_rec().detach().cpu().numpy()
+            return _spectral_radius_np(w_recurrent)
 
     def scale_recurrent_to_rho(self, target_rho):
         """Uniformly rescale magnitudes so rho(W_rec) == target_rho, preserving Dale signs."""
         with torch.no_grad():
-            w_rec = self._effective_w_rec()
-            rho = torch.linalg.eigvals(w_rec).abs().max().item()
+            w_recurrent = self._effective_w_rec()
+            rho = torch.linalg.eigvals(w_recurrent).abs().max().item()
             if rho <= 1e-8:
                 return rho
             scale = target_rho / rho
@@ -381,8 +381,8 @@ class DaleRNN(nn.Module):
 
         for t in range(time_steps):
             x_t = input_matrix[:, :, t]
-            w_rec = self._effective_w_rec()
-            gate = x_t @ self.w_in + h @ w_rec + self.bias  # Dale: separate W_in / Dale W_rec
+            w_recurrent = self._effective_w_rec()
+            gate = x_t @ self.w_in + h @ w_recurrent + self.bias  # Dale: separate W_in / Dale W_rec
             if noise_level > 0.0:
                 gate = gate + torch.randn_like(h) * (noise_level * self.sigma)
             h_new = self._cell_act(gate)
