@@ -2,6 +2,7 @@
 
 import argparse
 import math
+from datetime import datetime
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -468,6 +469,13 @@ def plot_example_runs(model, config, active_tasks):
     return fig
 
 
+def default_save_path(model_type, tasks, n_steps):
+    """checkpoints/{model}_{n_tasks}_{n_steps}_{YYYY-MM-DD_HH-MM-SS}.pt"""
+    n_tasks = len(tasks)
+    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return Path("checkpoints") / f"{model_type}_{n_tasks}_{n_steps}_{stamp}.pt"
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Train Yang LeakyRNN or DaleRNN on fdgo / delaygo")
     parser.add_argument(
@@ -503,7 +511,10 @@ def parse_args():
         "--save-path",
         type=str,
         default=None,
-        help="Path to save trained weights after training (e.g. checkpoints/dale_all.pt).",
+        help=(
+            "Path to save trained weights after training. "
+            "Default: checkpoints/{model}_{n_tasks}_{n_steps}_{date-time}.pt"
+        ),
     )
     parser.add_argument(
         "--load-path",
@@ -565,18 +576,18 @@ def main():
         plot_results=args.plot_results,
     )
 
-    if args.save_path:
-        save_checkpoint(
-            args.save_path,
-            model,
-            config,
-            args.model,
-            args.tasks,
-            model_kwargs=model_kwargs,
-            seed=args.seed,
-            train_steps=args.steps,
-            history=history,
-        )
+    save_path = args.save_path or default_save_path(args.model, args.tasks, args.steps)
+    save_checkpoint(
+        save_path,
+        model,
+        config,
+        args.model,
+        args.tasks,
+        model_kwargs=model_kwargs,
+        seed=args.seed,
+        train_steps=args.steps,
+        history=history,
+    )
 
 
 if __name__ == "__main__":
