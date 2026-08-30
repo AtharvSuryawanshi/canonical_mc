@@ -6,21 +6,25 @@ Below, **T always means time steps within one trial**, not “number of tasks.�
 
 ## 1. Symbols (use these consistently)
 
-| Symbol | Name in code | Meaning |
-|--------|--------------|---------|
-| **B** | `batch_size` | Number of trials simulated in parallel |
-| **T** | `tdim` / `time_steps` | Number of discrete time steps in **one** trial |
-| **dt** | `config["dt"]` | ms per time step (default 20 ms) |
-| **n_input** | `config["n_input"]` | Size of external input vector at each time step |
-| **n_output** | `config["n_output"]` | Size of target/readout vector |
-| **N** | `n_rnn` / `model.n_rnn` | Number of hidden RNN units |
-| **n_tasks** | `n_rule` | Number of cognitive tasks (20) |
-| **n_eachring** | ring width | Units per stimulus ring (e.g. 16 or 32) |
-| **α** | `alpha = dt/tau` | Leak factor (default 0.2) |
+
+| Symbol         | Name in code            | Meaning                                         |
+| -------------- | ----------------------- | ----------------------------------------------- |
+| **B**          | `batch_size`            | Number of trials simulated in parallel          |
+| **T**          | `tdim` / `time_steps`   | Number of discrete time steps in **one** trial  |
+| **dt**         | `config["dt"]`          | ms per time step (default 20 ms)                |
+| **n_input**    | `config["n_input"]`     | Size of external input vector at each time step |
+| **n_output**   | `config["n_output"]`    | Size of target/readout vector                   |
+| **N**          | `n_rnn` / `model.n_rnn` | Number of hidden RNN units                      |
+| **n_tasks**    | `n_rule`                | Number of cognitive tasks (20)                  |
+| **n_eachring** | ring width              | Units per stimulus ring (e.g. 16 or 32)         |
+| **α**          | `alpha = dt/tau`        | Leak factor (default 0.2)                       |
+
 
 Real time in ms ≈ `T × dt`. Example: `T=50`, `dt=20` → 1000 ms trial.
 
 ---
+
+
 
 ## 2. What the input vector contains
 
@@ -46,13 +50,21 @@ In code:
         "n_input": 1 + n_eachring * num_ring + n_rule,
 ```
 
+
+
 ### Fixation channel (index 0)
+
 - `trial.add("fix_in", ...)` sets `x[t, b, 0] = 1` while the network should hold fixation.
 
+
+
 ### Stimulus channels (rings 1 & 2)
+
 A stimulus at angle $\theta$ becomes a **Gaussian bump** over ring units:
 
-$$\text{bump}_k = 0.8 \cdot \exp\left(-\frac{d_k^2}{2}\right), \quad d_k = \frac{\text{circular\_dist}(\theta - \text{pref}_k)}{\pi/8}$$
+\[\text{bump}_k = 0.8 \cdot \exp\left(-\frac{d_k^2}{2}\right), \quad d_k = \frac{\text{circulardist}(\theta - \text{pref}_k)}{\pi/8}\]
+
+
 
 ```167:170:c:\Users\athar\Documents\Github\canonical_mc\task.py
     def add_x_loc(self, x_loc):
@@ -65,7 +77,10 @@ $$\text{bump}_k = 0.8 \cdot \exp\left(-\frac{d_k^2}{2}\right), \quad d_k = \frac
 - Ring 2 → channels `n_eachring+1:2*n_eachring+1`
 - Strength can be scaled (coherence in DM tasks).
 
+
+
 ### Task / context channel (rule one-hot)
+
 `trial.add_rule("dm1")` turns on **one** of the 20 rule inputs for the whole trial:
 
 ```161:165:c:\Users\athar\Documents\Github\canonical_mc\task.py
@@ -78,17 +93,21 @@ This tells the network **which task** it is solving (like a context cue in `cont
 
 ---
 
+
+
 ## 3. Trial arrays right after task generation
 
 `generate_trials(rule, config, batch_size)` builds a `Trial` object:
 
-| Array | Shape (NumPy) | Role |
-|-------|---------------|------|
-| `trial.x` | **(T, B, n_input)** | External inputs over time |
-| `trial.y` | **(T, B, n_output)** | Target outputs (fixation + ring) |
-| `trial.y_loc` | **(T, B)** | Target saccade angle; `-1` = stay at fixation |
-| `trial.c_mask` | **(T, B, n_output)** | Loss weight per time/output channel |
-| `trial.epochs` | dict | Named time windows, e.g. `fix1`, `stim1`, `go1` |
+
+| Array          | Shape (NumPy)        | Role                                            |
+| -------------- | -------------------- | ----------------------------------------------- |
+| `trial.x`      | **(T, B, n_input)**  | External inputs over time                       |
+| `trial.y`      | **(T, B, n_output)** | Target outputs (fixation + ring)                |
+| `trial.y_loc`  | **(T, B)**           | Target saccade angle; `-1` = stay at fixation   |
+| `trial.c_mask` | **(T, B, n_output)** | Loss weight per time/output channel             |
+| `trial.epochs` | dict                 | Named time windows, e.g. `fix1`, `stim1`, `go1` |
+
 
 Output side:
 
@@ -99,6 +118,8 @@ indices 1…32   → target ring (Gaussian bump at response location)
 ```
 
 ---
+
+
 
 ## 4. Reshape for the network (`trial_to_tensors`)
 
@@ -115,19 +136,27 @@ PyTorch wants **batch first**, channels second, time last:
 
 So the network receives:
 
-$$\textbf{input\_matrix} \in \mathbb{R}^{B \times n_{\text{input}} \times T}$$
+$$\textbf{inputmatrix} \in \mathbb{R}^{B \times n_{\text{input}} \times T}$$
 
 ---
+
+
 
 ## 5. One forward pass through the RNN
 
 Both `LeakyRNN` and `DaleRNN` loop over **t = 0 … T−1**.
 
 ### Hidden state
+
 - **h_t** ∈ ℝ^{B×N} — recurrent activity at step t (starts at 0)
 
+
+
 ### Input at step t
+
 - **x_t** = `input_matrix[:, :, t]` ∈ ℝ^{B×n_input}
+
+
 
 ### LeakyRNN update (Yang-style fused weights)
 
@@ -147,27 +176,38 @@ Math:
 2. Linear: `gate = [x_t, h_t] · W + b` → **(B, N)**
 3. Activation: `h̃_t = ReLU(gate)` (or ReLU² for “power”)
 4. Leaky integration:
-   $$h_{t+1} = (1-\alpha)\, h_t + \alpha\, \tilde{h}_t$$
+  $$h_{t+1} = (1-\alpha) h_t + \alpha \tilde{h}_t$$
 5. Readout:
-   $$y_t = \sigma(h_t W_{\text{out}} + b_{\text{out}}) \quad \in \mathbb{R}^{B \times n_{\text{output}}}$$
+  $$y_t = \sigma(h_t W_{\text{out}} + b_{\text{out}}) \quad \in \mathbb{R}^{B \times n_{\text{output}}}$$
+
+
 
 ### DaleRNN differences
+
 - Separate **W_in** (n_input × N) and **W_rec** (N × N, Dale-constrained)
 - Readout uses **only excitatory units**: `h_e = h[:, :n_e]`
 - Recurrent weights: `softplus(w_raw) × sign_vector`, diagonal zeroed
 
+
+
 ### Outputs of `simulate`
 
-| Tensor | Shape | Meaning |
-|--------|-------|---------|
-| `h_hist` / `r_hist` | **(B, T, N)** | Hidden firing rates over time |
-| `output` / `y_hat` | **(B, T, n_output)** | Sigmoid readout over time |
 
-**One training step = one `simulate` call = T recurrent updates.**
+| Tensor              | Shape                | Meaning                       |
+| ------------------- | -------------------- | ----------------------------- |
+| `h_hist` / `r_hist` | **(B, T, N)**        | Hidden firing rates over time |
+| `output` / `y_hat`  | **(B, T, n_output)** | Sigmoid readout over time     |
+
+
+**One training step = one** `simulate` **call = T recurrent updates.**
 
 ---
 
+
+
 ## 6. Loss and accuracy
+
+
 
 ### Loss (masked MSE)
 
@@ -176,15 +216,18 @@ def masked_mse(output, y, c_mask):
     return (c_mask * (output - y).square()).mean()
 ```
 
-$$\mathcal{L} = \frac{1}{BT \cdot n_{\text{out}}} \sum_{b,t,o} c\_mask_{b,t,o}\,(y\_hat_{b,t,o} - y_{b,t,o})^2$$
+$$\mathcal{L} = \frac{1}{BT \cdot n_{\text{out}}} \sum_{b,t,o} cmask_{b,t,o}(yhat_{b,t,o} - y_{b,t,o})^2$$
 
 `c_mask` up-weights fixation and post-response periods.
 
 ### Accuracy
+
 - Fixation trials (`y_loc < 0`): is fixation output > 0.5?
 - Go trials (`y_loc ≥ 0`): decode ring with population vector; is error < 36°?
 
 ---
+
+
 
 ## 7. Task variance — exact calculation
 
@@ -221,10 +264,9 @@ def task_variance_from_activity(h):
 Breakdown for unit **i**:
 
 1. At each time step **t**, compute variance **across batch** (across stimulus conditions):
-   $$\text{Var}_b\big[h_{t,b,i}\big] \quad \text{shape after var(axis=1): } (T_{\text{post}}, N)$$
-
+  $$\text{Var}*b\big[h*{t,b,i}\big] \quad \text{shape after var(axis=1): } (T_{\text{post}}, N)$$
 2. Average over time:
-   $$\mathrm{TV}_i^{(\text{pass})} = \frac{1}{T_{\text{post}}} \sum_t \mathrm{Var}_b\big[h_{t,b,i}\big]$$
+  $$\mathrm{TV}*i^{(\text{pass})} = \frac{1}{T*{\text{post}}} \sum_t \mathrm{Var}*b\big[h*{t,b,i}\big]$$
 
 Interpretation: **high TV** → unit i strongly depends on *which* stimulus was shown; **low TV** → unit barely changes across conditions.
 
@@ -248,6 +290,8 @@ Then KMeans clusters units by their **(n_tasks)-dimensional** normalized profile
 
 ---
 
+
+
 ## 8. Full picture (one training step)
 
 ```mermaid
@@ -269,30 +313,40 @@ flowchart LR
     H --> TV["task variance analysis"]
 ```
 
+
+
 ---
+
+
 
 ## 9. Quick numeric example (Dale, 2 tasks, small batch)
 
 Suppose `n_eachring=16`, 2 tasks, `B=4`, `T=40`, `N=128`:
 
-| Stage | Shape |
-|-------|-------|
-| `trial.x` | (40, 4, 53) |
-| `input_matrix` | (4, 53, 40) |
-| `h_hist` | (4, 40, 128) |
-| `output` | (4, 40, 17) |
+
+| Stage                      | Shape                                        |
+| -------------------------- | -------------------------------------------- |
+| `trial.x`                  | (40, 4, 53)                                  |
+| `input_matrix`             | (4, 53, 40)                                  |
+| `h_hist`                   | (4, 40, 128)                                 |
+| `output`                   | (4, 40, 17)                                  |
 | Task variance for one task | (128,) per pass → column in (128, 20) matrix |
+
 
 ---
 
+
+
 ## 10. Common confusions cleared up
 
-| You might think | Actually |
-|-----------------|----------|
-| **T** = number of tasks | **T** = time steps in one trial |
-| **batch** = tasks | **batch** = parallel trials (can be same or mixed tasks) |
-| Task variance uses output | Uses **hidden** activity `r_hist`, not readout |
-| One forward pass for TV | Need **many** passes with different random stimuli |
+
+| You might think                | Actually                                                                         |
+| ------------------------------ | -------------------------------------------------------------------------------- |
+| **T** = number of tasks        | **T** = time steps in one trial                                                  |
+| **batch** = tasks              | **batch** = parallel trials (can be same or mixed tasks)                         |
+| Task variance uses output      | Uses **hidden** activity `r_hist`, not readout                                   |
+| One forward pass for TV        | Need **many** passes with different random stimuli                               |
 | TV measures within-trial noise | TV measures variance **across stimulus conditions** (locations, coherence, etc.) |
+
 
 If you want, I can walk through one concrete task (e.g. `delaydm1`) step-by-step with which channels are active at which times.
