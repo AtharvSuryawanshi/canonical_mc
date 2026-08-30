@@ -495,7 +495,7 @@ def parse_args():
     parser.add_argument("--steps", type=int, default=1000)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--n-rnn", type=int, default=256, help="Hidden units (Yang LeakyRNN).")
-    parser.add_argument("--n-neurons", type=int, default=128, help="Hidden units (DaleRNN).")
+    parser.add_argument("--n-neurons", type=int, default=256, help="Hidden units (DaleRNN).")
     parser.add_argument("--n-eachring", type=int, default=16)
     parser.add_argument("--frac-e", type=float, default=0.8)
     parser.add_argument("--g", type=float, default=1.0, help="Target rho(W) for DaleRNN.")
