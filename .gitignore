@@ -206,6 +206,10 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# Slurm job logs (train.sjob writes ./%x.%j.%N.{out,err})
+*.out
+*.err
+
 # Ruff stuff:
 .ruff_cache/
 
