@@ -79,7 +79,7 @@ target/
 .ipynb_checkpoints
 
 # Trained model weights
-checkpoints/
+# checkpoints/
 
 # IPython
 profile_default/
