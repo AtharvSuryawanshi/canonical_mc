@@ -499,7 +499,14 @@ def parse_args():
     parser.add_argument("--n-eachring", type=int, default=16)
     parser.add_argument("--frac-e", type=float, default=0.8)
     parser.add_argument("--g", type=float, default=1.0, help="Target rho(W) for DaleRNN.")
-    parser.add_argument("--sigma-rec", type=float, default=0.05, help="Recurrent noise (Yang model).")
+    parser.add_argument("--sigma-rec", type=float, default=0.05, help="Recurrent noise scale (both models).")
+    parser.add_argument(
+        "--noise-level",
+        type=float,
+        default=None,
+        help="Recurrent noise multiplier on gate (actual std = noise_level * sigma_rec scaled). "
+        "Default: 1.0 for yang, 0.0 for dale.",
+    )
     parser.add_argument("--lr", type=float, default=1e-3, help="Adam learning rate.")
     parser.add_argument("--lambda-rate", type=float, default=0.0)
     parser.add_argument("--lambda-connectivity", type=float, default=0.0)
@@ -558,9 +565,16 @@ def main():
             model = make_dale_model(config, device=device, **model_kwargs)
             size_str = f"N={args.n_neurons}"
 
+    noise_level = (
+        args.noise_level
+        if args.noise_level is not None
+        else (1.0 if args.model == "yang" else 0.0)
+    )
+
     print(
         f"model={args.model}  device={device}  {size_str}  "
-        f"n_in={config['n_input']}  n_out={config['n_output']}  tasks={args.tasks}"
+        f"n_in={config['n_input']}  n_out={config['n_output']}  tasks={args.tasks}  "
+        f"noise_level={noise_level}"
     )
     history = train(
         model,
@@ -571,7 +585,7 @@ def main():
         lr=args.lr,
         lambda_rate=args.lambda_rate,
         lambda_connectivity=args.lambda_connectivity,
-        noise_level=1.0 if args.model == "yang" else 0.0,
+        noise_level=noise_level,
         log_every=args.log_every,
         plot_results=args.plot_results,
     )
