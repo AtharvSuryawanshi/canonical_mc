@@ -109,6 +109,29 @@ def evaluate_task(model, config, rule, batch_size, device, noise_level=0.0):
     return {"loss": loss, "activity": activity, **acc}
 
 
+def evaluate_objectives(model, config, active_tasks, batch_size, device, noise_level=0.0):
+    """Raw (unweighted) task, metabolic, and wiring costs after training."""
+    device = torch.device(device)
+    task_losses = []
+    metabolic_costs = []
+    accs = []
+    with torch.no_grad():
+        for rule in active_tasks:
+            trial = generate_trials(rule, config, batch_size, noise_on=False)
+            x, y, c_mask, y_loc = trial_to_tensors(trial, device)
+            r_hist, x_hist, output = model.simulate(x, noise_level=noise_level)
+            task_losses.append(masked_mse(output, y, c_mask).item())
+            metabolic_costs.append(rate_reg(r_hist).item())
+            prefs = ring_prefs(config, output.device, output.dtype)
+            accs.append(batch_accuracy(output, y_loc, prefs)["acc"])
+    return {
+        "task_loss": float(np.mean(task_losses)),
+        "metabolic_cost": float(np.mean(metabolic_costs)),
+        "wiring_cost": float(connectivity_reg(model).item()),
+        "mean_acc": float(np.mean(accs)),
+    }
+
+
 def make_yang_model(
     config,
     n_rnn=256,
@@ -302,6 +325,7 @@ def train(
     eval_batch_size=64,
     mixed_batch=True,
     plot_results=True,
+    show_progress=True,
 ):
     """Multitask training. By default each batch mixes all active tasks."""
     device = next(model.parameters()).device
@@ -318,7 +342,8 @@ def train(
         },
     }
 
-    for step in tqdm(range(1, n_steps + 1)):
+    steps = tqdm(range(1, n_steps + 1)) if show_progress else range(1, n_steps + 1)
+    for step in steps:
         if mixed_batch and len(active_tasks) > 1:
             trial = generate_mixed_trials(active_tasks, config, batch_size, noise_on=True)
         else:
