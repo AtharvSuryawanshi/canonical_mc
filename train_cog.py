@@ -476,6 +476,13 @@ def default_save_path(model_type, tasks, n_steps):
     return Path("checkpoints") / f"{model_type}_{n_tasks}_{n_steps}_{stamp}.pt"
 
 
+def resolve_active_tasks(task_battery, tasks):
+    """Return task tuple from explicit --tasks or a preset battery."""
+    if tasks is not None:
+        return tuple(tasks)
+    return tuple(rules_dict[task_battery])
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Train Yang LeakyRNN or DaleRNN on fdgo / delaygo")
     parser.add_argument(
@@ -485,12 +492,22 @@ def parse_args():
         help="Model backend: DaleRNN (default) or Yang LeakyRNN.",
     )
     parser.add_argument(
+        "--task-battery",
+        choices=["all", "core5", "sanity3"],
+        default="all",
+        help=(
+            "Preset task subset: all (20 tasks, default), "
+            "core5 (fdgo/fdanti/dm1/contextdm1/dmsgo, major demand types), "
+            "sanity3 (fdgo/contextdm1/dmsgo, bare-minimum smoke test). "
+            "Ignored when --tasks is set."
+        ),
+    )
+    parser.add_argument(
         "--tasks",
         nargs="+",
-        # All tasks
-        default=tuple(rules_dict["all"]),
+        default=None,
         choices=rules_dict["all"],
-        help="Tasks to train.",
+        help="Explicit task list (overrides --task-battery).",
     )
     parser.add_argument("--steps", type=int, default=1000)
     parser.add_argument("--batch-size", type=int, default=32)
@@ -546,6 +563,7 @@ def _model_kwargs_from_args(args):
 
 def main():
     args = parse_args()
+    active_tasks = resolve_active_tasks(args.task_battery, args.tasks)
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     model_kwargs = _model_kwargs_from_args(args)
 
@@ -571,15 +589,17 @@ def main():
         else (1.0 if args.model == "yang" else 0.0)
     )
 
+    battery_label = args.task_battery if args.tasks is None else "custom"
     print(
         f"model={args.model}  device={device}  {size_str}  "
-        f"n_in={config['n_input']}  n_out={config['n_output']}  tasks={args.tasks}  "
+        f"n_in={config['n_input']}  n_out={config['n_output']}  "
+        f"task_battery={battery_label}  tasks={active_tasks}  "
         f"noise_level={noise_level}"
     )
     history = train(
         model,
         config,
-        active_tasks=tuple(args.tasks),
+        active_tasks=active_tasks,
         n_steps=args.steps,
         batch_size=args.batch_size,
         lr=args.lr,
@@ -590,13 +610,13 @@ def main():
         plot_results=args.plot_results,
     )
 
-    save_path = args.save_path or default_save_path(args.model, args.tasks, args.steps)
+    save_path = args.save_path or default_save_path(args.model, active_tasks, args.steps)
     save_checkpoint(
         save_path,
         model,
         config,
         args.model,
-        args.tasks,
+        active_tasks,
         model_kwargs=model_kwargs,
         seed=args.seed,
         train_steps=args.steps,

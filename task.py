@@ -25,6 +25,19 @@ rules_dict = {
         "dmcgo",
         "dmcnogo",
     ],
+    # Quick test batteries (subset of "all"; see train_cog.py --task-battery)
+    "core5": [
+        "fdgo",        # trivial sensorimotor mapping
+        "fdanti",      # response inversion
+        "dm1",         # evidence integration, no gating
+        "contextdm1",  # context-gated integration
+        "dmsgo",       # delayed match-to-sample / working memory
+    ],
+    "sanity3": [
+        "fdgo",        # baseline learnability
+        "contextdm1",  # gating / rule-input handling
+        "dmsgo",       # delay / recurrence / memory
+    ],
 }
 
 rule_index_map = {
