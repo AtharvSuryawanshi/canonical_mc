@@ -1,0 +1,313 @@
+{
+  "model": "dale",
+  "task_battery": "sanity3",
+  "active_tasks": [
+    "fdgo",
+    "contextdm1",
+    "dmsgo"
+  ],
+  "steps": 1000,
+  "seed": 0,
+  "noise_level": 0.0,
+  "lambda_grid": {
+    "rate_min": 0.0,
+    "rate_max": 0.01,
+    "connectivity_min": 0.0,
+    "connectivity_max": 0.01,
+    "n_lambda": 5,
+    "scale": "linear",
+    "rate_values": [
+      0.0,
+      0.0025,
+      0.005,
+      0.0075,
+      0.01
+    ],
+    "connectivity_values": [
+      0.0,
+      0.0025,
+      0.005,
+      0.0075,
+      0.01
+    ]
+  },
+  "n_runs": 25,
+  "n_pareto": 4,
+  "rows": [
+    {
+      "run_idx": 1,
+      "lambda_rate": 0.0,
+      "lambda_connectivity": 0.0,
+      "task_loss": 0.01838635823999842,
+      "metabolic_cost": 0.9529436031977335,
+      "wiring_cost": 0.024866648018360138,
+      "mean_acc": 0.953125,
+      "train_time_s": 110.08939926396124,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 2,
+      "lambda_rate": 0.0,
+      "lambda_connectivity": 0.0025,
+      "task_loss": 0.01821245439350605,
+      "metabolic_cost": 0.9802521665891012,
+      "wiring_cost": 0.022626299411058426,
+      "mean_acc": 0.953125,
+      "train_time_s": 92.60974079207517,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 3,
+      "lambda_rate": 0.0,
+      "lambda_connectivity": 0.005,
+      "task_loss": 0.01863872803126772,
+      "metabolic_cost": 0.9842520356178284,
+      "wiring_cost": 0.021098459139466286,
+      "mean_acc": 0.953125,
+      "train_time_s": 92.39759598416276,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 4,
+      "lambda_rate": 0.0,
+      "lambda_connectivity": 0.0075,
+      "task_loss": 0.019201064482331276,
+      "metabolic_cost": 0.9312563339869181,
+      "wiring_cost": 0.020138844847679138,
+      "mean_acc": 0.9583333333333334,
+      "train_time_s": 92.4323777819518,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 5,
+      "lambda_rate": 0.0,
+      "lambda_connectivity": 0.01,
+      "task_loss": 0.01912140365069111,
+      "metabolic_cost": 0.9706733624140421,
+      "wiring_cost": 0.01954364776611328,
+      "mean_acc": 0.9583333333333334,
+      "train_time_s": 92.46618933789432,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 6,
+      "lambda_rate": 0.0025,
+      "lambda_connectivity": 0.0,
+      "task_loss": 0.017328568113346893,
+      "metabolic_cost": 0.3677464872598648,
+      "wiring_cost": 0.02377709560096264,
+      "mean_acc": 0.9635416666666666,
+      "train_time_s": 93.98460969910957,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 7,
+      "lambda_rate": 0.0025,
+      "lambda_connectivity": 0.0025,
+      "task_loss": 0.01744334911927581,
+      "metabolic_cost": 0.35510730743408203,
+      "wiring_cost": 0.021691979840397835,
+      "mean_acc": 0.953125,
+      "train_time_s": 94.01537870592438,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 8,
+      "lambda_rate": 0.0025,
+      "lambda_connectivity": 0.005,
+      "task_loss": 0.017014811125894386,
+      "metabolic_cost": 0.3613259692986806,
+      "wiring_cost": 0.0203871950507164,
+      "mean_acc": 0.9635416666666666,
+      "train_time_s": 94.05825567804277,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 9,
+      "lambda_rate": 0.0025,
+      "lambda_connectivity": 0.0075,
+      "task_loss": 0.017648370160410803,
+      "metabolic_cost": 0.34742940465609234,
+      "wiring_cost": 0.019213663414120674,
+      "mean_acc": 0.9583333333333334,
+      "train_time_s": 94.16351331095211,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 10,
+      "lambda_rate": 0.0025,
+      "lambda_connectivity": 0.01,
+      "task_loss": 0.01673902090017994,
+      "metabolic_cost": 0.35713184376557666,
+      "wiring_cost": 0.018627960234880447,
+      "mean_acc": 0.9635416666666666,
+      "train_time_s": 94.0824008740019,
+      "is_pareto": true
+    },
+    {
+      "run_idx": 11,
+      "lambda_rate": 0.005,
+      "lambda_connectivity": 0.0,
+      "task_loss": 0.017105793425192434,
+      "metabolic_cost": 0.24195853372414908,
+      "wiring_cost": 0.023161878809332848,
+      "mean_acc": 0.9635416666666666,
+      "train_time_s": 93.96117965714075,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 12,
+      "lambda_rate": 0.005,
+      "lambda_connectivity": 0.0025,
+      "task_loss": 0.017263441657026608,
+      "metabolic_cost": 0.24240467449029288,
+      "wiring_cost": 0.021124331280589104,
+      "mean_acc": 0.96875,
+      "train_time_s": 94.15485813911073,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 13,
+      "lambda_rate": 0.005,
+      "lambda_connectivity": 0.005,
+      "task_loss": 0.016489712987095118,
+      "metabolic_cost": 0.24375927448272705,
+      "wiring_cost": 0.019735107198357582,
+      "mean_acc": 0.96875,
+      "train_time_s": 94.3195564749185,
+      "is_pareto": true
+    },
+    {
+      "run_idx": 14,
+      "lambda_rate": 0.005,
+      "lambda_connectivity": 0.0075,
+      "task_loss": 0.01695258729159832,
+      "metabolic_cost": 0.25159119566281635,
+      "wiring_cost": 0.01880687102675438,
+      "mean_acc": 0.96875,
+      "train_time_s": 94.31228332198225,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 15,
+      "lambda_rate": 0.005,
+      "lambda_connectivity": 0.01,
+      "task_loss": 0.017116886874039967,
+      "metabolic_cost": 0.24886052310466766,
+      "wiring_cost": 0.018278229981660843,
+      "mean_acc": 0.9635416666666666,
+      "train_time_s": 94.31085304892622,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 16,
+      "lambda_rate": 0.0075,
+      "lambda_connectivity": 0.0,
+      "task_loss": 0.017570282487819593,
+      "metabolic_cost": 0.1896794537703196,
+      "wiring_cost": 0.022944195196032524,
+      "mean_acc": 0.953125,
+      "train_time_s": 94.04705103696324,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 17,
+      "lambda_rate": 0.0075,
+      "lambda_connectivity": 0.0025,
+      "task_loss": 0.01724133888880412,
+      "metabolic_cost": 0.19122232993443808,
+      "wiring_cost": 0.02077881060540676,
+      "mean_acc": 0.9739583333333334,
+      "train_time_s": 94.18434436293319,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 18,
+      "lambda_rate": 0.0075,
+      "lambda_connectivity": 0.005,
+      "task_loss": 0.017299481201916933,
+      "metabolic_cost": 0.19658678273359934,
+      "wiring_cost": 0.01966398023068905,
+      "mean_acc": 0.953125,
+      "train_time_s": 94.15605918690562,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 19,
+      "lambda_rate": 0.0075,
+      "lambda_connectivity": 0.0075,
+      "task_loss": 0.017290763867398102,
+      "metabolic_cost": 0.19570046166578928,
+      "wiring_cost": 0.018679695203900337,
+      "mean_acc": 0.9635416666666666,
+      "train_time_s": 94.13436006288975,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 20,
+      "lambda_rate": 0.0075,
+      "lambda_connectivity": 0.01,
+      "task_loss": 0.01728074625134468,
+      "metabolic_cost": 0.19318670531113943,
+      "wiring_cost": 0.017957080155611038,
+      "mean_acc": 0.9583333333333334,
+      "train_time_s": 94.18160596000962,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 21,
+      "lambda_rate": 0.01,
+      "lambda_connectivity": 0.0,
+      "task_loss": 0.01701784071822961,
+      "metabolic_cost": 0.1626439243555069,
+      "wiring_cost": 0.02239922806620598,
+      "mean_acc": 0.96875,
+      "train_time_s": 94.06494081392884,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 22,
+      "lambda_rate": 0.01,
+      "lambda_connectivity": 0.0025,
+      "task_loss": 0.0176398903131485,
+      "metabolic_cost": 0.16717365880807242,
+      "wiring_cost": 0.02051824890077114,
+      "mean_acc": 0.9635416666666666,
+      "train_time_s": 94.65680506778881,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 23,
+      "lambda_rate": 0.01,
+      "lambda_connectivity": 0.005,
+      "task_loss": 0.017121709883213043,
+      "metabolic_cost": 0.17021780709425607,
+      "wiring_cost": 0.019013069570064545,
+      "mean_acc": 0.9739583333333334,
+      "train_time_s": 94.77679815003648,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 24,
+      "lambda_rate": 0.01,
+      "lambda_connectivity": 0.0075,
+      "task_loss": 0.016897876591732103,
+      "metabolic_cost": 0.16106322904427847,
+      "wiring_cost": 0.01821138523519039,
+      "mean_acc": 0.9739583333333334,
+      "train_time_s": 94.79670557705685,
+      "is_pareto": true
+    },
+    {
+      "run_idx": 25,
+      "lambda_rate": 0.01,
+      "lambda_connectivity": 0.01,
+      "task_loss": 0.01708215071509282,
+      "metabolic_cost": 0.16434995581706366,
+      "wiring_cost": 0.017722994089126587,
+      "mean_acc": 0.9635416666666666,
+      "train_time_s": 94.61566327395849,
+      "is_pareto": true
+    }
+  ]
+}
