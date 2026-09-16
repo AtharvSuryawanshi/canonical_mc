@@ -1,0 +1,2 @@
+run_idx,lambda_rate,lambda_connectivity,task_loss,metabolic_cost,wiring_cost,mean_acc,train_time_s,is_pareto
+1,0.0,0.01,0.017693353661646444,0.8626849055290222,0.02028624154627323,0.9947916666666666,185.05333849999442,False

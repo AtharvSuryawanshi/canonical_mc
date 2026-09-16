@@ -1,0 +1,72 @@
+{
+  "model": "dale",
+  "task_battery": "sanity3",
+  "active_tasks": [
+    "fdgo",
+    "contextdm1",
+    "dmsgo"
+  ],
+  "steps": 30,
+  "seed": 0,
+  "noise_level": 0.0,
+  "sweep_mode": "connectivity",
+  "pareto_objectives": [
+    "task_loss",
+    "wiring_cost"
+  ],
+  "fix_lambda_rate": 0.0,
+  "fix_lambda_connectivity": null,
+  "lambda_grid": {
+    "rate_min": 0.0,
+    "rate_max": 0.01,
+    "connectivity_min": 0.005,
+    "connectivity_max": 0.015,
+    "n_lambda": 3,
+    "scale": "linear",
+    "rate_values": [
+      0.0
+    ],
+    "connectivity_values": [
+      0.005,
+      0.009999999999999998,
+      0.015
+    ]
+  },
+  "n_runs": 3,
+  "n_pareto": 3,
+  "rows": [
+    {
+      "run_idx": 1,
+      "lambda_rate": 0.0,
+      "lambda_connectivity": 0.005,
+      "task_loss": 0.09153441339731216,
+      "metabolic_cost": 1.7432418862978618,
+      "wiring_cost": 0.01931866444647312,
+      "mean_acc": 0.296875,
+      "train_time_s": 8.96056249999674,
+      "is_pareto": true
+    },
+    {
+      "run_idx": 2,
+      "lambda_rate": 0.0,
+      "lambda_connectivity": 0.009999999999999998,
+      "task_loss": 0.09235040098428726,
+      "metabolic_cost": 1.9139354228973389,
+      "wiring_cost": 0.019156087189912796,
+      "mean_acc": 0.3072916666666667,
+      "train_time_s": 12.48179589999927,
+      "is_pareto": true
+    },
+    {
+      "run_idx": 3,
+      "lambda_rate": 0.0,
+      "lambda_connectivity": 0.015,
+      "task_loss": 0.0926157534122467,
+      "metabolic_cost": 1.8520545363426208,
+      "wiring_cost": 0.019059864804148674,
+      "mean_acc": 0.3229166666666667,
+      "train_time_s": 12.091816799998924,
+      "is_pareto": true
+    }
+  ]
+}

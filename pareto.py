@@ -24,17 +24,64 @@ from train_cog import (
 )
 
 
+def _lambda_axis(min_val, max_val, n_lambda, scale):
+    if scale == "log":
+        if min_val <= 0:
+            raise ValueError("log scale requires strictly positive lambda min values")
+        return np.logspace(np.log10(min_val), np.log10(max_val), n_lambda)
+    return np.linspace(min_val, max_val, n_lambda)
+
+
 def build_lambda_grid(lr_min, lr_max, lc_min, lc_max, n_lambda, scale):
     """1D grids for lambda_rate and lambda_connectivity."""
-    if scale == "log":
-        if lr_min <= 0 or lc_min <= 0:
-            raise ValueError("log scale requires strictly positive lambda min values")
-        lr_vals = np.logspace(np.log10(lr_min), np.log10(lr_max), n_lambda)
-        lc_vals = np.logspace(np.log10(lc_min), np.log10(lc_max), n_lambda)
-    else:
-        lr_vals = np.linspace(lr_min, lr_max, n_lambda)
-        lc_vals = np.linspace(lc_min, lc_max, n_lambda)
+    lr_vals = _lambda_axis(lr_min, lr_max, n_lambda, scale)
+    lc_vals = _lambda_axis(lc_min, lc_max, n_lambda, scale)
     return lr_vals, lc_vals
+
+
+def build_grid_pairs(args):
+    """Cartesian 2D grid, or 1D sweep when one lambda is fixed."""
+    fix_lr = args.fix_lambda_rate
+    fix_lc = args.fix_lambda_connectivity
+    if fix_lr is not None and fix_lc is not None:
+        raise ValueError("Set at most one of --fix-lambda-rate and --fix-lambda-connectivity")
+
+    if fix_lr is not None:
+        lc_vals = _lambda_axis(
+            args.lambda_connectivity_min,
+            args.lambda_connectivity_max,
+            args.n_lambda,
+            args.lambda_scale,
+        )
+        lr_vals = np.array([fix_lr], dtype=float)
+        pairs = [(float(fix_lr), float(lc)) for lc in lc_vals]
+        sweep = "connectivity"
+        pareto_objectives = ("task_loss", "wiring_cost")
+        return pairs, lr_vals, lc_vals, sweep, pareto_objectives
+
+    if fix_lc is not None:
+        lr_vals = _lambda_axis(
+            args.lambda_rate_min,
+            args.lambda_rate_max,
+            args.n_lambda,
+            args.lambda_scale,
+        )
+        lc_vals = np.array([fix_lc], dtype=float)
+        pairs = [(float(lr), float(fix_lc)) for lr in lr_vals]
+        sweep = "rate"
+        pareto_objectives = ("task_loss", "metabolic_cost")
+        return pairs, lr_vals, lc_vals, sweep, pareto_objectives
+
+    lr_vals, lc_vals = build_lambda_grid(
+        args.lambda_rate_min,
+        args.lambda_rate_max,
+        args.lambda_connectivity_min,
+        args.lambda_connectivity_max,
+        args.n_lambda,
+        args.lambda_scale,
+    )
+    pairs = list(product(lr_vals, lc_vals))
+    return pairs, lr_vals, lc_vals, "both", ("task_loss", "metabolic_cost", "wiring_cost")
 
 
 def make_fresh_model(args, config, device):
@@ -44,9 +91,15 @@ def make_fresh_model(args, config, device):
     return make_dale_model(config, device=device, **model_kwargs)
 
 
-def default_output_dir(model, battery_label, n_lambda):
-    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    return Path("pareto_runs") / f"{model}_{battery_label}_{n_lambda}x{n_lambda}_{stamp}"
+def default_output_dir(model, battery_label, n_lambda, sweep="both"):
+    stamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    if sweep == "connectivity":
+        tag = f"1d_lc_{n_lambda}"
+    elif sweep == "rate":
+        tag = f"1d_lr_{n_lambda}"
+    else:
+        tag = f"{n_lambda}x{n_lambda}"
+    return Path("pareto_runs") / f"{model}_{battery_label}_{tag}_{stamp}"
 
 
 def pareto_mask(objectives):
@@ -74,26 +127,45 @@ def append_csv_row(csv_path, row, write_header=False):
         writer.writerow(row)
 
 
-def plot_pareto_front(rows, out_path):
-    objectives = np.array(
-        [[r["task_loss"], r["metabolic_cost"], r["wiring_cost"]] for r in rows]
-    )
-    is_pareto = np.array([r["is_pareto"] for r in rows], dtype=bool)
+def _objective_label(name):
+    return {
+        "task_loss": "task loss",
+        "metabolic_cost": "metabolic cost",
+        "wiring_cost": "wiring cost",
+    }[name]
 
-    fig, axes = plt.subplots(1, 3, figsize=(14, 4))
-    pairs = [
-        (0, 1, "task loss", "metabolic cost"),
-        (0, 2, "task loss", "wiring cost"),
-        (1, 2, "metabolic cost", "wiring cost"),
-    ]
-    for ax, (i, j, xl, yl) in zip(axes, pairs):
-        ax.scatter(objectives[~is_pareto, i], objectives[~is_pareto, j], c="0.7", s=36, label="grid")
-        ax.scatter(objectives[is_pareto, i], objectives[is_pareto, j], c="C1", s=64, label="Pareto")
-        ax.set_xlabel(xl)
-        ax.set_ylabel(yl)
+
+def plot_pareto_front(rows, out_path, pareto_objectives):
+    is_pareto = np.array([r["is_pareto"] for r in rows], dtype=bool)
+    names = pareto_objectives
+    objectives = np.array([[r[k] for k in names] for r in rows])
+
+    if len(names) == 2:
+        fig, ax = plt.subplots(figsize=(6, 5))
+        ax.scatter(objectives[~is_pareto, 0], objectives[~is_pareto, 1], c="0.7", s=36, label="grid")
+        ax.scatter(objectives[is_pareto, 0], objectives[is_pareto, 1], c="C1", s=64, label="Pareto")
+        ax.set_xlabel(_objective_label(names[0]))
+        ax.set_ylabel(_objective_label(names[1]))
+        ax.legend(loc="best", fontsize=8)
         ax.grid(True, alpha=0.3)
-    axes[0].legend(loc="best", fontsize=8)
-    fig.suptitle("Pareto front (minimize all objectives)")
+        fig.suptitle("Pareto front (2 objectives)")
+    else:
+        fig, axes = plt.subplots(1, 3, figsize=(14, 4))
+        idx = {"task_loss": 0, "metabolic_cost": 1, "wiring_cost": 2}
+        pairs = [
+            ("task_loss", "metabolic_cost"),
+            ("task_loss", "wiring_cost"),
+            ("metabolic_cost", "wiring_cost"),
+        ]
+        for ax, (a, b) in zip(axes, pairs):
+            i, j = idx[a], idx[b]
+            ax.scatter(objectives[~is_pareto, i], objectives[~is_pareto, j], c="0.7", s=36, label="grid")
+            ax.scatter(objectives[is_pareto, i], objectives[is_pareto, j], c="C1", s=64, label="Pareto")
+            ax.set_xlabel(_objective_label(a))
+            ax.set_ylabel(_objective_label(b))
+            ax.grid(True, alpha=0.3)
+        axes[0].legend(loc="best", fontsize=8)
+        fig.suptitle("Pareto front (3 objectives)")
     fig.tight_layout()
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
@@ -148,6 +220,18 @@ def parse_args():
         default="linear",
         help="Spacing for lambda grids (linear or log).",
     )
+    parser.add_argument(
+        "--fix-lambda-rate",
+        type=float,
+        default=None,
+        help="Hold lambda_rate fixed; sweep lambda_connectivity only (2D Pareto: task vs wiring).",
+    )
+    parser.add_argument(
+        "--fix-lambda-connectivity",
+        type=float,
+        default=None,
+        help="Hold lambda_connectivity fixed; sweep lambda_rate only (2D Pareto: task vs metabolic).",
+    )
 
     parser.add_argument("--output-dir", type=str, default=None)
     parser.add_argument(
@@ -158,10 +242,8 @@ def parse_args():
     return parser.parse_args()
 
 
-def finalize_results(rows):
-    objectives = np.array(
-        [[r["task_loss"], r["metabolic_cost"], r["wiring_cost"]] for r in rows]
-    )
+def finalize_results(rows, pareto_objectives):
+    objectives = np.array([[r[k] for k in pareto_objectives] for r in rows])
     mask = pareto_mask(objectives)
     for row, is_p in zip(rows, mask):
         row["is_pareto"] = bool(is_p)
@@ -181,19 +263,11 @@ def main():
         else (1.0 if args.model == "yang" else 0.0)
     )
 
-    lr_vals, lc_vals = build_lambda_grid(
-        args.lambda_rate_min,
-        args.lambda_rate_max,
-        args.lambda_connectivity_min,
-        args.lambda_connectivity_max,
-        args.n_lambda,
-        args.lambda_scale,
-    )
-    grid_pairs = list(product(lr_vals, lc_vals))
+    grid_pairs, lr_vals, lc_vals, sweep, pareto_objectives = build_grid_pairs(args)
 
     out_dir = Path(
         args.output_dir
-        or default_output_dir(args.model, battery_label, args.n_lambda)
+        or default_output_dir(args.model, battery_label, args.n_lambda, sweep=sweep)
     )
     out_dir.mkdir(parents=True, exist_ok=True)
     csv_path = out_dir / "summary.csv"
@@ -201,11 +275,14 @@ def main():
     if args.plot:
         plt.switch_backend("Agg")
 
+    if sweep == "both":
+        grid_desc = f"{args.n_lambda}x{args.n_lambda}={len(grid_pairs)}"
+    else:
+        grid_desc = f"1D {sweep} n={len(grid_pairs)}  pareto={pareto_objectives}"
     print(
         f"Pareto sweep: model={args.model}  device={device}  "
         f"task_battery={battery_label}  tasks={len(active_tasks)}  "
-        f"grid={args.n_lambda}x{args.n_lambda}={len(grid_pairs)} runs  "
-        f"output={out_dir.resolve()}"
+        f"grid={grid_desc}  output={out_dir.resolve()}"
     )
 
     rows = []
@@ -266,7 +343,7 @@ def main():
         if device.type == "cuda":
             torch.cuda.empty_cache()
 
-    rows = finalize_results(rows)
+    rows = finalize_results(rows, pareto_objectives)
 
     with csv_path.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
@@ -280,6 +357,10 @@ def main():
         "steps": args.steps,
         "seed": args.seed,
         "noise_level": noise_level,
+        "sweep_mode": sweep,
+        "pareto_objectives": list(pareto_objectives),
+        "fix_lambda_rate": args.fix_lambda_rate,
+        "fix_lambda_connectivity": args.fix_lambda_connectivity,
         "lambda_grid": {
             "rate_min": args.lambda_rate_min,
             "rate_max": args.lambda_rate_max,
@@ -305,7 +386,7 @@ def main():
 
     if args.plot:
         plot_path = out_dir / "pareto_front.png"
-        plot_pareto_front(rows, plot_path)
+        plot_pareto_front(rows, plot_path, pareto_objectives)
         print(f"Saved -> {plot_path.resolve()}")
 
 

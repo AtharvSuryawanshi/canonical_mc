@@ -495,9 +495,9 @@ def plot_example_runs(model, config, active_tasks):
 
 
 def default_save_path(model_type, tasks, n_steps):
-    """checkpoints/{model}_{n_tasks}_{n_steps}_{YYYY-MM-DD_HH-MM-SS}.pt"""
+    """checkpoints/{model}_{n_tasks}_{n_steps}_{YYYY_MM_DD_HH_MM_SS}.pt"""
     n_tasks = len(tasks)
-    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    stamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
     return Path("checkpoints") / f"{model_type}_{n_tasks}_{n_steps}_{stamp}.pt"
 
 
