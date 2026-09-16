@@ -249,16 +249,18 @@ def parse_args():
         help=f"Comma-separated trial RNG seeds for eval (default: {len(DEFAULT_EVAL_SEEDS)} fixed seeds).",
     )
 
-    parser.add_argument("--lambda-rate-min", type=float, default=0.0)
-    parser.add_argument("--lambda-rate-max", type=float, default=1e-2)
-    parser.add_argument("--lambda-connectivity-min", type=float, default=0.0)
-    parser.add_argument("--lambda-connectivity-max", type=float, default=1e-2)
+    # Ranges bracket the point where the penalty matches the task loss
+    # (lambda_rate ~2.5e-2, lambda_connectivity ~1.5) by ~2 decades each side.
+    parser.add_argument("--lambda-rate-min", type=float, default=1e-4)
+    parser.add_argument("--lambda-rate-max", type=float, default=1e0)
+    parser.add_argument("--lambda-connectivity-min", type=float, default=1e-3)
+    parser.add_argument("--lambda-connectivity-max", type=float, default=1e1)
     parser.add_argument("--n-lambda", type=int, default=5)
     parser.add_argument(
         "--lambda-scale",
         choices=["linear", "log"],
-        default="linear",
-        help="Spacing for lambda grids (linear or log).",
+        default="log",
+        help="Spacing for lambda grids. Log requires strictly positive min values.",
     )
     parser.add_argument(
         "--fix-lambda-rate",
