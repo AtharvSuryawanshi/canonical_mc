@@ -109,8 +109,65 @@ def evaluate_task(model, config, rule, batch_size, device, noise_level=0.0):
     return {"loss": loss, "activity": activity, **acc}
 
 
+def evaluate_pareto_metrics(
+    model,
+    train_config,
+    active_tasks,
+    device,
+    *,
+    eval_seeds,
+    batch_size,
+    noise_level=0.0,
+    easy_task=True,
+    n_eachring=None,
+):
+    """Seeded, noiseless eval: accuracy (mean + min over tasks), costs, optional per-task acc."""
+    device = torch.device(device)
+    n_ring = n_eachring or train_config.get(
+        "n_eachring", train_config.get("n_neurons_per_ring", 16)
+    )
+    active_tasks = tuple(active_tasks)
+    task_accs = {rule: [] for rule in active_tasks}
+    task_losses = {rule: [] for rule in active_tasks}
+    metabolic_costs = []
+
+    with torch.no_grad():
+        for seed_k in eval_seeds:
+            eval_config = default_config(
+                n_eachring=int(n_ring), seed=int(seed_k), easy_task=easy_task
+            )
+            for rule in active_tasks:
+                trial = generate_trials(rule, eval_config, batch_size, noise_on=False)
+                x, y, c_mask, y_loc = trial_to_tensors(trial, device)
+                r_hist, x_hist, output = model.simulate(x, noise_level=noise_level)
+                task_losses[rule].append(masked_mse(output, y, c_mask).item())
+                metabolic_costs.append(rate_reg(r_hist).item())
+                prefs = ring_prefs(eval_config, output.device, output.dtype)
+                task_accs[rule].append(batch_accuracy(output, y_loc, prefs)["acc"])
+
+    per_task_mean_acc = {
+        rule: float(np.mean(task_accs[rule])) for rule in active_tasks
+    }
+    mean_acc = float(np.mean(list(per_task_mean_acc.values())))
+    min_task_acc = float(min(per_task_mean_acc.values()))
+    task_loss = float(
+        np.mean([np.mean(task_losses[rule]) for rule in active_tasks])
+    )
+
+    out = {
+        "mean_acc": mean_acc,
+        "min_task_acc": min_task_acc,
+        "task_loss": task_loss,
+        "metabolic_cost": float(np.mean(metabolic_costs)),
+        "wiring_cost": float(connectivity_reg(model).item()),
+    }
+    for rule, acc in per_task_mean_acc.items():
+        out[f"acc_{rule}"] = acc
+    return out
+
+
 def evaluate_objectives(model, config, active_tasks, batch_size, device, noise_level=0.0):
-    """Raw (unweighted) task, metabolic, and wiring costs after training."""
+    """Single-pass eval (legacy). Prefer evaluate_pareto_metrics for Pareto sweeps."""
     device = torch.device(device)
     task_losses = []
     metabolic_costs = []
@@ -129,6 +186,7 @@ def evaluate_objectives(model, config, active_tasks, batch_size, device, noise_l
         "metabolic_cost": float(np.mean(metabolic_costs)),
         "wiring_cost": float(connectivity_reg(model).item()),
         "mean_acc": float(np.mean(accs)),
+        "min_task_acc": float(min(accs)) if accs else float("nan"),
     }
 
 

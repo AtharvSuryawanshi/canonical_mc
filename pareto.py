@@ -16,12 +16,22 @@ from tqdm import tqdm
 from task import default_config, rules_dict
 from train_cog import (
     _model_kwargs_from_args,
-    evaluate_objectives,
+    evaluate_pareto_metrics,
     make_dale_model,
     make_yang_model,
     resolve_active_tasks,
     train_without_plots,
 )
+
+# Fixed eval seeds for comparable Pareto runs (see pareto_analysis.ipynb calibration).
+DEFAULT_EVAL_SEEDS = tuple(10000 + i for i in range(10))
+
+OBJECTIVE_MAXIMIZE = {
+    "mean_acc": True,
+    "task_loss": False,
+    "metabolic_cost": False,
+    "wiring_cost": False,
+}
 
 
 def _lambda_axis(min_val, max_val, n_lambda, scale):
@@ -56,7 +66,7 @@ def build_grid_pairs(args):
         lr_vals = np.array([fix_lr], dtype=float)
         pairs = [(float(fix_lr), float(lc)) for lc in lc_vals]
         sweep = "connectivity"
-        pareto_objectives = ("task_loss", "wiring_cost")
+        pareto_objectives = ("mean_acc", "wiring_cost")
         return pairs, lr_vals, lc_vals, sweep, pareto_objectives
 
     if fix_lc is not None:
@@ -69,7 +79,7 @@ def build_grid_pairs(args):
         lc_vals = np.array([fix_lc], dtype=float)
         pairs = [(float(lr), float(fix_lc)) for lr in lr_vals]
         sweep = "rate"
-        pareto_objectives = ("task_loss", "metabolic_cost")
+        pareto_objectives = ("mean_acc", "metabolic_cost")
         return pairs, lr_vals, lc_vals, sweep, pareto_objectives
 
     lr_vals, lc_vals = build_lambda_grid(
@@ -81,7 +91,7 @@ def build_grid_pairs(args):
         args.lambda_scale,
     )
     pairs = list(product(lr_vals, lc_vals))
-    return pairs, lr_vals, lc_vals, "both", ("task_loss", "metabolic_cost", "wiring_cost")
+    return pairs, lr_vals, lc_vals, "both", ("mean_acc", "metabolic_cost", "wiring_cost")
 
 
 def make_fresh_model(args, config, device):
@@ -102,9 +112,17 @@ def default_output_dir(model, battery_label, n_lambda, sweep="both"):
     return Path("pareto_runs") / f"{model}_{battery_label}_{tag}_{stamp}"
 
 
-def pareto_mask(objectives):
-    """Mark nondominated rows (minimize all three objectives). objectives: (n, 3)."""
-    n = objectives.shape[0]
+def pareto_maximize_flags(pareto_objectives):
+    return tuple(OBJECTIVE_MAXIMIZE.get(name, False) for name in pareto_objectives)
+
+
+def pareto_mask(objectives, maximize=None):
+    """Mark nondominated rows. objectives: (n, k); maximize per column where True."""
+    n, k = objectives.shape
+    if maximize is None:
+        maximize = (False,) * k
+    else:
+        maximize = tuple(maximize)
     mask = np.ones(n, dtype=bool)
     for i in range(n):
         if not mask[i]:
@@ -112,7 +130,22 @@ def pareto_mask(objectives):
         for j in range(n):
             if i == j or not mask[j]:
                 continue
-            if np.all(objectives[j] <= objectives[i]) and np.any(objectives[j] < objectives[i]):
+            better_or_equal = True
+            strictly_better = False
+            for d in range(k):
+                if maximize[d]:
+                    if objectives[j, d] < objectives[i, d]:
+                        better_or_equal = False
+                        break
+                    if objectives[j, d] > objectives[i, d]:
+                        strictly_better = True
+                else:
+                    if objectives[j, d] > objectives[i, d]:
+                        better_or_equal = False
+                        break
+                    if objectives[j, d] < objectives[i, d]:
+                        strictly_better = True
+            if better_or_equal and strictly_better:
                 mask[i] = False
                 break
     return mask
@@ -129,6 +162,7 @@ def append_csv_row(csv_path, row, write_header=False):
 
 def _objective_label(name):
     return {
+        "mean_acc": "mean task accuracy",
         "task_loss": "task loss",
         "metabolic_cost": "metabolic cost",
         "wiring_cost": "wiring cost",
@@ -151,14 +185,14 @@ def plot_pareto_front(rows, out_path, pareto_objectives):
         fig.suptitle("Pareto front (2 objectives)")
     else:
         fig, axes = plt.subplots(1, 3, figsize=(14, 4))
-        idx = {"task_loss": 0, "metabolic_cost": 1, "wiring_cost": 2}
+        name_to_col = {name: i for i, name in enumerate(names)}
         pairs = [
-            ("task_loss", "metabolic_cost"),
-            ("task_loss", "wiring_cost"),
-            ("metabolic_cost", "wiring_cost"),
+            (names[0], names[1]),
+            (names[0], names[2]),
+            (names[1], names[2]),
         ]
         for ax, (a, b) in zip(axes, pairs):
-            i, j = idx[a], idx[b]
+            i, j = name_to_col[a], name_to_col[b]
             ax.scatter(objectives[~is_pareto, i], objectives[~is_pareto, j], c="0.7", s=36, label="grid")
             ax.scatter(objectives[is_pareto, i], objectives[is_pareto, j], c="C1", s=64, label="Pareto")
             ax.set_xlabel(_objective_label(a))
@@ -208,6 +242,12 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--device", type=str, default=None)
     parser.add_argument("--eval-batch-size", type=int, default=64)
+    parser.add_argument(
+        "--eval-seeds",
+        type=str,
+        default=None,
+        help=f"Comma-separated trial RNG seeds for eval (default: {len(DEFAULT_EVAL_SEEDS)} fixed seeds).",
+    )
 
     parser.add_argument("--lambda-rate-min", type=float, default=0.0)
     parser.add_argument("--lambda-rate-max", type=float, default=1e-2)
@@ -242,9 +282,15 @@ def parse_args():
     return parser.parse_args()
 
 
+def parse_eval_seeds(text):
+    if text is None or str(text).strip() == "":
+        return DEFAULT_EVAL_SEEDS
+    return tuple(int(s.strip()) for s in str(text).split(",") if s.strip())
+
+
 def finalize_results(rows, pareto_objectives):
     objectives = np.array([[r[k] for k in pareto_objectives] for r in rows])
-    mask = pareto_mask(objectives)
+    mask = pareto_mask(objectives, maximize=pareto_maximize_flags(pareto_objectives))
     for row, is_p in zip(rows, mask):
         row["is_pareto"] = bool(is_p)
     return rows
@@ -264,6 +310,7 @@ def main():
     )
 
     grid_pairs, lr_vals, lc_vals, sweep, pareto_objectives = build_grid_pairs(args)
+    eval_seeds = parse_eval_seeds(args.eval_seeds)
 
     out_dir = Path(
         args.output_dir
@@ -307,13 +354,16 @@ def main():
             show_progress=False,
         )
 
-        obj = evaluate_objectives(
+        obj = evaluate_pareto_metrics(
             model,
             config,
             active_tasks,
-            args.eval_batch_size,
             device,
+            eval_seeds=eval_seeds,
+            batch_size=args.eval_batch_size,
             noise_level=0.0,
+            easy_task=True,
+            n_eachring=args.n_eachring,
         )
         train_time_s = time.perf_counter() - t0
 
@@ -321,21 +371,26 @@ def main():
             "run_idx": run_idx,
             "lambda_rate": float(lr),
             "lambda_connectivity": float(lc),
+            "mean_acc": obj["mean_acc"],
+            "min_task_acc": obj["min_task_acc"],
             "task_loss": obj["task_loss"],
             "metabolic_cost": obj["metabolic_cost"],
             "wiring_cost": obj["wiring_cost"],
-            "mean_acc": obj["mean_acc"],
             "train_time_s": train_time_s,
             "is_pareto": False,
         }
+        for key, val in obj.items():
+            if key.startswith("acc_"):
+                row[key] = val
         rows.append(row)
         append_csv_row(csv_path, row, write_header=(run_idx == 1))
 
         tqdm.write(
             f"run {run_idx}/{len(grid_pairs)}  "
             f"lr={lr:.2e}  lc={lc:.2e}  "
+            f"acc={obj['mean_acc']:.3f}  min_acc={obj['min_task_acc']:.3f}  "
             f"task={obj['task_loss']:.4f}  meta={obj['metabolic_cost']:.4f}  "
-            f"wire={obj['wiring_cost']:.4f}  acc={obj['mean_acc']:.3f}  "
+            f"wire={obj['wiring_cost']:.4f}  "
             f"time={train_time_s:.1f}s"
         )
 
@@ -359,6 +414,9 @@ def main():
         "noise_level": noise_level,
         "sweep_mode": sweep,
         "pareto_objectives": list(pareto_objectives),
+        "pareto_task_objective": "mean_acc",
+        "eval_seeds": list(eval_seeds),
+        "eval_easy_task": True,
         "fix_lambda_rate": args.fix_lambda_rate,
         "fix_lambda_connectivity": args.fix_lambda_connectivity,
         "lambda_grid": {

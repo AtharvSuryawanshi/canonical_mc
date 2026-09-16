@@ -1,0 +1,96 @@
+{
+  "model": "dale",
+  "task_battery": "sanity3",
+  "active_tasks": [
+    "fdgo",
+    "contextdm1",
+    "dmsgo"
+  ],
+  "steps": 1500,
+  "seed": 0,
+  "noise_level": 0.0,
+  "sweep_mode": "connectivity",
+  "pareto_objectives": [
+    "task_loss",
+    "wiring_cost"
+  ],
+  "fix_lambda_rate": 0.0,
+  "fix_lambda_connectivity": null,
+  "lambda_grid": {
+    "rate_min": 0.0,
+    "rate_max": 0.01,
+    "connectivity_min": 0.01,
+    "connectivity_max": 0.04,
+    "n_lambda": 5,
+    "scale": "linear",
+    "rate_values": [
+      0.0
+    ],
+    "connectivity_values": [
+      0.01,
+      0.0175,
+      0.025,
+      0.0325,
+      0.04
+    ]
+  },
+  "n_runs": 5,
+  "n_pareto": 2,
+  "rows": [
+    {
+      "run_idx": 1,
+      "lambda_rate": 0.0,
+      "lambda_connectivity": 0.01,
+      "task_loss": 0.0183347100391984,
+      "metabolic_cost": 0.9844067692756653,
+      "wiring_cost": 0.020140690729022026,
+      "mean_acc": 0.9895833333333334,
+      "train_time_s": 192.99536719999742,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 2,
+      "lambda_rate": 0.0,
+      "lambda_connectivity": 0.0175,
+      "task_loss": 0.017817747158308823,
+      "metabolic_cost": 0.9736120303471884,
+      "wiring_cost": 0.019113698974251747,
+      "mean_acc": 0.9635416666666666,
+      "train_time_s": 179.0143855999995,
+      "is_pareto": true
+    },
+    {
+      "run_idx": 3,
+      "lambda_rate": 0.0,
+      "lambda_connectivity": 0.025,
+      "task_loss": 0.018066633337487776,
+      "metabolic_cost": 0.9649036129315695,
+      "wiring_cost": 0.017610762268304825,
+      "mean_acc": 0.9895833333333334,
+      "train_time_s": 196.61579699999857,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 4,
+      "lambda_rate": 0.0,
+      "lambda_connectivity": 0.0325,
+      "task_loss": 0.01829141192138195,
+      "metabolic_cost": 0.9462439815203348,
+      "wiring_cost": 0.016733936965465546,
+      "mean_acc": 0.9895833333333334,
+      "train_time_s": 184.8631635999991,
+      "is_pareto": false
+    },
+    {
+      "run_idx": 5,
+      "lambda_rate": 0.0,
+      "lambda_connectivity": 0.04,
+      "task_loss": 0.017947159241884947,
+      "metabolic_cost": 0.9587953488032023,
+      "wiring_cost": 0.016179461032152176,
+      "mean_acc": 0.9791666666666666,
+      "train_time_s": 176.9569793999981,
+      "is_pareto": true
+    }
+  ]
+}
