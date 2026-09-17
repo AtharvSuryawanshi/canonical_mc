@@ -15,6 +15,7 @@ from tqdm import tqdm
 
 from task import default_config, rules_dict
 from train_cog import (
+    DALE_DEFAULT_NOISE_LEVEL,
     _model_kwargs_from_args,
     evaluate_pareto_metrics,
     make_dale_model,
@@ -26,11 +27,18 @@ from train_cog import (
 # Fixed eval seeds for comparable Pareto runs (see pareto_analysis.ipynb calibration).
 DEFAULT_EVAL_SEEDS = tuple(10000 + i for i in range(10))
 
+# pareto_maximize_flags() falls back to False (minimize) for unknown names, so a
+# missing entry here silently inverts the front. min_task_acc in particular is
+# the neuroscience-faithful task objective (mean_acc lets the network abandon a
+# hard task and still look good), and it was absent.
 OBJECTIVE_MAXIMIZE = {
     "mean_acc": True,
+    "min_task_acc": True,
     "task_loss": False,
     "metabolic_cost": False,
     "wiring_cost": False,
+    "conn_frac": False,
+    "wiring_cost_w_in_l2": False,
 }
 
 
@@ -65,6 +73,8 @@ def build_grid_pairs(args):
         )
         lr_vals = np.array([fix_lr], dtype=float)
         pairs = [(float(fix_lr), float(lc)) for lc in lc_vals]
+        if args.include_lambda_zero:
+            pairs.insert(0, (float(fix_lr), 0.0))
         sweep = "connectivity"
         pareto_objectives = ("mean_acc", "wiring_cost")
         return pairs, lr_vals, lc_vals, sweep, pareto_objectives
@@ -78,6 +88,8 @@ def build_grid_pairs(args):
         )
         lc_vals = np.array([fix_lc], dtype=float)
         pairs = [(float(lr), float(fix_lc)) for lr in lr_vals]
+        if args.include_lambda_zero:
+            pairs.insert(0, (0.0, float(fix_lc)))
         sweep = "rate"
         pareto_objectives = ("mean_acc", "metabolic_cost")
         return pairs, lr_vals, lc_vals, sweep, pareto_objectives
@@ -90,12 +102,16 @@ def build_grid_pairs(args):
         args.n_lambda,
         args.lambda_scale,
     )
-    pairs = list(product(lr_vals, lc_vals))
+    pairs = [(float(a), float(b)) for a, b in product(lr_vals, lc_vals)]
+    if args.include_lambda_zero:
+        pairs.insert(0, (0.0, 0.0))
     return pairs, lr_vals, lc_vals, "both", ("mean_acc", "metabolic_cost", "wiring_cost")
 
 
-def make_fresh_model(args, config, device):
+def make_fresh_model(args, config, device, seed=None):
     model_kwargs = _model_kwargs_from_args(args)
+    if seed is not None:
+        model_kwargs["seed"] = int(seed)
     if args.model == "yang":
         return make_yang_model(config, device=device, **model_kwargs)
     return make_dale_model(config, device=device, **model_kwargs)
@@ -149,6 +165,39 @@ def pareto_mask(objectives, maximize=None):
                 mask[i] = False
                 break
     return mask
+
+
+AGG_METRIC_KEYS = (
+    "mean_acc",
+    "min_task_acc",
+    "task_loss",
+    "metabolic_cost",
+    "wiring_cost",
+    "conn_frac",
+    "wiring_cost_w_in_l2",
+)
+
+
+def aggregate_seed_runs(lr, lc, objs, train_time_s):
+    """Collapse the per-seed evals at one lambda point into a single row.
+
+    Primary column names hold the across-seed mean (so downstream analysis keeps
+    working), with a matching ``*_std`` column next to each.
+    """
+    row = {
+        "lambda_rate": float(lr),
+        "lambda_connectivity": float(lc),
+        "n_seeds": len(objs),
+    }
+    keys = [k for k in AGG_METRIC_KEYS if k in objs[0]]
+    keys += sorted(k for k in objs[0] if k.startswith("acc_"))
+    for key in keys:
+        vals = np.array([o[key] for o in objs], dtype=float)
+        row[key] = float(np.mean(vals))
+        row[f"{key}_std"] = float(np.std(vals, ddof=1)) if len(vals) > 1 else 0.0
+    row["train_time_s"] = float(train_time_s)
+    row["is_pareto"] = False
+    return row
 
 
 def append_csv_row(csv_path, row, write_header=False):
@@ -235,7 +284,7 @@ def parse_args():
         "--noise-level",
         type=float,
         default=None,
-        help="Default: 1.0 for yang, 0.0 for dale.",
+        help="Default: 1.0 for yang, 0.1 for dale.",
     )
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--log-every", type=int, default=20)
@@ -249,8 +298,9 @@ def parse_args():
         help=f"Comma-separated trial RNG seeds for eval (default: {len(DEFAULT_EVAL_SEEDS)} fixed seeds).",
     )
 
-    # Ranges bracket the point where the penalty matches the task loss
-    # (lambda_rate ~2.5e-2, lambda_connectivity ~1.5) by ~2 decades each side.
+    # NOTE: these ranges were calibrated against the OLD task loss (global
+    # .mean()) and the OLD wiring cost (L2 on W_in). Both changed, so recalibrate
+    # with `python train_cog.py --report-scales` before trusting them.
     parser.add_argument("--lambda-rate-min", type=float, default=1e-4)
     parser.add_argument("--lambda-rate-max", type=float, default=1e0)
     parser.add_argument("--lambda-connectivity-min", type=float, default=1e-3)
@@ -275,6 +325,53 @@ def parse_args():
         help="Hold lambda_connectivity fixed; sweep lambda_rate only (2D Pareto: task vs metabolic).",
     )
 
+    parser.add_argument(
+        "--n-seeds",
+        type=int,
+        default=1,
+        help="Independent training seeds per lambda point. Every grid point used "
+        "the same init and the same data stream, so a single unlucky init became "
+        "a 'Pareto point' with no error bar. >1 gives mean +- std per lambda; the "
+        "front is computed on the per-lambda means.",
+    )
+    parser.add_argument(
+        "--include-lambda-zero",
+        dest="include_lambda_zero",
+        action="store_true",
+        default=True,
+        help="Prepend an unregularized (swept lambda = 0) anchor run (default). "
+        "A log-spaced axis cannot contain 0, so the reference point the whole "
+        "claim is relative to was missing.",
+    )
+    parser.add_argument(
+        "--no-include-lambda-zero",
+        dest="include_lambda_zero",
+        action="store_false",
+    )
+    parser.add_argument("--rate-kind", choices=["l1", "l2"], default="l2")
+    parser.add_argument("--rate-inh-scale", type=float, default=1.0)
+    parser.add_argument("--conn-kind", choices=["l1", "l2"], default="l1")
+    parser.add_argument("--conn-target", choices=["w_rec", "w_in"], default="w_rec")
+    parser.add_argument("--conn-inh-scale", type=float, default=1.0)
+    parser.add_argument("--prune-eps", type=float, default=0.0)
+    parser.add_argument(
+        "--loss-per-trial", dest="loss_per_trial", action="store_true", default=True
+    )
+    parser.add_argument(
+        "--no-loss-per-trial", dest="loss_per_trial", action="store_false"
+    )
+    parser.add_argument(
+        "--eval-noise-level",
+        type=float,
+        default=0.0,
+        help="Recurrent noise during Pareto eval. 0.0 (default) keeps the clean, "
+        "reproducible readout; raise it to make the front reward noise robustness.",
+    )
+    parser.add_argument(
+        "--eval-input-noise",
+        action="store_true",
+        help="Also apply input noise during Pareto eval.",
+    )
     parser.add_argument("--output-dir", type=str, default=None)
     parser.add_argument(
         "--plot",
@@ -308,7 +405,7 @@ def main():
     noise_level = (
         args.noise_level
         if args.noise_level is not None
-        else (1.0 if args.model == "yang" else 0.0)
+        else (1.0 if args.model == "yang" else DALE_DEFAULT_NOISE_LEVEL)
     )
 
     grid_pairs, lr_vals, lc_vals, sweep, pareto_objectives = build_grid_pairs(args)
@@ -325,80 +422,97 @@ def main():
         plt.switch_backend("Agg")
 
     if sweep == "both":
-        grid_desc = f"{args.n_lambda}x{args.n_lambda}={len(grid_pairs)}"
+        grid_desc = f"{args.n_lambda}x{args.n_lambda} (+anchor) = {len(grid_pairs)}"
     else:
         grid_desc = f"1D {sweep} n={len(grid_pairs)}  pareto={pareto_objectives}"
     print(
         f"Pareto sweep: model={args.model}  device={device}  "
         f"task_battery={battery_label}  tasks={len(active_tasks)}  "
-        f"grid={grid_desc}  output={out_dir.resolve()}"
+        f"grid={grid_desc}  n_seeds={max(1, int(args.n_seeds))}  "
+        f"output={out_dir.resolve()}"
     )
 
+    reg_opts = {
+        "rate_kind": args.rate_kind,
+        "rate_inh_scale": args.rate_inh_scale,
+        "conn_kind": args.conn_kind,
+        "conn_target": args.conn_target,
+        "conn_inh_scale": args.conn_inh_scale,
+    }
+    seeds = [int(args.seed) + k for k in range(max(1, int(args.n_seeds)))]
+    runs_csv = out_dir / "runs.csv"
+
     rows = []
+    runs = []
     for run_idx, (lr, lc) in enumerate(
-        tqdm(grid_pairs, desc="Pareto sweep", unit="run"), start=1
+        tqdm(grid_pairs, desc="Pareto sweep", unit="point"), start=1
     ):
         t0 = time.perf_counter()
-        config = default_config(n_eachring=args.n_eachring, seed=args.seed, easy_task=True)
-        model = make_fresh_model(args, config, device)
+        objs = []
+        for seed in seeds:
+            config = default_config(
+                n_eachring=args.n_eachring, seed=seed, easy_task=True
+            )
+            model = make_fresh_model(args, config, device, seed=seed)
 
-        train_without_plots(
-            model,
-            config,
-            active_tasks=active_tasks,
-            n_steps=args.steps,
-            batch_size=args.batch_size,
-            lr=args.lr,
-            lambda_rate=float(lr),
-            lambda_connectivity=float(lc),
-            noise_level=noise_level,
-            log_every=args.log_every,
-            show_progress=False,
-        )
+            train_without_plots(
+                model,
+                config,
+                active_tasks=active_tasks,
+                n_steps=args.steps,
+                batch_size=args.batch_size,
+                lr=args.lr,
+                lambda_rate=float(lr),
+                lambda_connectivity=float(lc),
+                noise_level=noise_level,
+                log_every=args.log_every,
+                show_progress=False,
+                loss_per_trial=args.loss_per_trial,
+                **reg_opts,
+            )
 
-        obj = evaluate_pareto_metrics(
-            model,
-            config,
-            active_tasks,
-            device,
-            eval_seeds=eval_seeds,
-            batch_size=args.eval_batch_size,
-            noise_level=0.0,
-            easy_task=True,
-            n_eachring=args.n_eachring,
-        )
+            obj = evaluate_pareto_metrics(
+                model,
+                config,
+                active_tasks,
+                device,
+                eval_seeds=eval_seeds,
+                batch_size=args.eval_batch_size,
+                noise_level=args.eval_noise_level,
+                input_noise=args.eval_input_noise,
+                easy_task=True,
+                **reg_opts,
+            )
+            objs.append(obj)
+
+            run_row = {
+                "point_idx": run_idx,
+                "seed": seed,
+                "lambda_rate": float(lr),
+                "lambda_connectivity": float(lc),
+                **{k: v for k, v in obj.items()},
+            }
+            runs.append(run_row)
+            append_csv_row(runs_csv, run_row, write_header=(len(runs) == 1))
+
+            del model
+            if device.type == "cuda":
+                torch.cuda.empty_cache()
+
         train_time_s = time.perf_counter() - t0
-
-        row = {
-            "run_idx": run_idx,
-            "lambda_rate": float(lr),
-            "lambda_connectivity": float(lc),
-            "mean_acc": obj["mean_acc"],
-            "min_task_acc": obj["min_task_acc"],
-            "task_loss": obj["task_loss"],
-            "metabolic_cost": obj["metabolic_cost"],
-            "wiring_cost": obj["wiring_cost"],
-            "train_time_s": train_time_s,
-            "is_pareto": False,
-        }
-        for key, val in obj.items():
-            if key.startswith("acc_"):
-                row[key] = val
+        row = aggregate_seed_runs(lr, lc, objs, train_time_s)
+        row["run_idx"] = run_idx
         rows.append(row)
-        append_csv_row(csv_path, row, write_header=(run_idx == 1))
 
+        spread = f" +-{row['mean_acc_std']:.3f}" if len(seeds) > 1 else ""
         tqdm.write(
-            f"run {run_idx}/{len(grid_pairs)}  "
+            f"point {run_idx}/{len(grid_pairs)}  "
             f"lr={lr:.2e}  lc={lc:.2e}  "
-            f"acc={obj['mean_acc']:.3f}  min_acc={obj['min_task_acc']:.3f}  "
-            f"task={obj['task_loss']:.4f}  meta={obj['metabolic_cost']:.4f}  "
-            f"wire={obj['wiring_cost']:.4f}  "
+            f"acc={row['mean_acc']:.3f}{spread}  min_acc={row['min_task_acc']:.3f}  "
+            f"task={row['task_loss']:.4f}  meta={row['metabolic_cost']:.4f}  "
+            f"wire={row['wiring_cost']:.4f}  conn={row['conn_frac']:.3f}  "
             f"time={train_time_s:.1f}s"
         )
-
-        del model
-        if device.type == "cuda":
-            torch.cuda.empty_cache()
 
     rows = finalize_results(rows, pareto_objectives)
 
@@ -413,7 +527,15 @@ def main():
         "active_tasks": list(active_tasks),
         "steps": args.steps,
         "seed": args.seed,
+        "n_seeds": len(seeds),
+        "seeds": seeds,
         "noise_level": noise_level,
+        "eval_noise_level": args.eval_noise_level,
+        "eval_input_noise": bool(args.eval_input_noise),
+        "loss_per_trial": bool(args.loss_per_trial),
+        "reg": reg_opts,
+        "prune_eps": args.prune_eps,
+        "lambda_zero_anchor": bool(args.include_lambda_zero),
         "sweep_mode": sweep,
         "pareto_objectives": list(pareto_objectives),
         "pareto_task_objective": "mean_acc",
@@ -431,17 +553,24 @@ def main():
             "rate_values": lr_vals.tolist(),
             "connectivity_values": lc_vals.tolist(),
         },
-        "n_runs": len(rows),
+        "n_points": len(rows),
+        "n_runs": len(runs),
         "n_pareto": int(sum(r["is_pareto"] for r in rows)),
         "rows": rows,
+        "per_seed_rows": runs,
     }
     json_path = out_dir / "summary.json"
     with json_path.open("w") as f:
         json.dump(summary, f, indent=2)
 
     n_pareto = summary["n_pareto"]
-    print(f"Done. {n_pareto}/{len(rows)} Pareto-optimal points.")
+    print(
+        f"Done. {n_pareto}/{len(rows)} Pareto-optimal points "
+        f"({len(runs)} training runs, {len(seeds)} seed(s) per point)."
+    )
     print(f"Saved -> {csv_path.resolve()}")
+    if len(seeds) > 1:
+        print(f"Saved -> {runs_csv.resolve()}  (per-seed rows)")
     print(f"Saved -> {json_path.resolve()}")
 
     if args.plot:
