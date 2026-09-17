@@ -5,9 +5,9 @@
 Why are canonical circuits canonical? Why are they so widely present in the cortex?
 
 The working hypothesis here is that cortical circuit motifs are what you get when
-a network has to solve many tasks under **metabolic** and **wiring** budgets. So we
+a network has to solve many tasks under **firing** and **wiring** budgets. So we
 train sign-constrained (Dale's law) RNNs on the Yang et al. (2019) cognitive task
-battery while charging them for firing rates and for recurrent connectivity, and
+battery while charging them for higher firing rates and for recurrent connectivity, and
 look at the Pareto front that trades task performance against those two costs.
 
 ## Layout
@@ -31,7 +31,7 @@ FIXED_ISSUES.md      audited mismatches between that theory and the code
 ## Install
 
 ```bash
-conda create -n cmc_env python=3.12
+conda create -n cmc_env python=3.12 -y
 conda activate cmc_env
 pip install -r requirements.txt
 pip install -e .
