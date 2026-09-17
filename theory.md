@@ -45,7 +45,7 @@ indices 65 … 84                  → task / rule identity (one-hot)
 
 In code:
 
-```57:58:c:\Users\athar\Documents\Github\canonical_mc\task.py
+```57:58:c:\Users\athar\Documents\Github\canonical_mc\cmc\task.py
         "rule_start": 1 + n_eachring * num_ring,
         "n_input": 1 + n_eachring * num_ring + n_rule,
 ```
@@ -66,7 +66,7 @@ A stimulus at angle $\theta$ becomes a **Gaussian bump** over ring units:
 
 
 
-```167:170:c:\Users\athar\Documents\Github\canonical_mc\task.py
+```167:170:c:\Users\athar\Documents\Github\canonical_mc\cmc\task.py
     def add_x_loc(self, x_loc):
         dist = get_dist(x_loc - self.pref)
         dist /= np.pi / 8
@@ -83,7 +83,7 @@ A stimulus at angle $\theta$ becomes a **Gaussian bump** over ring units:
 
 `trial.add_rule("dm1")` turns on **one** of the 20 rule inputs for the whole trial:
 
-```161:165:c:\Users\athar\Documents\Github\canonical_mc\task.py
+```161:165:c:\Users\athar\Documents\Github\canonical_mc\cmc\task.py
     def add_rule(self, rule, on=None, off=None, strength=1.0):
         ...
             self.x[on:off, :, get_rule_index(rule, self.config)] = strength
@@ -125,7 +125,7 @@ indices 1…32   → target ring (Gaussian bump at response location)
 
 PyTorch wants **batch first**, channels second, time last:
 
-```26:34:c:\Users\athar\Documents\Github\canonical_mc\train_cog.py
+```26:34:c:\Users\athar\Documents\Github\canonical_mc\cmc\train_cog.py
     x = torch.as_tensor(trial.x, device=device, dtype=torch.float32)
     ...
     x_model = x.permute(1, 2, 0).contiguous()   # (B, n_input, T)
@@ -160,7 +160,7 @@ Both `LeakyRNN` and `DaleRNN` loop over **t = 0 … T−1**.
 
 ### LeakyRNN update (Yang-style fused weights)
 
-```174:183:c:\Users\athar\Documents\Github\canonical_mc\network.py
+```174:183:c:\Users\athar\Documents\Github\canonical_mc\cmc\network.py
         for t in range(time_steps):
             x_t = input_matrix[:, :, t]
             gate = torch.cat([x_t, h], dim=1) @ self.kernel + self.bias
@@ -211,7 +211,7 @@ Math:
 
 ### Loss (masked MSE)
 
-```37:39:c:\Users\athar\Documents\Github\canonical_mc\train_cog.py
+```37:39:c:\Users\athar\Documents\Github\canonical_mc\cmc\train_cog.py
 def masked_mse(output, y, c_mask):
     return (c_mask * (output - y).square()).mean()
 ```

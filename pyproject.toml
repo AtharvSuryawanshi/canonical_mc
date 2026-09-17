@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cmc"
+description = "Cost-constrained multitask RNNs: why are canonical microcircuits canonical?"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+dynamic = ["version"]
+authors = [{ name = "Atharv Suryawanshi" }]
+dependencies = [
+    "torch>=2.0",
+    "numpy>=1.24",
+    "matplotlib>=3.7",
+    "tqdm>=4.65",
+]
+
+[project.optional-dependencies]
+# Needed by the notebooks/ analyses, not by training itself.
+analysis = [
+    "pandas>=2.0",
+    "scipy>=1.10",
+    "scikit-learn>=1.3",
+    "plotly>=5.18",
+    "ipykernel>=6.25",
+    "nbformat>=5.9",
+]
+# Multi-objective optimisation over the (lambda_rate, lambda_connectivity) front.
+optim = ["pymoo>=0.6"]
+
+[project.scripts]
+cmc-train = "cmc.train_cog:main"
+cmc-pareto = "cmc.pareto:main"
+
+[tool.setuptools]
+packages = ["cmc"]
+
+[tool.setuptools.dynamic]
+version = { attr = "cmc.__version__" }

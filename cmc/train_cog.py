@@ -9,8 +9,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from tqdm import tqdm
-from network import DaleRNN, LeakyRNN
-from task import default_config, generate_trials, generate_mixed_trials, rules_dict
+from cmc.network import DaleRNN, LeakyRNN
+from cmc.paths import CHECKPOINTS_DIR
+from cmc.task import default_config, generate_trials, generate_mixed_trials, rules_dict
 
 
 # DaleRNN used to train with zero recurrent noise, so it never saw the
@@ -917,7 +918,7 @@ def default_save_path(model_type, tasks, n_steps):
     """checkpoints/{model}_{n_tasks}_{n_steps}_{YYYY_MM_DD_HH_MM_SS}.pt"""
     n_tasks = len(tasks)
     stamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    return Path("checkpoints") / f"{model_type}_{n_tasks}_{n_steps}_{stamp}.pt"
+    return CHECKPOINTS_DIR / f"{model_type}_{n_tasks}_{n_steps}_{stamp}.pt"
 
 
 def resolve_active_tasks(task_battery, tasks):

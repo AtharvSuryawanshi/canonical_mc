@@ -1,6 +1,6 @@
 # Fixed issues
 
-Audit of `task.py` / `network.py` / `train_cog.py` / `pareto.py` for places where the
+Audit of `cmc/task.py` / `cmc/network.py` / `cmc/train_cog.py` / `cmc/pareto.py` for places where the
 neuroscience intent and the code disagreed. Each entry states the issue, why it
 matters, and what was changed.
 
@@ -11,14 +11,14 @@ matters, and what was changed.
 > Recalibrate the lambda ranges before the next sweep:
 >
 > ```bash
-> python train_cog.py --model dale --task-battery sanity3 --n-neurons 256 --report-scales
+> python -m cmc.train_cog --model dale --task-battery sanity3 --n-neurons 256 --report-scales
 > ```
 
 ---
 
 ## 1. The wiring penalty was applied to W_in with an L2
 
-**Files:** `train_cog.py` (`connectivity_reg`), `network.py`
+**Files:** `cmc/train_cog.py` (`connectivity_reg`), `cmc/network.py`
 
 **Issue.** `lambda_connectivity` penalized `w_in.square().mean()`. Verified on a
 live `DaleRNN(N=128)`: the penalized tensor was `(53, 128)` = `W_in`, while
@@ -65,7 +65,7 @@ nonzero magnitude and actively prevent pruning. Instead:
 
 ## 2. An L1 on W_rec would preferentially prune inhibition
 
-**Files:** `network.py` (`DaleRNN.ei_row_scale`), `train_cog.py` (`_w_rec_magnitude`)
+**Files:** `cmc/network.py` (`DaleRNN.ei_row_scale`), `cmc/train_cog.py` (`_w_rec_magnitude`)
 
 **Issue.** `_init_dale_w_rec` multiplies inhibitory rows by `n_e / n_i` to balance
 total E and I drive. Measured at `frac_e=0.8`:
@@ -98,7 +98,7 @@ E/I balance, and weakening it would break the thing under study.
 
 ## 3. Accuracy arithmetically averaged circular angles
 
-**File:** `train_cog.py` (`circular_mean`, `wrap_to_pi`, `batch_accuracy`)
+**File:** `cmc/train_cog.py` (`circular_mean`, `wrap_to_pi`, `batch_accuracy`)
 
 **Issue.** `pred_go` was the plain mean over time of `atan2` output, which lives
 on `(-pi, pi]`. For a target near `pi` the per-step decodes straddle the branch cut
@@ -135,7 +135,7 @@ notebooks import it.
 
 ## 4. Accuracy never required the network to release fixation
 
-**File:** `train_cog.py` (`batch_accuracy`)
+**File:** `cmc/train_cog.py` (`batch_accuracy`)
 
 **Issue.** `fix_ok` was checked only over steps where `y_loc < 0` (the pre-go
 period). Nothing checked that the fixation output goes *down* after go onset.
@@ -166,7 +166,7 @@ window, which is where the nogo criterion actually lives.
 
 ## 5. Accuracy was scored on steps the loss refuses to grade
 
-**Files:** `task.py` (`Trial.post_ons`), `train_cog.py` (`response_mask`)
+**Files:** `cmc/task.py` (`Trial.post_ons`), `cmc/train_cog.py` (`response_mask`)
 
 **Issue.** Every task sets `check_ons = go_onset + 100 ms` and
 `add_c_mask(post_ons=check_ons)`, so the 100 ms reaction-time transient after go
@@ -188,7 +188,7 @@ the final timestep alone, which is what `network.get_perf` uses.
 
 ## 6. `easy_task` removed the integration from the integration tasks
 
-**File:** `task.py` (`EASY_STIM_COH_RANGE`)
+**File:** `cmc/task.py` (`EASY_STIM_COH_RANGE`)
 
 **Issue.** `easy_task=True` multiplied the coherence set by 10 (dm/contextdm) or 2
 (delaydm/contextdelaydm), giving coherences up to 0.8 on a mean of 1.0:
@@ -217,7 +217,7 @@ Per-step SNR is now 2.5x-5.1x, so the tasks require genuine accumulation.
 
 ## 7. Metabolic cost had no L1 option and no E/I knob
 
-**File:** `train_cog.py` (`rate_reg`, `_population_weighted`)
+**File:** `cmc/train_cog.py` (`rate_reg`, `_population_weighted`)
 
 **Issue.** The rate cost was hard-coded to `r_hist.square().mean()`.
 
@@ -245,7 +245,7 @@ new.
 
 ## 8. Mixed batches weighted tasks by trial duration
 
-**File:** `train_cog.py` (`masked_mse`)
+**File:** `cmc/train_cog.py` (`masked_mse`)
 
 **Issue.** `concat_trials` right-pads short tasks up to the longest `tdim`, and
 `masked_mse` took a plain `.mean()` over the whole padded tensor. Measured for
@@ -283,7 +283,7 @@ recalibrating.
 
 ## 9. Dale trained and evaluated with zero recurrent noise
 
-**Files:** `train_cog.py` (`DALE_DEFAULT_NOISE_LEVEL`), `pareto.py`
+**Files:** `cmc/train_cog.py` (`DALE_DEFAULT_NOISE_LEVEL`), `cmc/pareto.py`
 
 **Issue.** `noise_level` defaulted to `0.0` for `dale`, and
 `evaluate_pareto_metrics` used `noise_on=False` plus `noise_level=0.0`. The Dale
@@ -304,7 +304,7 @@ reward robustness when you want that.
 
 ## 10. One seed per lambda, and no lambda = 0 anchor
 
-**File:** `pareto.py`
+**File:** `cmc/pareto.py`
 
 **Issue.** Every grid point used `seed=args.seed` for both init and trial stream,
 with no replication. And with log spacing from `1e-3` there was no `lambda = 0`
@@ -329,11 +329,11 @@ missing (a log axis cannot contain 0).
 
 ## 11. `OBJECTIVE_MAXIMIZE` was missing `min_task_acc`
 
-**File:** `pareto.py`
+**File:** `cmc/pareto.py`
 
 **Issue.** `pareto_maximize_flags` uses `OBJECTIVE_MAXIMIZE.get(name, False)`, and
 `min_task_acc` had no entry -- so naming it as an objective would silently
-**minimize** it and produce an inverted front. `pareto_analysis.ipynb` already
+**minimize** it and produce an inverted front. `notebooks/pareto_analysis.ipynb` already
 lists `min_task_acc` in `OBJECTIVE_LABELS`, so this was one edit from happening.
 
 **Why it matters.** `min_task_acc` is the neuroscience-faithful task objective:
@@ -351,20 +351,20 @@ is a separate analysis decision.
 
 | Where | Issue | Fix |
 |---|---|---|
-| `train_cog.py` `connectivity_reg` | `getattr(m,"W_in",None) or getattr(m,"w_in",None)` worked only because `W_in` is absent; a model defining it would make `bool()` on a multi-element tensor raise | removed, replaced by explicit `target=` dispatch |
-| `train_cog.py` `train` | `frac_silent` / `frac_saturated` in `history` came from the **last task in the loop only** (`act` was overwritten each iteration) | averaged across tasks |
-| `train_cog.py` `sample_input_drive` | used `model.W_in.t()` and `model.b`; neither exists (`w_in`, `bias`), and `w_in` is already `(n_input, N)` so the transpose would not align | `x_t @ model.w_in + model.bias`, works for both models |
-| `train_cog.py` `plot_preactivation_at_init` | guarded on `model.firing_rate` and used `model.rate_max`; no model has either, so it always printed "skipped" | uses `model._cell_act` and the 0.05 threshold from `activity_stats`; now runs for both backends |
-| `task.py` `concat_trials` | kept `trials[0].epochs`, so a mixed trial's epoch dict silently described only the first task | `epochs = {}` plus `epochs_by_task` per rule (captured *before* mutating, since `merged is trials[0]`) |
-| `train_cog.py` `evaluate_pareto_metrics` | rebuilt the eval config from `default_config()` defaults, silently discarding any non-default `dt`/`tau`/`sigma_x`/`ruleset` the model was trained with | new `eval_config_from()` copies the training config and swaps only the RNG; `n_eachring` mismatches now raise instead of passing silently |
-| `train_cog.py` | no way to pick lambda ranges after the cost definitions changed | new `penalty_scales()` and `--report-scales`: prints each term's magnitude and the break-even lambdas |
-| `train_cog.py` / `pareto.py` | training and the reported Pareto costs could drift apart | single `DEFAULT_REG` dict threaded through `train()` and `evaluate_pareto_metrics()`, so the front plots the functional the gradient saw; `summary.json` records it under `reg` |
+| `cmc/train_cog.py` `connectivity_reg` | `getattr(m,"W_in",None) or getattr(m,"w_in",None)` worked only because `W_in` is absent; a model defining it would make `bool()` on a multi-element tensor raise | removed, replaced by explicit `target=` dispatch |
+| `cmc/train_cog.py` `train` | `frac_silent` / `frac_saturated` in `history` came from the **last task in the loop only** (`act` was overwritten each iteration) | averaged across tasks |
+| `cmc/train_cog.py` `sample_input_drive` | used `model.W_in.t()` and `model.b`; neither exists (`w_in`, `bias`), and `w_in` is already `(n_input, N)` so the transpose would not align | `x_t @ model.w_in + model.bias`, works for both models |
+| `cmc/train_cog.py` `plot_preactivation_at_init` | guarded on `model.firing_rate` and used `model.rate_max`; no model has either, so it always printed "skipped" | uses `model._cell_act` and the 0.05 threshold from `activity_stats`; now runs for both backends |
+| `cmc/task.py` `concat_trials` | kept `trials[0].epochs`, so a mixed trial's epoch dict silently described only the first task | `epochs = {}` plus `epochs_by_task` per rule (captured *before* mutating, since `merged is trials[0]`) |
+| `cmc/train_cog.py` `evaluate_pareto_metrics` | rebuilt the eval config from `default_config()` defaults, silently discarding any non-default `dt`/`tau`/`sigma_x`/`ruleset` the model was trained with | new `eval_config_from()` copies the training config and swaps only the RNG; `n_eachring` mismatches now raise instead of passing silently |
+| `cmc/train_cog.py` | no way to pick lambda ranges after the cost definitions changed | new `penalty_scales()` and `--report-scales`: prints each term's magnitude and the break-even lambdas |
+| `cmc/train_cog.py` / `cmc/pareto.py` | training and the reported Pareto costs could drift apart | single `DEFAULT_REG` dict threaded through `train()` and `evaluate_pareto_metrics()`, so the front plots the functional the gradient saw; `summary.json` records it under `reg` |
 
 ---
 
 ## Still open (deliberately not changed)
 
-- **`rho(W_rec)` is only set at init.** `network.py:scale_recurrent_to_rho` is
+- **`rho(W_rec)` is only set at init.** `cmc/network.py:scale_recurrent_to_rho` is
   applied once; the spectral radius then drifts freely, and a wiring penalty will
   systematically shrink it. Any "near-critical dynamics" claim holds at step 0 only.
 - **L1 is not a wiring cost.** It penalizes synaptic *strength*; the biological cost
@@ -377,6 +377,6 @@ is a separate analysis decision.
 - **The Pareto front still uses `mean_acc`** and has no feasibility filter, so a run
   where training collapsed to chance still enters as a legitimate low-cost point
   (see #11).
-- **Task-variance normalization** in `analysis_of_network.ipynb` divides by each
+- **Task-variance normalization** in `notebooks/analysis_of_network.ipynb` divides by each
   unit's peak after only an `ACTIVE_THRESH=1e-3` filter, so units just above
   threshold get their noise amplified to full scale and can form spurious clusters.

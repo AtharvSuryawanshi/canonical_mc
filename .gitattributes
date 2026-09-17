@@ -1,0 +1,2 @@
+# Cluster job scripts must keep LF endings: bash on Linux chokes on CR.
+*.sjob text eol=lf

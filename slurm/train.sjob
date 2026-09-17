@@ -4,10 +4,10 @@
 # Adapted for one A100 MIG slice on the LRZ AI Systems (base torch
 # 2.13+cu130 has no kernels for V100 / CC 7.0).
 #
-# Submit from this directory:
-#   sbatch train.sjob
-# Extra args are forwarded to train_cog.py:
-#   sbatch train.sjob --steps 5000 --model dale
+# Submit from the repo root (log files land in the submit directory):
+#   sbatch slurm/train.sjob
+# Extra args are forwarded to cmc.train_cog:
+#   sbatch slurm/train.sjob --steps 5000 --model dale
 
 #SBATCH -J cmc_train
 #SBATCH -D ./
@@ -32,7 +32,7 @@ fi
 CONDA_ROOT="${CONDA_ROOT:-$HOME/miniconda3}"
 # shellcheck source=/dev/null
 source "${CONDA_ROOT}/etc/profile.d/conda.sh"
-conda activate "${CONDA_ENV:-base}"
+conda activate "${CONDA_ENV:-cmc_env}"
 
 export MPLBACKEND=Agg
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"
@@ -40,8 +40,8 @@ export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"
 echo "Host: $(hostname)  Date: $(date)"
 echo "Job: ${SLURM_JOB_NAME:-local}  ID: ${SLURM_JOB_ID:-none}  GPU: ${CUDA_VISIBLE_DEVICES:-unset}"
 which python
-python -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
+python -c "import torch, cmc; print('torch', torch.__version__, 'cuda', torch.cuda.is_available(), 'cmc', cmc.__version__)"
 
-python train_cog.py --device cuda "$@"
+python -m cmc.train_cog --device cuda "$@"
 
 echo "Finished: $(date)"

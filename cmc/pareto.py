@@ -13,8 +13,9 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from task import default_config, rules_dict
-from train_cog import (
+from cmc.paths import PARETO_RUNS_DIR
+from cmc.task import default_config, rules_dict
+from cmc.train_cog import (
     DALE_DEFAULT_NOISE_LEVEL,
     _model_kwargs_from_args,
     evaluate_pareto_metrics,
@@ -125,7 +126,7 @@ def default_output_dir(model, battery_label, n_lambda, sweep="both"):
         tag = f"1d_lr_{n_lambda}"
     else:
         tag = f"{n_lambda}x{n_lambda}"
-    return Path("pareto_runs") / f"{model}_{battery_label}_{tag}_{stamp}"
+    return PARETO_RUNS_DIR / f"{model}_{battery_label}_{tag}_{stamp}"
 
 
 def pareto_maximize_flags(pareto_objectives):
@@ -300,7 +301,7 @@ def parse_args():
 
     # NOTE: these ranges were calibrated against the OLD task loss (global
     # .mean()) and the OLD wiring cost (L2 on W_in). Both changed, so recalibrate
-    # with `python train_cog.py --report-scales` before trusting them.
+    # with `python -m cmc.train_cog --report-scales` before trusting them.
     parser.add_argument("--lambda-rate-min", type=float, default=1e-4)
     parser.add_argument("--lambda-rate-max", type=float, default=1e0)
     parser.add_argument("--lambda-connectivity-min", type=float, default=1e-3)
