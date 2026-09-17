@@ -79,6 +79,13 @@ lambda at which it breaks even against the task loss:
 python -m cmc.train_cog --model dale --task-battery sanity3 --report-scales
 ```
 
+This reports at *initialization*. Between init and a trained solution the rate
+cost grows ~26x and the task loss falls ~30x, so the break-even lambdas it prints
+overshoot the useful range by ~500x (rate) and ~20x (wiring) -- treat it as a
+check that the terms are finite rather than as the centre of the grid. The
+`--lambda-*-min/max` defaults in `cmc/pareto.py` are already calibrated against
+trained lambda=0 solutions, and the comment above them records the measurements.
+
 Sweep the front:
 
 ```bash

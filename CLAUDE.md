@@ -68,5 +68,9 @@ also deferred, would need a probability-of-connection parameterization.
 **Important:** the fixes above changed what the loss functions numerically
 mean (wiring quantity, loss normalization, task difficulty). Old
 checkpoints/sweeps from before this fix are **not directly comparable** to
-new ones. Use `python -m cmc.train_cog --report-scales` to recalibrate
-lambda ranges before trusting a new sweep.
+new ones. Lambda ranges have been recalibrated for the new objectives --
+the defaults in `cmc/pareto.py` carry both the measurements and the
+reasoning. Note that `--report-scales` measures at *init*, where the rate
+cost is 26x smaller and the task loss 30x larger than at a trained
+solution, so its break-even lambdas overshoot by ~500x (rate) / ~20x
+(wiring): it is a check that the terms are finite, not a grid centre.

@@ -299,13 +299,59 @@ def parse_args():
         help=f"Comma-separated trial RNG seeds for eval (default: {len(DEFAULT_EVAL_SEEDS)} fixed seeds).",
     )
 
-    # NOTE: these ranges were calibrated against the OLD task loss (global
-    # .mean()) and the OLD wiring cost (L2 on W_in). Both changed, so recalibrate
-    # with `python -m cmc.train_cog --report-scales` before trusting them.
-    parser.add_argument("--lambda-rate-min", type=float, default=1e-4)
-    parser.add_argument("--lambda-rate-max", type=float, default=1e0)
-    parser.add_argument("--lambda-connectivity-min", type=float, default=1e-3)
-    parser.add_argument("--lambda-connectivity-max", type=float, default=1e1)
+    # Lambda ranges recalibrated against the CURRENT objectives: L1 on W_rec for
+    # wiring, per-trial task loss, noise_level=0.1. The pre-fix ranges were
+    # calibrated against the OLD task loss (global .mean()) and the OLD wiring
+    # cost (L2 on W_in) -- a different quantity -- so they are not reusable.
+    #
+    # Measured at a *trained* lambda=0 DaleRNN (N=256, n_eachring=16, easy_task):
+    #
+    #                        task_loss   metabolic   wiring   break-even lr / lc
+    #   sanity3 (1k steps)     0.0111      1.247      0.0234     0.0089 / 0.47
+    #   core5   (2k steps)     0.0057      0.781      0.0236     0.0072 / 0.24
+    #
+    # Two traps in reading those numbers:
+    #
+    # 1. `train_cog --report-scales` measures at INIT, where the rate cost is 26x
+    #    smaller and the task loss 30x larger than at the solution. Its break-even
+    #    lambdas (~4 rate, ~8 wiring) overshoot by ~500x / ~20x. Use them to check
+    #    the terms are finite, not to centre the grid.
+    # 2. Break-even at the *unregularized* solution is only a lower anchor. The
+    #    knee sits above it by however compressible the penalized term is, since
+    #    the network shrinks that term before it sacrifices accuracy -- and the
+    #    two costs differ enormously in compressibility:
+    #
+    #      rate cost   ~46x compressible (0.52 -> 0.011 at acc 0.95), so the
+    #                  lambda_rate knee lands near 0.3-1, ~100x break-even.
+    #      wiring cost only ~2.3x compressible. Measured (sanity3, 1k steps,
+    #                  lambda_rate=0), wiring / conn_frac / mean_acc:
+    #                    lc=0     0.0234 / 0.729 / 0.833
+    #                    lc=0.1   0.0233 / 0.728 / 0.856   <- inert
+    #                    lc=1     0.0219 / 0.710 / 0.858   <- inert
+    #                    lc=10    0.0149 / 0.577 / 0.835   <- onset
+    #                    lc=100   0.0106 / 0.448 / 0.649   <- knee
+    #                    lc=1000  0.0103 / 0.436 / 0.653   <- saturated
+    #                  so the lambda_conn knee is 10-100, ~200x break-even, and
+    #                  beyond ~100 the cost stops falling: softplus magnitudes
+    #                  are strictly positive, so with prune_eps=0 an L1 shrinks
+    #                  synapses toward a floor instead of pruning them. The
+    #                  wiring axis therefore spans only ~2.3x no matter how large
+    #                  lambda_conn gets -- see DaleRNN.prune_eps to lift that.
+    #
+    # These defaults are sized for --n-lambda 5: they start where the cost first
+    # moves and end at saturation / collapse, because the inert low end is already
+    # covered by the --include-lambda-zero anchor. For --n-lambda 8-10, extend the
+    # min down (--lambda-rate-min 1e-3, --lambda-connectivity-min 3e-1) to resolve
+    # the flat "free lunch" arm where cost falls at no accuracy cost.
+    #
+    # Battery caveat: the knee scales with task_loss (lambda ~ task_loss / cost),
+    # so a battery or step count with a lower task loss shifts it DOWN. core5 at
+    # 2k steps has half sanity3's task loss, so expect its knee at ~0.5x these
+    # values; that is why the connectivity range starts at 1 rather than 10.
+    parser.add_argument("--lambda-rate-min", type=float, default=1e-2)
+    parser.add_argument("--lambda-rate-max", type=float, default=3e0)
+    parser.add_argument("--lambda-connectivity-min", type=float, default=1e0)
+    parser.add_argument("--lambda-connectivity-max", type=float, default=3e2)
     parser.add_argument("--n-lambda", type=int, default=5)
     parser.add_argument(
         "--lambda-scale",
