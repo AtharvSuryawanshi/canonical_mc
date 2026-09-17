@@ -130,6 +130,14 @@ class LeakyRNN(nn.Module):
     def w_recurrent(self):
         return self.kernel[self.n_input :, :]
 
+    def effective_w_rec(self):
+        """Recurrent weight matrix actually used in the forward pass."""
+        return self.w_recurrent
+
+    def ei_row_scale(self):
+        """Per-presynaptic-row magnitude scale. No E/I split here, so all ones."""
+        return torch.ones(self.n_rnn, device=self.kernel.device, dtype=self.kernel.dtype)
+
     def _normalize_input(self, input_matrix):
         if not torch.is_tensor(input_matrix):
             input_matrix = torch.as_tensor(input_matrix, dtype=torch.float32)
@@ -279,6 +287,7 @@ class DaleRNN(nn.Module):
         sigma_rec=0.05,
         frac_e=0.8,
         target_rho=1.0,
+        prune_eps=0.0,
         seed=0,
     ):
         super().__init__()
@@ -291,6 +300,11 @@ class DaleRNN(nn.Module):
         self.alpha = alpha
         self.activation_name = activation
         self.frac_e = frac_e
+        # Optional hard pruning threshold on synaptic magnitude. 0.0 = off.
+        # softplus() is strictly positive, so an L1 penalty alone can only drive
+        # magnitudes toward (never to) zero; relu(m - eps) gives exact zeros, at
+        # the cost of a dead gradient -- a pruned synapse never comes back.
+        self.prune_eps = float(prune_eps)
         self.n_e = int(n_rnn * frac_e)
         self.n_i = n_rnn - self.n_e
         self.sigma = math.sqrt(2.0 / alpha) * sigma_rec
@@ -314,11 +328,34 @@ class DaleRNN(nn.Module):
 
         self._act = _activation_fn(activation)
 
+    def _recurrent_magnitude(self):
+        """Unsigned synaptic magnitudes, with autapses and pruned synapses at 0."""
+        w_mag = torch.nn.functional.softplus(self.w_raw)
+        if self.prune_eps > 0.0:
+            w_mag = torch.relu(w_mag - self.prune_eps)  # exact zeros, dead gradient
+        return w_mag * self.no_autapse
+
     def _effective_w_rec(self):
         # Dale: softplus magnitudes, presynaptic sign on rows, no autapses
-        w_mag = torch.nn.functional.softplus(self.w_raw)
-        w_recurrent = w_mag * self.sign_vector[:, None]
-        return w_recurrent * self.no_autapse
+        return self._recurrent_magnitude() * self.sign_vector[:, None]
+
+    def effective_w_rec(self):
+        """Recurrent weight matrix actually used in the forward pass."""
+        return self._effective_w_rec()
+
+    def ei_row_scale(self):
+        """Per-presynaptic-row magnitude scale used to normalize weight penalties.
+
+        ``_init_dale_w_rec`` multiplies inhibitory rows by ``n_e / n_i`` so that
+        total E and I drive balance. That makes each I synapse ~n_e/n_i times
+        larger than each E synapse, so an unnormalized L1 would spend most of its
+        budget pruning inhibition. Dividing by this scale equalizes *fractional*
+        shrinkage pressure across the two populations.
+        """
+        scale = torch.ones(self.n_rnn, device=self.w_raw.device, dtype=self.w_raw.dtype)
+        if self.n_i > 0:
+            scale[self.n_e :] = self.n_e / self.n_i
+        return scale
 
     def recurrent_spectral_radius(self):
         """Largest |eigenvalue| of Dale-constrained W_rec."""

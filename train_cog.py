@@ -13,6 +13,12 @@ from network import DaleRNN, LeakyRNN
 from task import default_config, generate_trials, generate_mixed_trials, rules_dict
 
 
+# DaleRNN used to train with zero recurrent noise, so it never saw the
+# perturbations that make redundant recurrent wiring worth paying for -- a
+# noiseless objective reports wiring as nearly free.
+DALE_DEFAULT_NOISE_LEVEL = 0.1
+
+
 def trial_to_tensors(trial, device):
     """Convert a numpy Trial to model / loss tensors.
 
@@ -34,19 +40,134 @@ def trial_to_tensors(trial, device):
     return x_model, y, c_mask, y_loc
 
 
-def masked_mse(output, y, c_mask):
-    """Yang lsq loss: mean of mask-weighted squared error."""
-    return (c_mask * (output - y).square()).mean()
+def masked_mse(output, y, c_mask, per_trial=True):
+    """Mask-weighted squared error on the ring readout.
+
+    ``per_trial=True`` (default) divides each trial by its own total mask weight,
+    so every trial contributes equally no matter how long it is. The old plain
+    ``.mean()`` (``per_trial=False``) divided by ``B * T * n_output``, which makes
+    a mixed batch weight each task in proportion to its trial duration: for
+    sanity3 at batch 96, dmsgo received ~1.5x the gradient weight of fdgo purely
+    because concat_trials right-pads the shorter tasks up to the longest tdim.
+
+    Note the loss itself is already circular: the target is a Gaussian bump laid
+    out on the ring with ``get_dist`` (circular distance), so a 1 deg error near
+    180 deg costs the same as a 1 deg error near 0 deg. Only the *decoding* in
+    batch_accuracy had a wrap bug.
+    """
+    err = c_mask * (output - y).square()
+    if not per_trial:
+        return err.mean()
+    num = err.flatten(1).sum(dim=1)
+    den = c_mask.flatten(1).sum(dim=1).clamp_min(1e-8)
+    return (num / den).mean()
 
 
-def rate_reg(r_hist):
-    """L2 metabolic / rate cost, factored out so it can be reweighted later."""
-    return r_hist.square().mean()
+def _population_weighted(per_unit_cost, model, inh_scale):
+    """Weight a per-unit cost by E/I population fraction.
+
+    With ``inh_scale == 1`` this is exactly the plain per-unit mean, so it is
+    invariant to frac_e and changes nothing by default. ``inh_scale < 1`` makes
+    inhibitory activity cheaper, which is the knob for keeping a rate penalty
+    from silencing the (unread-out, and therefore "free" to kill) I population
+    first.
+    """
+    n_e = getattr(model, "n_e", None)
+    n_i = getattr(model, "n_i", 0)
+    if model is None or n_e is None or n_i == 0:
+        return per_unit_cost.mean()
+    n_rnn = n_e + n_i
+    cost_e = per_unit_cost[..., :n_e].mean()
+    cost_i = per_unit_cost[..., n_e:].mean()
+    return (n_e / n_rnn) * cost_e + inh_scale * (n_i / n_rnn) * cost_i
 
 
-def connectivity_reg(model):
-    w_in = getattr(model, "W_in", None) or getattr(model, "w_in", None)
-    return w_in.square().mean()
+def rate_reg(r_hist, model=None, kind="l2", inh_scale=1.0):
+    """Metabolic / rate cost.
+
+    ``kind="l1"`` is the closer analogue of metabolic cost: ATP per spike is
+    roughly linear in firing rate. ``kind="l2"`` (the default, kept for
+    continuity with earlier runs) barely penalizes a broadly active population
+    and heavily penalizes a few high firers, which is a homeostatic rather than a
+    metabolic cost.
+    """
+    if kind == "l1":
+        per_unit = r_hist.abs()
+    elif kind == "l2":
+        per_unit = r_hist.square()
+    else:
+        raise ValueError(f"rate_reg: kind must be 'l1' or 'l2', got {kind!r}")
+    return _population_weighted(per_unit, model, inh_scale)
+
+
+def _w_rec_magnitude(model, inh_scale=1.0):
+    """Normalized recurrent synaptic magnitudes plus the mask of counted synapses.
+
+    Magnitudes are divided by ``ei_row_scale()`` so that E and I synapses feel
+    equal *fractional* shrinkage pressure. Without this, _init_dale_w_rec's
+    ``n_e / n_i`` balance scaling makes each inhibitory synapse ~3.9x larger than
+    each excitatory one (measured at frac_e=0.8), so an unnormalized L1 spends
+    half its budget on the 20% of rows that are inhibitory and prunes inhibition
+    first -- which with ReLU units means runaway excitation.
+    """
+    w_rec = model.effective_w_rec()
+    mag = w_rec.abs() / model.ei_row_scale()[:, None]
+    # Autapses are structurally absent in DaleRNN, so they must not be counted.
+    # LeakyRNN's fused kernel has a real, trainable diagonal, so it is counted.
+    mask = getattr(model, "no_autapse", None)
+    if mask is None:
+        mask = torch.ones_like(mag)
+    if inh_scale != 1.0:
+        row_w = torch.ones(mag.shape[0], device=mag.device, dtype=mag.dtype)
+        n_e = getattr(model, "n_e", None)
+        if n_e is not None:
+            row_w[n_e:] = inh_scale
+        mask = mask * row_w[:, None]
+    return mag, mask
+
+
+def connectivity_reg(model, kind="l1", target="w_rec", inh_scale=1.0):
+    """Wiring cost of the *recurrent* circuit.
+
+    The hypothesis is about the cost of recurrent circuit wiring, so the penalty
+    belongs on W_rec. It used to be applied to W_in (the input projection) with
+    an L2 -- i.e. it penalized thalamocortical-style afferents and shrank them
+    uniformly instead of pruning any. ``target="w_in"`` reproduces that legacy
+    quantity for comparison with old sweeps.
+
+    L1, not L2: L2 shrinks every synapse toward small-but-present, which is not
+    what "fewer wires" means. L1 is the convex surrogate for a connection count.
+    Note that for DaleRNN the magnitude is ``softplus(w_raw)``, which is strictly
+    positive, so L1 alone can never reach exact zero -- see DaleRNN.prune_eps.
+
+    Normalized per counted synapse, so lambda means "cost per synapse" and stays
+    comparable if n_neurons changes.
+    """
+    if kind not in ("l1", "l2"):
+        raise ValueError(f"connectivity_reg: kind must be 'l1' or 'l2', got {kind!r}")
+    if target == "w_in":
+        mag = model.w_in.abs()
+        return mag.mean() if kind == "l1" else mag.square().mean()
+    if target != "w_rec":
+        raise ValueError(f"connectivity_reg: target must be 'w_rec' or 'w_in', got {target!r}")
+    mag, mask = _w_rec_magnitude(model, inh_scale=inh_scale)
+    term = mag if kind == "l1" else mag.square()
+    return (term * mask).sum() / mask.sum().clamp_min(1.0)
+
+
+def connection_fraction(model, thresh=1e-2):
+    """Fraction of recurrent synapses that are effectively present.
+
+    Reported, never trained on: L1 is a convex surrogate for a connection count,
+    and this is the count itself. Magnitudes are E/I-normalized so the threshold
+    means the same thing for both populations.
+    """
+    with torch.no_grad():
+        mag, mask = _w_rec_magnitude(model)
+        counted = mask > 0
+        if not counted.any():
+            return float("nan")
+        return float(((mag > thresh) & counted).sum() / counted.sum())
 
 
 def ring_prefs(config, device, dtype):
@@ -62,39 +183,145 @@ def decode_ring(output, prefs):
     return torch.atan2(sin_c, cos_c)
 
 
-def circular_abs(delta):
+def wrap_to_pi(delta):
+    """Wrap an angle difference into (-pi, pi]: 181 deg vs 180 deg is a 1 deg error."""
     return torch.remainder(delta + math.pi, 2 * math.pi) - math.pi
 
 
-def batch_accuracy(output, y_loc, prefs, ang_thresh=math.pi / 5, fix_thresh=0.5):
-    """Per-trial metrics: hold fixation, then land within 36° after go."""
-    pred_loc = decode_ring(output, prefs)
-    go = y_loc >= 0
-    fix = y_loc < 0
+# Backwards-compatible alias (used by exp.ipynb / exp_dale.ipynb).
+circular_abs = wrap_to_pi
 
-    go_counts = go.sum(dim=1).clamp_min(1)
-    target_loc = (y_loc.masked_fill(~go, 0.0).sum(dim=1) / go_counts)
-    pred_go = pred_loc.masked_fill(~go, 0.0).sum(dim=1) / go_counts
-    ang_ok = circular_abs(pred_go - target_loc).abs() < ang_thresh
+
+def circular_mean(angles, mask):
+    """Mean direction over time: atan2(<sin>, <cos>) on the masked steps.
+
+    An arithmetic mean of angles is wrong at the +-pi branch cut. decode_ring
+    returns atan2 output in (-pi, pi], so for a target near pi the per-step
+    decodes straddle the cut and average to ~0 -- i.e. 180 deg away. Verified:
+    a network whose bump wobbled +-14 deg (well inside the 36 deg criterion) at
+    *every* step scored acc=0.00 for targets in [3.00, 3.19] rad and acc=1.00
+    just outside that band. That put a location-dependent floor on measured
+    accuracy which grew with how jittery the network was, so it penalized
+    high-lambda runs twice.
+
+    angles, mask : (B, T). Returns (B,).
+    """
+    w = mask.to(angles.dtype)
+    denom = w.sum(dim=1).clamp_min(1e-8)
+    sin_m = (torch.sin(angles) * w).sum(dim=1) / denom
+    cos_m = (torch.cos(angles) * w).sum(dim=1) / denom
+    return torch.atan2(sin_m, cos_m)
+
+
+def response_mask(trial, device):
+    """(batch, T) bool mask of the graded response window.
+
+    This is ``c_mask``'s post_ons region: every task sets
+    ``check_ons = go_onset + 100 ms`` and ``add_c_mask(post_ons=check_ons)``, so
+    the 100 ms reaction-time transient after go onset is deliberately ungraded by
+    the loss. Accuracy must use the same window; scoring every step with
+    y_loc >= 0 (the old behaviour) graded the network on exactly the transient
+    the loss told it to ignore.
+    """
+    tdim = trial.tdim
+    if getattr(trial, "post_ons", None) is None:
+        mask = torch.zeros(trial.batch_size, tdim, dtype=torch.bool, device=device)
+        mask[:, -1] = True
+        return mask
+    post = torch.as_tensor(np.asarray(trial.post_ons), device=device).long()
+    steps = torch.arange(tdim, device=device)
+    return steps[None, :] >= post[:, None]
+
+
+def batch_accuracy(
+    output, y_loc, prefs, resp_mask=None, ang_thresh=math.pi / 5, fix_thresh=0.5
+):
+    """Yang-style trial performance, scored on the graded response window.
+
+    Criterion, matching ``network.get_perf``:
+      * fixation-hold trials (no go target): correct iff still fixating;
+      * go trials: correct iff the decoded location is within ``ang_thresh``
+        **and** fixation has been released.
+
+    The release requirement was previously missing -- fixation was only checked
+    over the pre-go period, so a network that produced the right bump and held
+    its fixation unit at 0.95 forever scored acc=1.0 (verified). That is a real
+    loophole for dmsgo/dmsnogo/dmcgo/dmcnogo, where go-vs-nogo *is* the task.
+
+    resp_mask : (batch, T) bool, from ``response_mask``. If None, falls back to
+        the final time step alone, which is what ``network.get_perf`` uses.
+    """
+    batch_size, time_steps, _ = output.shape
+    if resp_mask is None:
+        resp_mask = torch.zeros(
+            batch_size, time_steps, dtype=torch.bool, device=output.device
+        )
+        resp_mask[:, -1] = True
+
+    pred_loc = decode_ring(output, prefs)
+    go = (y_loc >= 0) & resp_mask
     has_go = go.any(dim=1)
+    has_fix = ~has_go
+
+    pred_go = circular_mean(pred_loc, go)
+    target_loc = circular_mean(y_loc, go)
+    ang_ok = wrap_to_pi(pred_go - target_loc).abs() < ang_thresh
 
     fix_out = output[..., 0]
-    fix_counts = fix.sum(dim=1).clamp_min(1)
-    fix_mean = fix_out.masked_fill(~fix, 0.0).sum(dim=1) / fix_counts
-    fix_ok = fix_mean > fix_thresh
-    has_fix = fix.any(dim=1)
+    resp_counts = resp_mask.sum(dim=1).clamp_min(1)
+    fix_resp = (fix_out * resp_mask).sum(dim=1) / resp_counts
+    fixating = fix_resp > fix_thresh
 
-    trial_ok = torch.ones_like(has_go)
-    trial_ok = torch.where(has_go, ang_ok, trial_ok)
-    trial_ok = torch.where(has_fix, trial_ok & fix_ok, trial_ok)
+    # go: right place AND fixation released. hold: still fixating.
+    trial_ok = torch.where(has_go, ang_ok & ~fixating, fixating)
 
-    go_acc = ang_ok[has_go].float().mean().item() if has_go.any() else float("nan")
-    fix_acc = fix_ok[has_fix].float().mean().item() if has_fix.any() else float("nan")
+    def _mean(flags, sel):
+        return flags[sel].float().mean().item() if sel.any() else float("nan")
+
     return {
         "acc": trial_ok.float().mean().item(),
-        "go_acc": go_acc,
-        "fix_acc": fix_acc,
+        "go_acc": _mean(ang_ok & ~fixating, has_go),
+        "fix_acc": _mean(fixating, has_fix),
+        # Diagnostics: separates "saccaded to the wrong place" from "never let go".
+        "loc_acc": _mean(ang_ok, has_go),
+        "release_acc": _mean(~fixating, has_go),
     }
+
+
+# Default regularizer shape. Kept in one place so training and the reported
+# Pareto costs can never drift apart -- the front must plot the same functional
+# that the gradient saw.
+DEFAULT_REG = {
+    "rate_kind": "l2",
+    "rate_inh_scale": 1.0,
+    "conn_kind": "l1",
+    "conn_target": "w_rec",
+    "conn_inh_scale": 1.0,
+}
+
+
+def _reg_opts(**overrides):
+    opts = dict(DEFAULT_REG)
+    unknown = set(overrides) - set(opts)
+    if unknown:
+        raise TypeError(f"unknown regularizer options: {sorted(unknown)}")
+    opts.update({k: v for k, v in overrides.items() if v is not None})
+    return opts
+
+
+def eval_config_from(train_config, seed, easy_task=None):
+    """Eval config that inherits the training config, with a fresh seeded RNG.
+
+    Previously this was rebuilt from ``default_config()``, which silently
+    discarded any non-default dt / tau / sigma_x / ruleset the model was actually
+    trained with. Copying the training config keeps train and eval on the same
+    task definition; only the RNG (and optionally easy_task) is swapped.
+    """
+    config = dict(train_config)
+    if easy_task is not None:
+        config["easy_task"] = bool(easy_task)
+    config["rng"] = np.random.RandomState(int(seed))
+    return config
 
 
 def evaluate_task(model, config, rule, batch_size, device, noise_level=0.0):
@@ -104,7 +331,7 @@ def evaluate_task(model, config, rule, batch_size, device, noise_level=0.0):
         r_hist, x_hist, output = model.simulate(x, noise_level=noise_level)
         loss = masked_mse(output, y, c_mask).item()
         prefs = ring_prefs(config, output.device, output.dtype)
-        acc = batch_accuracy(output, y_loc, prefs)
+        acc = batch_accuracy(output, y_loc, prefs, resp_mask=response_mask(trial, device))
         activity = model.activity_stats(r_hist, x_hist)
     return {"loss": loss, "activity": activity, **acc}
 
@@ -118,32 +345,55 @@ def evaluate_pareto_metrics(
     eval_seeds,
     batch_size,
     noise_level=0.0,
+    input_noise=False,
     easy_task=True,
     n_eachring=None,
+    conn_thresh=1e-2,
+    **reg_overrides,
 ):
-    """Seeded, noiseless eval: accuracy (mean + min over tasks), costs, optional per-task acc."""
+    """Seeded eval: accuracy (mean + min over tasks) and the two cost objectives.
+
+    Costs use the same regularizer options as training, so the Pareto axes plot
+    the quantity the gradient actually minimized.
+    """
     device = torch.device(device)
-    n_ring = n_eachring or train_config.get(
-        "n_eachring", train_config.get("n_neurons_per_ring", 16)
-    )
+    reg = _reg_opts(**reg_overrides)
     active_tasks = tuple(active_tasks)
+    if n_eachring is not None:
+        trained_ring = train_config.get("n_eachring")
+        if trained_ring is not None and int(n_eachring) != int(trained_ring):
+            raise ValueError(
+                f"n_eachring={n_eachring} does not match the trained config "
+                f"({trained_ring}); the model cannot consume that input size."
+            )
     task_accs = {rule: [] for rule in active_tasks}
     task_losses = {rule: [] for rule in active_tasks}
     metabolic_costs = []
 
     with torch.no_grad():
         for seed_k in eval_seeds:
-            eval_config = default_config(
-                n_eachring=int(n_ring), seed=int(seed_k), easy_task=easy_task
-            )
+            eval_config = eval_config_from(train_config, seed_k, easy_task=easy_task)
             for rule in active_tasks:
-                trial = generate_trials(rule, eval_config, batch_size, noise_on=False)
+                trial = generate_trials(
+                    rule, eval_config, batch_size, noise_on=input_noise
+                )
                 x, y, c_mask, y_loc = trial_to_tensors(trial, device)
                 r_hist, x_hist, output = model.simulate(x, noise_level=noise_level)
                 task_losses[rule].append(masked_mse(output, y, c_mask).item())
-                metabolic_costs.append(rate_reg(r_hist).item())
+                metabolic_costs.append(
+                    rate_reg(
+                        r_hist,
+                        model=model,
+                        kind=reg["rate_kind"],
+                        inh_scale=reg["rate_inh_scale"],
+                    ).item()
+                )
                 prefs = ring_prefs(eval_config, output.device, output.dtype)
-                task_accs[rule].append(batch_accuracy(output, y_loc, prefs)["acc"])
+                task_accs[rule].append(
+                    batch_accuracy(
+                        output, y_loc, prefs, resp_mask=response_mask(trial, device)
+                    )["acc"]
+                )
 
     per_task_mean_acc = {
         rule: float(np.mean(task_accs[rule])) for rule in active_tasks
@@ -159,7 +409,18 @@ def evaluate_pareto_metrics(
         "min_task_acc": min_task_acc,
         "task_loss": task_loss,
         "metabolic_cost": float(np.mean(metabolic_costs)),
-        "wiring_cost": float(connectivity_reg(model).item()),
+        "wiring_cost": float(
+            connectivity_reg(
+                model,
+                kind=reg["conn_kind"],
+                target=reg["conn_target"],
+                inh_scale=reg["conn_inh_scale"],
+            ).item()
+        ),
+        "conn_frac": connection_fraction(model, thresh=conn_thresh),
+        "wiring_cost_w_in_l2": float(
+            connectivity_reg(model, kind="l2", target="w_in").item()
+        ),
     }
     for rule, acc in per_task_mean_acc.items():
         out[f"acc_{rule}"] = acc
@@ -178,9 +439,13 @@ def evaluate_objectives(model, config, active_tasks, batch_size, device, noise_l
             x, y, c_mask, y_loc = trial_to_tensors(trial, device)
             r_hist, x_hist, output = model.simulate(x, noise_level=noise_level)
             task_losses.append(masked_mse(output, y, c_mask).item())
-            metabolic_costs.append(rate_reg(r_hist).item())
+            metabolic_costs.append(rate_reg(r_hist, model=model).item())
             prefs = ring_prefs(config, output.device, output.dtype)
-            accs.append(batch_accuracy(output, y_loc, prefs)["acc"])
+            accs.append(
+                batch_accuracy(
+                    output, y_loc, prefs, resp_mask=response_mask(trial, device)
+                )["acc"]
+            )
     return {
         "task_loss": float(np.mean(task_losses)),
         "metabolic_cost": float(np.mean(metabolic_costs)),
@@ -188,6 +453,67 @@ def evaluate_objectives(model, config, active_tasks, batch_size, device, noise_l
         "mean_acc": float(np.mean(accs)),
         "min_task_acc": float(min(accs)) if accs else float("nan"),
     }
+
+
+def penalty_scales(
+    model,
+    config,
+    active_tasks,
+    batch_size=64,
+    device="cpu",
+    noise_level=0.0,
+    loss_per_trial=True,
+    **reg_overrides,
+):
+    """Magnitude of each loss term at the current weights, plus break-even lambdas.
+
+    lambda_x is meaningful only relative to the task loss: the interesting range
+    brackets lambda_x * cost_x == task_loss. Both of these moved in this round of
+    fixes -- masked_mse now normalizes per trial (task loss ~2x smaller) and the
+    wiring cost is now L1 on W_rec instead of L2 on W_in (a different quantity
+    entirely) -- so the old calibrated ranges no longer apply. Run this on a
+    freshly initialized model to pick new ones.
+    """
+    device = torch.device(device)
+    reg = _reg_opts(**reg_overrides)
+    task_losses, rate_costs = [], []
+    with torch.no_grad():
+        for rule in active_tasks:
+            trial = generate_trials(rule, config, batch_size, noise_on=True)
+            x, y, c_mask, _ = trial_to_tensors(trial, device)
+            r_hist, _, output = model.simulate(x, noise_level=noise_level)
+            task_losses.append(
+                masked_mse(output, y, c_mask, per_trial=loss_per_trial).item()
+            )
+            rate_costs.append(
+                rate_reg(
+                    r_hist,
+                    model=model,
+                    kind=reg["rate_kind"],
+                    inh_scale=reg["rate_inh_scale"],
+                ).item()
+            )
+        wiring = connectivity_reg(
+            model,
+            kind=reg["conn_kind"],
+            target=reg["conn_target"],
+            inh_scale=reg["conn_inh_scale"],
+        ).item()
+
+    task_loss = float(np.mean(task_losses))
+    rate_cost = float(np.mean(rate_costs))
+    out = {
+        "task_loss": task_loss,
+        "metabolic_cost": rate_cost,
+        "wiring_cost": float(wiring),
+        "conn_frac": connection_fraction(model),
+        "lambda_rate_breakeven": task_loss / rate_cost if rate_cost > 0 else float("inf"),
+        "lambda_connectivity_breakeven": (
+            task_loss / wiring if wiring > 0 else float("inf")
+        ),
+        "reg": dict(reg),
+    }
+    return out
 
 
 def make_yang_model(
@@ -221,6 +547,7 @@ def make_dale_model(
     activation="relu",
     w_rec_init="randortho",
     sigma_rec=0.05,
+    prune_eps=0.0,
     seed=0,
     device="cpu",
 ):
@@ -234,6 +561,7 @@ def make_dale_model(
         sigma_rec=sigma_rec,
         frac_e=frac_e,
         target_rho=g,
+        prune_eps=prune_eps,
         seed=seed,
     )
     rho = model.recurrent_spectral_radius()
@@ -335,18 +663,29 @@ def sample_input_drive(model, config, task="fdgo", batch_size=8, device="cpu", t
         t_step = min(t_step, trial.tdim - 1)
     with torch.no_grad():
         x_t = x[:, :, t_step]
-        drive = torch.matmul(x_t, model.W_in.t()) + model.b
+        # w_in is (n_input, n_rnn) for both models; the old code used a
+        # nonexistent model.W_in / model.b and a transpose that would not align.
+        drive = x_t @ model.w_in + model.bias
     return drive.detach().cpu().numpy().ravel(), t_step
 
 
 def plot_preactivation_at_init(model, config, device="cpu", task="fdgo"):
-    """Histogram of input drive at init — Dale model only."""
-    if not hasattr(model, "firing_rate"):
-        print("plot_preactivation_at_init: skipped (Yang LeakyRNN has no Dale firing_rate)")
-        return None
+    """Histogram of input drive at init and the rates it produces (both models).
+
+    The old guard tested ``hasattr(model, "firing_rate")`` and referenced
+    ``model.rate_max``; neither exists on DaleRNN or LeakyRNN, so this always
+    printed "skipped" and never ran.
+    """
     drive, t_step = sample_input_drive(model, config, task=task, device=device)
-    rates = model.firing_rate(torch.as_tensor(drive, device=next(model.parameters()).device)).detach().cpu().numpy()
-    silent_thresh = 0.05 * model.rate_max
+    param_device = next(model.parameters()).device
+    with torch.no_grad():
+        rates = (
+            model._cell_act(torch.as_tensor(drive, device=param_device))
+            .detach()
+            .cpu()
+            .numpy()
+        )
+    silent_thresh = 0.05  # matches activity_stats' frac_silent threshold
 
     fig, axes = plt.subplots(1, 2, figsize=(9, 3.5))
     axes[0].hist(drive, bins=40, color="C0", alpha=0.85, edgecolor="white")
@@ -384,8 +723,11 @@ def train(
     mixed_batch=True,
     plot_results=True,
     show_progress=True,
+    loss_per_trial=True,
+    **reg_overrides,
 ):
     """Multitask training. By default each batch mixes all active tasks."""
+    reg = _reg_opts(**reg_overrides)
     device = next(model.parameters()).device
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     history = {
@@ -395,9 +737,18 @@ def train(
         "frac_silent": [],
         "frac_saturated": [],
         "per_task": {
-            task: {"loss": [], "acc": [], "go_acc": [], "fix_acc": []}
+            task: {
+                "loss": [],
+                "acc": [],
+                "go_acc": [],
+                "fix_acc": [],
+                "loc_acc": [],
+                "release_acc": [],
+            }
             for task in active_tasks
         },
+        "reg": dict(reg),
+        "loss_per_trial": bool(loss_per_trial),
     }
 
     steps = tqdm(range(1, n_steps + 1)) if show_progress else range(1, n_steps + 1)
@@ -410,13 +761,22 @@ def train(
         x, y, c_mask, y_loc = trial_to_tensors(trial, device)
 
         def loss_fn(r_hist, x_hist, output_matrix, y=y, c_mask=c_mask):
-            task_loss = masked_mse(output_matrix, y, c_mask)
-            reg = task_loss
+            total = masked_mse(output_matrix, y, c_mask, per_trial=loss_per_trial)
             if lambda_rate:
-                reg = reg + lambda_rate * rate_reg(r_hist)
+                total = total + lambda_rate * rate_reg(
+                    r_hist,
+                    model=model,
+                    kind=reg["rate_kind"],
+                    inh_scale=reg["rate_inh_scale"],
+                )
             if lambda_connectivity:
-                reg = reg + lambda_connectivity * connectivity_reg(model)
-            return reg
+                total = total + lambda_connectivity * connectivity_reg(
+                    model,
+                    kind=reg["conn_kind"],
+                    target=reg["conn_target"],
+                    inh_scale=reg["conn_inh_scale"],
+                )
+            return total
 
         loss = model.train_step(
             optimizer,
@@ -433,22 +793,23 @@ def train(
             parts = [f"step {step:4d} | train {loss.item():.4f}"]
             if mixed_batch and len(active_tasks) > 1:
                 parts[-1] += " (mixed)"
-            act = None
+            acts = []
             for task in active_tasks:
                 metrics = evaluate_task(model, config, task, eval_batch_size, device)
-                history["per_task"][task]["loss"].append(metrics["loss"])
-                history["per_task"][task]["acc"].append(metrics["acc"])
-                history["per_task"][task]["go_acc"].append(metrics["go_acc"])
-                history["per_task"][task]["fix_acc"].append(metrics["fix_acc"])
+                for key in ("loss", "acc", "go_acc", "fix_acc", "loc_acc", "release_acc"):
+                    history["per_task"][task][key].append(metrics[key])
                 parts.append(
                     f"{task} accuracy:{metrics['acc']:.3f} "
                     f"go:{metrics['go_acc']:.2f} fix:{metrics['fix_acc']:.2f} "
                     f"loss:{metrics['loss']:.4f}"
                 )
-                act = metrics["activity"]
-            history["frac_silent"].append(act["frac_silent"])
-            history["frac_saturated"].append(act["frac_saturated"])
-            parts.append(f"sat:{act['frac_saturated']:.2f}; silent:{act['frac_silent']:.2f}")
+                acts.append(metrics["activity"])
+            # Average over tasks: this used to record only the last task's stats.
+            frac_silent = float(np.mean([a["frac_silent"] for a in acts]))
+            frac_saturated = float(np.mean([a["frac_saturated"] for a in acts]))
+            history["frac_silent"].append(frac_silent)
+            history["frac_saturated"].append(frac_saturated)
+            parts.append(f"sat:{frac_saturated:.2f}; silent:{frac_silent:.2f}")
             # print(" | ".join(parts))
 
     if plot_results:
@@ -605,11 +966,76 @@ def parse_args():
         type=float,
         default=None,
         help="Recurrent noise multiplier on gate (actual std = noise_level * sigma_rec scaled). "
-        "Default: 1.0 for yang, 0.0 for dale.",
+        "Default: 1.0 for yang, 0.1 for dale.",
     )
     parser.add_argument("--lr", type=float, default=1e-3, help="Adam learning rate.")
     parser.add_argument("--lambda-rate", type=float, default=0.0)
     parser.add_argument("--lambda-connectivity", type=float, default=0.0)
+    parser.add_argument(
+        "--rate-kind",
+        choices=["l1", "l2"],
+        default="l2",
+        help="Metabolic cost norm on firing rates. l1 is closer to ATP-per-spike; "
+        "l2 (default) is kept for continuity with earlier runs.",
+    )
+    parser.add_argument(
+        "--rate-inh-scale",
+        type=float,
+        default=1.0,
+        help="Extra weight on the inhibitory population in the rate cost. "
+        "1.0 (default) == plain per-unit mean; <1 protects I units from being "
+        "silenced first (they carry no readout cost, so they are cheap to kill).",
+    )
+    parser.add_argument(
+        "--conn-kind",
+        choices=["l1", "l2"],
+        default="l1",
+        help="Wiring cost norm on W_rec. L1 (default) is the convex surrogate "
+        "for a connection count; L2 only shrinks.",
+    )
+    parser.add_argument(
+        "--conn-target",
+        choices=["w_rec", "w_in"],
+        default="w_rec",
+        help="Which matrix the wiring cost penalizes. w_rec (default) is the "
+        "recurrent circuit; w_in reproduces the old (incorrect) input-projection "
+        "penalty for comparison.",
+    )
+    parser.add_argument(
+        "--conn-inh-scale",
+        type=float,
+        default=1.0,
+        help="Extra weight on inhibitory rows of the wiring cost, applied on top "
+        "of the n_e/n_i magnitude normalization. 1.0 == equal cost per synapse.",
+    )
+    parser.add_argument(
+        "--prune-eps",
+        type=float,
+        default=0.0,
+        help="DaleRNN only: hard-threshold synaptic magnitudes at this value in "
+        "the forward pass, giving exact zeros. 0.0 (default) = off. Pruning is "
+        "irreversible -- a synapse below eps has zero gradient and never returns.",
+    )
+    parser.add_argument(
+        "--loss-per-trial",
+        dest="loss_per_trial",
+        action="store_true",
+        default=True,
+        help="Normalize the task loss per trial so long tasks are not favoured "
+        "(default).",
+    )
+    parser.add_argument(
+        "--no-loss-per-trial",
+        dest="loss_per_trial",
+        action="store_false",
+        help="Legacy global .mean() task loss (weights tasks by trial duration).",
+    )
+    parser.add_argument(
+        "--report-scales",
+        action="store_true",
+        help="Print the magnitude of each loss term and the break-even lambdas at "
+        "init, then exit without training.",
+    )
     parser.add_argument("--log-every", type=int, default=20)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--device", type=str, default=None)
@@ -640,6 +1066,7 @@ def _model_kwargs_from_args(args):
         "frac_e": args.frac_e,
         "g": args.g,
         "sigma_rec": args.sigma_rec,
+        "prune_eps": getattr(args, "prune_eps", 0.0),
         "seed": args.seed,
     }
 
@@ -669,7 +1096,7 @@ def main():
     noise_level = (
         args.noise_level
         if args.noise_level is not None
-        else (1.0 if args.model == "yang" else 0.0)
+        else (1.0 if args.model == "yang" else DALE_DEFAULT_NOISE_LEVEL)
     )
 
     battery_label = args.task_battery if args.tasks is None else "custom"
@@ -679,6 +1106,34 @@ def main():
         f"task_battery={battery_label}  tasks={active_tasks}  "
         f"noise_level={noise_level}"
     )
+    reg_opts = {
+        "rate_kind": args.rate_kind,
+        "rate_inh_scale": args.rate_inh_scale,
+        "conn_kind": args.conn_kind,
+        "conn_target": args.conn_target,
+        "conn_inh_scale": args.conn_inh_scale,
+    }
+
+    if args.report_scales:
+        scales = penalty_scales(
+            model,
+            config,
+            active_tasks,
+            batch_size=args.batch_size,
+            device=device,
+            noise_level=noise_level,
+            loss_per_trial=args.loss_per_trial,
+            **reg_opts,
+        )
+        print()
+        print("Loss-term magnitudes at init:")
+        for key in ("task_loss", "metabolic_cost", "wiring_cost", "conn_frac"):
+            print(f"  {key:28s} {scales[key]:.6g}")
+        print("Break-even lambdas (penalty == task loss):")
+        print(f"  lambda_rate                  {scales['lambda_rate_breakeven']:.4g}")
+        print(f"  lambda_connectivity          {scales['lambda_connectivity_breakeven']:.4g}")
+        return
+
     history = train(
         model,
         config,
@@ -691,6 +1146,8 @@ def main():
         noise_level=noise_level,
         log_every=args.log_every,
         plot_results=args.plot_results,
+        loss_per_trial=args.loss_per_trial,
+        **reg_opts,
     )
 
     save_path = args.save_path or default_save_path(args.model, active_tasks, args.steps)

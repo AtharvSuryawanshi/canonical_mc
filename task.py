@@ -2,6 +2,13 @@
 
 import numpy as np
 
+# easy_task coherence band. Kept narrow (0.10-0.20) so the decision tasks stay
+# genuine evidence-integration problems: with sigma_x_eff ~= 0.032 the per-step
+# SNR is ~2-3x, so the network must accumulate rather than read off one frame.
+# The old easy setting (x10 / x2 on the hard ranges, up to coh=0.8) gave ~9x
+# per-step SNR, which made dm/contextdm solvable from a single timestep.
+EASY_STIM_COH_RANGE = np.array([0.10, 0.15, 0.20], dtype=np.float32)
+
 rules_dict = {
     "all": [
         "fdgo",
@@ -107,6 +114,10 @@ class Trial:
             self.y[:, :, :] = 0.05
         self.y_loc = -np.ones((tdim, batch_size), dtype=self.float_type)
         self.c_mask = None
+        # First graded response step per trial (set by add_c_mask). Accuracy must
+        # be scored on this window, not on every step where y_loc >= 0: the
+        # 100 ms after go onset is deliberately ungraded by c_mask.
+        self.post_ons = None
         self.epochs = {}
         self.rule = None
         self._sigma_x = config["sigma_x"] * np.sqrt(2.0 / config["alpha"])
@@ -155,6 +166,9 @@ class Trial:
         pre_on = int(100 / self.dt)
         pre_offs = self.expand(pre_offs)
         post_ons = self.expand(post_ons)
+        self.post_ons = np.asarray(
+            [self.tdim if o is None else int(o) for o in post_ons], dtype=np.int64
+        )
 
         if self.config["loss_type"] == "lsq":
             c_mask = np.zeros((self.tdim, self.batch_size, self.n_output), dtype=self.float_type)
@@ -319,7 +333,7 @@ def _dm(config, batch_size, stim_mod=1):
     stims_mean = rng.uniform(0.8, 1.2, (batch_size,))
     stim_coh_range = np.array([0.01, 0.02, 0.04, 0.08], dtype=np.float32)
     if config.get("easy_task", True):
-        stim_coh_range = stim_coh_range * 10
+        stim_coh_range = EASY_STIM_COH_RANGE
 
     stims_coh = rng.choice(stim_coh_range, (batch_size,))
     stims_sign = rng.choice([1, -1], (batch_size,))
@@ -397,7 +411,7 @@ def _contextdm(config, batch_size, attend_mod):
 
     stim_coh_range = np.array([0.01, 0.02, 0.04, 0.08], dtype=np.float32)
     if config.get("easy_task", True):
-        stim_coh_range = stim_coh_range * 10
+        stim_coh_range = EASY_STIM_COH_RANGE
 
     if attend_mod in (1, 2):
         stim1_mod1_strengths, stim2_mod1_strengths = _contextdm_genstim(
@@ -573,7 +587,7 @@ def _delaydm(config, batch_size, stim_mod):
     stims_mean = rng.uniform(0.8, 1.2, (batch_size,))
     stim_coh_range = np.array([0.08, 0.16, 0.32], dtype=np.float32)
     if config.get("easy_task", True):
-        stim_coh_range = stim_coh_range * 2
+        stim_coh_range = EASY_STIM_COH_RANGE
 
     stims_coh = rng.choice(stim_coh_range, (batch_size,))
     stims_sign = rng.choice([1, -1], (batch_size,))
@@ -644,7 +658,7 @@ def _contextdelaydm(config, batch_size, attend_mod):
 
     stim_coh_range = np.array([0.08, 0.16, 0.32], dtype=np.float32)
     if config.get("easy_task", True):
-        stim_coh_range = stim_coh_range * 2
+        stim_coh_range = EASY_STIM_COH_RANGE
 
     if attend_mod in (1, 2):
         stim1_mod1_strengths, stim2_mod1_strengths = _contextdm_genstim(
@@ -854,6 +868,7 @@ def pad_trial(trial, tdim):
     trial.y_loc = np.pad(trial.y_loc, ((0, pad), (0, 0)), constant_values=-1)
     if trial.c_mask is not None:
         trial.c_mask = np.pad(trial.c_mask, ((0, pad), (0, 0), (0, 0)))
+    # post_ons is an index into time and is unchanged by right-padding.
     trial.tdim = tdim
     return trial
 
@@ -869,8 +884,17 @@ def concat_trials(trials):
     merged.y = np.concatenate([t.y for t in trials], axis=1)
     merged.y_loc = np.concatenate([t.y_loc for t in trials], axis=1)
     merged.c_mask = np.concatenate([t.c_mask for t in trials], axis=1)
+    if all(t.post_ons is not None for t in trials):
+        merged.post_ons = np.concatenate([t.post_ons for t in trials])
     merged.batch_size = int(sum(t.batch_size for t in trials))
+    # Capture before mutating: ``merged is trials[0]``, so setting .rule / .epochs
+    # first would overwrite the first task's own entry.
+    epochs_by_task = {t.rule: dict(t.epochs) for t in trials}
     merged.rule = "mixed"
+    # Epoch windows differ per task, so a single dict would silently describe
+    # only the first task. Expose them per task instead of one wrong answer.
+    merged.epochs = {}
+    merged.epochs_by_task = epochs_by_task
     return merged
 
 
