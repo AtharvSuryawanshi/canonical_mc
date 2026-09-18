@@ -3,6 +3,7 @@
 import argparse
 import csv
 import json
+import os
 import time
 from datetime import datetime
 from itertools import product
@@ -126,7 +127,11 @@ def default_output_dir(model, battery_label, n_lambda, sweep="both"):
         tag = f"1d_lr_{n_lambda}"
     else:
         tag = f"{n_lambda}x{n_lambda}"
-    return PARETO_RUNS_DIR / f"{model}_{battery_label}_{tag}_{stamp}"
+    # Two jobs submitted in the same second would otherwise collide on the
+    # timestamp; the Slurm job id keeps them distinct.
+    job_id = os.environ.get("SLURM_JOB_ID", "").strip()
+    suffix = f"_{job_id}" if job_id else ""
+    return PARETO_RUNS_DIR / f"{model}_{battery_label}_{tag}_{stamp}{suffix}"
 
 
 def pareto_maximize_flags(pareto_objectives):
@@ -348,10 +353,10 @@ def parse_args():
     # so a battery or step count with a lower task loss shifts it DOWN. core5 at
     # 2k steps has half sanity3's task loss, so expect its knee at ~0.5x these
     # values; that is why the connectivity range starts at 1 rather than 10.
-    parser.add_argument("--lambda-rate-min", type=float, default=1e-2)
-    parser.add_argument("--lambda-rate-max", type=float, default=3e0)
+    parser.add_argument("--lambda-rate-min", type=float, default=1e-1)
+    parser.add_argument("--lambda-rate-max", type=float, default=5.0)
     parser.add_argument("--lambda-connectivity-min", type=float, default=1e0)
-    parser.add_argument("--lambda-connectivity-max", type=float, default=3e2)
+    parser.add_argument("--lambda-connectivity-max", type=float, default=60)
     parser.add_argument("--n-lambda", type=int, default=5)
     parser.add_argument(
         "--lambda-scale",
