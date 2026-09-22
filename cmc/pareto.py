@@ -224,35 +224,63 @@ def _objective_label(name):
     }[name]
 
 
+COST_OBJECTIVES = {"task_loss", "metabolic_cost", "wiring_cost", "conn_frac"}
+
+
+def _maybe_log(ax, values, name, which):
+    """Log-scale an axis when a cost objective spans more than a decade.
+
+    The lambda=0 anchor is an unconstrained network -- nothing bounds its firing
+    rates -- so its metabolic cost lands ~60x above every penalised point. On a
+    linear axis that single point flattens the rest of the front onto zero.
+    """
+    if name not in COST_OBJECTIVES:
+        return
+    v = values[values > 0]
+    if v.size and v.max() / v.min() > 10:
+        (ax.set_xscale if which == "x" else ax.set_yscale)("log")
+
+
+def _front_panel(ax, objectives, is_pareto, is_anchor, i, j, names):
+    grid = ~is_pareto & ~is_anchor
+    front = is_pareto & ~is_anchor
+    ax.scatter(objectives[grid, i], objectives[grid, j], c="0.7", s=36, label="grid")
+    ax.scatter(objectives[front, i], objectives[front, j], c="C1", s=64, label="Pareto")
+    if is_anchor.any():
+        ax.scatter(
+            objectives[is_anchor, i],
+            objectives[is_anchor, j],
+            marker="*",
+            s=260,
+            c="C3",
+            zorder=5,
+            label=r"$\lambda=0$ anchor",
+        )
+    ax.set_xlabel(_objective_label(names[i]))
+    ax.set_ylabel(_objective_label(names[j]))
+    ax.grid(True, alpha=0.3)
+    _maybe_log(ax, objectives[:, i], names[i], "x")
+    _maybe_log(ax, objectives[:, j], names[j], "y")
+
+
 def plot_pareto_front(rows, out_path, pareto_objectives):
     is_pareto = np.array([r["is_pareto"] for r in rows], dtype=bool)
-    names = pareto_objectives
+    names = list(pareto_objectives)
     objectives = np.array([[r[k] for k in names] for r in rows])
+    is_anchor = np.array(
+        [r["lambda_rate"] == 0 and r["lambda_connectivity"] == 0 for r in rows],
+        dtype=bool,
+    )
 
     if len(names) == 2:
         fig, ax = plt.subplots(figsize=(6, 5))
-        ax.scatter(objectives[~is_pareto, 0], objectives[~is_pareto, 1], c="0.7", s=36, label="grid")
-        ax.scatter(objectives[is_pareto, 0], objectives[is_pareto, 1], c="C1", s=64, label="Pareto")
-        ax.set_xlabel(_objective_label(names[0]))
-        ax.set_ylabel(_objective_label(names[1]))
+        _front_panel(ax, objectives, is_pareto, is_anchor, 0, 1, names)
         ax.legend(loc="best", fontsize=8)
-        ax.grid(True, alpha=0.3)
         fig.suptitle("Pareto front (2 objectives)")
     else:
         fig, axes = plt.subplots(1, 3, figsize=(14, 4))
-        name_to_col = {name: i for i, name in enumerate(names)}
-        pairs = [
-            (names[0], names[1]),
-            (names[0], names[2]),
-            (names[1], names[2]),
-        ]
-        for ax, (a, b) in zip(axes, pairs):
-            i, j = name_to_col[a], name_to_col[b]
-            ax.scatter(objectives[~is_pareto, i], objectives[~is_pareto, j], c="0.7", s=36, label="grid")
-            ax.scatter(objectives[is_pareto, i], objectives[is_pareto, j], c="C1", s=64, label="Pareto")
-            ax.set_xlabel(_objective_label(a))
-            ax.set_ylabel(_objective_label(b))
-            ax.grid(True, alpha=0.3)
+        for ax, (i, j) in zip(axes, [(0, 1), (0, 2), (1, 2)]):
+            _front_panel(ax, objectives, is_pareto, is_anchor, i, j, names)
         axes[0].legend(loc="best", fontsize=8)
         fig.suptitle("Pareto front (3 objectives)")
     fig.tight_layout()
