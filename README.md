@@ -19,13 +19,15 @@ cmc/                 installable package -- all the code that runs
   train_cog.py       objectives, regularizers, accuracy scoring, training loop, CLI
   pareto.py          (lambda_rate, lambda_connectivity) sweeps and Pareto fronts
   zoom_lambda.py     many seeds at a few chosen lambdas, every network saved
+  moo.py             NSGA-III (pymoo) search of the front instead of a grid
   paths.py           repo-anchored checkpoints/ and pareto_runs/ locations
 notebooks/           analysis and exploration, imports the package
-slurm/               LRZ batch scripts (train.sjob, pareto.sjob)
+slurm/               LRZ batch scripts (train, pareto, zoom_lambda, moo)
 archives/            legacy code, kept for reference, not imported
 checkpoints/         trained weights (written by cmc.train_cog)
 pareto_runs/         one directory per sweep (written by cmc.pareto)
 zoom_lambda_runs/    saved networks for inspection (weights git-ignored)
+moo_runs/            one directory per NSGA-III search (written by cmc.moo)
 theory.md            the neuroscience the objectives are meant to encode
 FIXED_ISSUES.md      audited mismatches between that theory and the code
 ```
@@ -55,10 +57,11 @@ Windows and macOS). For a specific CUDA build, install torch first from the
 `pip install -r requirements.txt` -- the existing install already satisfies the pin
 and will not be replaced.
 
-Planned extras, not installed by default:
+`requirements.txt` includes pymoo (for `cmc.moo`). Without requirements.txt,
+the same extra is available as:
 
 ```bash
-pip install -e ".[optim]"      # pymoo, for optimising over the front
+pip install -e ".[optim]"
 ```
 
 ## Usage
@@ -110,6 +113,23 @@ sbatch slurm/zoom_lambda.sjob
 Each network lands in `zoom_lambda_runs/<run>/<point>/seed_XX.pt`, loadable with
 `cmc.train_cog.load_checkpoint`, together with its metrics and per-neuron task
 variance; `runs.csv` lists which seeds still do every task.
+
+Instead of a lambda grid, NSGA-III (pymoo) can choose which networks to train.
+Objectives are worst-task error and log metabolic / wiring cost, with
+`min_task_acc >= 0.6` as a constraint. The current genome is
+`(log lambda_rate, log lambda_connectivity)`, which validates the loop against
+the known 6x6 front (default: population 8 x 4 generations = 32 networks, ~4 h
+on a GPU). A budget genome with constrained training, which needs no lambdas,
+is next.
+
+```bash
+python -m cmc.moo --steps 200 --pop-size 6 --n-gen 2 --device cpu   # smoke test
+sbatch slurm/moo.sjob --reference-run pareto_runs/dale_core5_6x6_2026_09_23_05_45_12_5802320
+```
+
+`moo_vs_reference.png` and `summary.json` report how many of the found networks
+are dominated by a seed-0 network of the reference sweep. A job that hits its
+time limit resumes when resubmitted with the same `--output-dir`.
 
 Analysis lives in `notebooks/`: `pareto_analysis.ipynb` for the fronts,
 `analysis_of_network.ipynb` for task variance and clustering,

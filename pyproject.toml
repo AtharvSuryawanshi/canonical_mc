@@ -28,7 +28,7 @@ analysis = [
     "nbformat>=5.9",
 ]
 # Multi-objective optimisation over the (lambda_rate, lambda_connectivity) front.
-optim = ["pymoo>=0.6"]
+optim = ["pymoo>=0.6.2"]
 
 [project.scripts]
 cmc-train = "cmc.train_cog:main"

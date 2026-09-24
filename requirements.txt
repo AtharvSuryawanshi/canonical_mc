@@ -25,4 +25,4 @@ jupyterlab>=4.0
 ipykernel>=6.25
 
 # --- planned: multi-objective optimisation over the front -----------------
-# pymoo>=0.6
+pymoo>=0.6.2

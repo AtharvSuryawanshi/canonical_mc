@@ -165,9 +165,8 @@ def default_output_dir(model, battery_label, n_points, n_seeds):
     return ZOOM_LAMBDA_DIR / f"{model}_{battery_label}_{n_points}pt_{n_seeds}seed_{stamp}"
 
 
-def main(argv=None):
-    args = build_parser().parse_args(argv)
-    points = parse_points(args.points)
+def resolve_run_settings(args):
+    """(active_tasks, battery_label, device, noise_level, eval_seeds, reg_opts)."""
     active_tasks = resolve_active_tasks(args.task_battery, args.tasks)
     battery_label = args.task_battery if args.tasks is None else "custom"
     device = torch.device(args.device or ("cuda" if torch.cuda.is_available() else "cpu"))
@@ -176,8 +175,6 @@ def main(argv=None):
         if args.noise_level is not None
         else (1.0 if args.model == "yang" else DALE_DEFAULT_NOISE_LEVEL)
     )
-    eval_seeds = parse_eval_seeds(args.eval_seeds)
-    seeds = [int(args.seed) + k for k in range(max(1, int(args.n_seeds)))]
     reg_opts = {
         "rate_kind": args.rate_kind,
         "rate_inh_scale": args.rate_inh_scale,
@@ -185,6 +182,56 @@ def main(argv=None):
         "conn_target": args.conn_target,
         "conn_inh_scale": args.conn_inh_scale,
     }
+    return active_tasks, battery_label, device, noise_level, parse_eval_seeds(args.eval_seeds), reg_opts
+
+
+def train_and_evaluate(args, lambda_rate, lambda_connectivity, seed, active_tasks,
+                       device, noise_level, eval_seeds, reg_opts):
+    """Train one network exactly as ``cmc.pareto`` does and evaluate it.
+
+    Returns (model, config, history, metrics). Shared by zoom_lambda and cmc.moo,
+    so every script produces the identical network for a given (lambda, seed).
+    """
+    config = default_config(n_eachring=args.n_eachring, seed=seed, easy_task=True)
+    model = make_fresh_model(args, config, device, seed=seed)
+    history = train_without_plots(
+        model,
+        config,
+        active_tasks=active_tasks,
+        n_steps=args.steps,
+        batch_size=args.batch_size,
+        lr=args.lr,
+        lambda_rate=float(lambda_rate),
+        lambda_connectivity=float(lambda_connectivity),
+        noise_level=noise_level,
+        log_every=args.log_every,
+        show_progress=False,
+        loss_per_trial=args.loss_per_trial,
+        **reg_opts,
+    )
+    model.eval()
+    metrics = evaluate_pareto_metrics(
+        model,
+        config,
+        active_tasks,
+        device,
+        eval_seeds=eval_seeds,
+        batch_size=args.eval_batch_size,
+        noise_level=args.eval_noise_level,
+        input_noise=args.eval_input_noise,
+        easy_task=True,
+        **reg_opts,
+    )
+    return model, config, history, metrics
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    points = parse_points(args.points)
+    active_tasks, battery_label, device, noise_level, eval_seeds, reg_opts = (
+        resolve_run_settings(args)
+    )
+    seeds = [int(args.seed) + k for k in range(max(1, int(args.n_seeds)))]
 
     out_dir = Path(args.output_dir or default_output_dir(args.model, battery_label, len(points), len(seeds)))
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -211,35 +258,8 @@ def main(argv=None):
             continue
 
         t0 = time.perf_counter()
-        config = default_config(n_eachring=args.n_eachring, seed=seed, easy_task=True)
-        model = make_fresh_model(args, config, device, seed=seed)
-        history = train_without_plots(
-            model,
-            config,
-            active_tasks=active_tasks,
-            n_steps=args.steps,
-            batch_size=args.batch_size,
-            lr=args.lr,
-            lambda_rate=float(lr),
-            lambda_connectivity=float(lc),
-            noise_level=noise_level,
-            log_every=args.log_every,
-            show_progress=False,
-            loss_per_trial=args.loss_per_trial,
-            **reg_opts,
-        )
-        model.eval()
-        metrics = evaluate_pareto_metrics(
-            model,
-            config,
-            active_tasks,
-            device,
-            eval_seeds=eval_seeds,
-            batch_size=args.eval_batch_size,
-            noise_level=args.eval_noise_level,
-            input_noise=args.eval_input_noise,
-            easy_task=True,
-            **reg_opts,
+        model, config, history, metrics = train_and_evaluate(
+            args, lr, lc, seed, active_tasks, device, noise_level, eval_seeds, reg_opts
         )
         task_var, mean_rate = activity_summary(
             model, config, active_tasks, device, eval_seeds, args.eval_batch_size

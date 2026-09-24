@@ -11,7 +11,7 @@ metabolic cost vs. wiring cost).
 
 ```
 cmc/            installable package: task.py, network.py, train_cog.py,
-                pareto.py, paths.py — see README.md for install/run commands
+                pareto.py, zoom_lambda.py, moo.py, paths.py — see README.md for install/run commands
 notebooks/      analysis, imports cmc.*
 slurm/          LRZ batch scripts
 archives/       legacy code, not imported by anything
@@ -80,6 +80,14 @@ variance; full activity is re-simulated, not stored. Output in
 `zoom_lambda_runs/`, weights git-ignored. A network is fully determined by
 (lambda, seed): torch is seeded in the model constructors, which it was not
 before -- sweeps predating that are not bit-reproducible.
+
+**Multi-objective (`cmc.moo`):** NSGA-III (pymoo ask/tell), where each evaluation
+is one full training via `zoom_lambda.train_and_evaluate`. Objectives are
+(1 - min_task_acc, log10 metabolic, log10 wiring), with min_task_acc >= 0.6 as
+a constraint. Genome `lambda` = log lambdas: still a weighted sum, so it cannot
+reach non-convex parts of the front; it only validates the loop against the 6x6
+front. The goal is the planned `budget` genome: constrained training with cost
+ceilings, no hand-set lambdas. Output in `moo_runs/`.
 
 **Important:** the fixes above changed what the loss functions numerically
 mean (wiring quantity, loss normalization, task difficulty). Old

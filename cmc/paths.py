@@ -25,4 +25,7 @@ PARETO_RUNS_DIR = REPO_ROOT / "pareto_runs"
 #: Saved networks at hand-picked lambda points, written by ``cmc.zoom_lambda``.
 ZOOM_LAMBDA_DIR = REPO_ROOT / "zoom_lambda_runs"
 
-__all__ = ["REPO_ROOT", "CHECKPOINTS_DIR", "PARETO_RUNS_DIR", "ZOOM_LAMBDA_DIR"]
+#: NSGA-III searches, written by ``cmc.moo``.
+MOO_RUNS_DIR = REPO_ROOT / "moo_runs"
+
+__all__ = ["REPO_ROOT", "CHECKPOINTS_DIR", "PARETO_RUNS_DIR", "ZOOM_LAMBDA_DIR", "MOO_RUNS_DIR"]
