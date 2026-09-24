@@ -362,6 +362,49 @@ is a separate analysis decision.
 
 ---
 
+## 13. The Pareto front was mostly networks that had stopped doing the task
+
+**File:** `cmc/pareto.py` (`compute_front`, `FEASIBLE_MIN_TASK_ACC`)
+
+**Issue.** The front used `mean_acc` and let every network compete. In the core5
+6x6 run, 35 of 37 points were "Pareto-optimal", 8 of them at chance.
+
+**Why it matters.** A network at chance is the cheapest in the grid (it barely
+fires and has almost no connections left), so nothing can beat it on cost and it
+is never dominated. Separately, `mean_acc` hides an abandoned task: at
+lambda=(0.02, 19.1) the mean is 0.902 while `dmsgo` sits at 0.559, barely above
+always-fixate (~0.5). The question is what a network pays to do *all* the tasks.
+
+**Fix.** The task axis is now `min_task_acc`, and networks with
+`min_task_acc < 0.6` are excluded before the front is computed (6x6: 35 -> 14
+points, none at chance). Switches: `--include-infeasible`,
+`--pareto-task-objective mean_acc`, `--feasible-min-task-acc`; in the notebook,
+`EXCLUDE_INFEASIBLE` / `TASK_OBJECTIVE`, recomputed from `summary.csv`, so it
+applies to earlier runs too.
+
+---
+
+## 14. Torch's random generator was never seeded
+
+**Files:** `cmc/train_cog.py` (`make_yang_model`, `make_dale_model`)
+
+**Issue.** `seed` went only to numpy (`w_in`, `w_rec` init, trial stream). The
+readout weights (`torch.randn`) and the per-step training noise
+(`torch.randn_like`) came from torch's global generator, which nothing seeded.
+
+**Why it matters.** The same command produced different networks on every run,
+and within a sweep each network depended on everything trained before it. So a
+"seed" did not identify a network, and a network from a sweep could not be
+retrained to inspect it.
+
+**Fix.** `torch.manual_seed(seed)` right before each model is built. A network is
+now fully determined by (lambda, seed): verified identical metrics (difference
+0.0) between `cmc.pareto` and `cmc.zoom_lambda`, across repeated runs, and for a
+network trained alone vs after others. Sweeps run before this fix are
+statistically valid but not bit-reproducible.
+
+---
+
 ## Still open (deliberately not changed)
 
 - **`rho(W_rec)` is only set at init.** `cmc/network.py:scale_recurrent_to_rho` is

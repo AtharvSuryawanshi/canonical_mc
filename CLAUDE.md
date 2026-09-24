@@ -60,10 +60,26 @@ regress them:
 
 **Deliberately not changed / open:** `rho(W_rec)` is only enforced at init
 and can drift during training; L1 is a proxy for connection count, not
-actual wire length (no spatial embedding); Pareto front currently
-optimizes `mean_acc`, not `min_task_acc` (a network can abandon a hard task
-and still look good) — deferred; L0 / connection-probability formulation
-also deferred, would need a probability-of-connection parameterization.
+actual wire length (no spatial embedding); L0 / connection-probability
+formulation deferred, would need a probability-of-connection parameterization.
+
+**Pareto front rules** (`cmc/pareto.py` `compute_front`, mirrored in the
+notebook): task axis is `min_task_acc` (worst task), not `mean_acc` -- a
+network can abandon one task and still score ~0.9 mean. Networks with
+`min_task_acc < 0.6` (`FEASIBLE_MIN_TASK_ACC`) are excluded from the front by
+default, otherwise chance-level networks sit on it as the cheapest points
+(35/37 "Pareto" in the core5 6x6 run -> 14 after the fix). Switches:
+`--include-infeasible`, `--pareto-task-objective mean_acc`,
+`--feasible-min-task-acc`; notebook `EXCLUDE_INFEASIBLE` / `TASK_OBJECTIVE`.
+
+**Inspecting networks:** `cmc.pareto` keeps only metrics. `cmc.zoom_lambda`
+trains many seeds (default 10) at a few chosen lambda points (default: a 2x2
+control / rate / wiring / both design from the corrected core5 6x6 front) and
+saves every network with its lambdas, metrics, feasibility and per-neuron task
+variance; full activity is re-simulated, not stored. Output in
+`zoom_lambda_runs/`, weights git-ignored. A network is fully determined by
+(lambda, seed): torch is seeded in the model constructors, which it was not
+before -- sweeps predating that are not bit-reproducible.
 
 **Important:** the fixes above changed what the loss functions numerically
 mean (wiring quantity, loss normalization, task difficulty). Old

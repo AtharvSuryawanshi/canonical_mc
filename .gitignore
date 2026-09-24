@@ -80,6 +80,9 @@ target/
 
 # Trained model weights
 # checkpoints/
+# zoom_lambda saves every network (~40 MB per run): keep weights out of git,
+# commit only runs.csv / summary.json.
+zoom_lambda_runs/**/*.pt
 
 # IPython
 profile_default/

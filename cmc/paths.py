@@ -22,4 +22,7 @@ CHECKPOINTS_DIR = REPO_ROOT / "checkpoints"
 #: One subdirectory per Pareto sweep, written by ``cmc.pareto``.
 PARETO_RUNS_DIR = REPO_ROOT / "pareto_runs"
 
-__all__ = ["REPO_ROOT", "CHECKPOINTS_DIR", "PARETO_RUNS_DIR"]
+#: Saved networks at hand-picked lambda points, written by ``cmc.zoom_lambda``.
+ZOOM_LAMBDA_DIR = REPO_ROOT / "zoom_lambda_runs"
+
+__all__ = ["REPO_ROOT", "CHECKPOINTS_DIR", "PARETO_RUNS_DIR", "ZOOM_LAMBDA_DIR"]

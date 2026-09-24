@@ -78,7 +78,7 @@ def build_grid_pairs(args):
         if args.include_lambda_zero:
             pairs.insert(0, (float(fix_lr), 0.0))
         sweep = "connectivity"
-        pareto_objectives = ("mean_acc", "wiring_cost")
+        pareto_objectives = (args.pareto_task_objective, "wiring_cost")
         return pairs, lr_vals, lc_vals, sweep, pareto_objectives
 
     if fix_lc is not None:
@@ -93,7 +93,7 @@ def build_grid_pairs(args):
         if args.include_lambda_zero:
             pairs.insert(0, (0.0, float(fix_lc)))
         sweep = "rate"
-        pareto_objectives = ("mean_acc", "metabolic_cost")
+        pareto_objectives = (args.pareto_task_objective, "metabolic_cost")
         return pairs, lr_vals, lc_vals, sweep, pareto_objectives
 
     lr_vals, lc_vals = build_lambda_grid(
@@ -107,7 +107,13 @@ def build_grid_pairs(args):
     pairs = [(float(a), float(b)) for a, b in product(lr_vals, lc_vals)]
     if args.include_lambda_zero:
         pairs.insert(0, (0.0, 0.0))
-    return pairs, lr_vals, lc_vals, "both", ("mean_acc", "metabolic_cost", "wiring_cost")
+    return (
+        pairs,
+        lr_vals,
+        lc_vals,
+        "both",
+        (args.pareto_task_objective, "metabolic_cost", "wiring_cost"),
+    )
 
 
 def make_fresh_model(args, config, device, seed=None):
@@ -218,10 +224,12 @@ def append_csv_row(csv_path, row, write_header=False):
 def _objective_label(name):
     return {
         "mean_acc": "mean task accuracy",
+        "min_task_acc": "min task accuracy (worst task)",
+        "conn_frac": "connection fraction",
         "task_loss": "task loss",
         "metabolic_cost": "metabolic cost",
         "wiring_cost": "wiring cost",
-    }[name]
+    }.get(name, name)
 
 
 COST_OBJECTIVES = {"task_loss", "metabolic_cost", "wiring_cost", "conn_frac"}
@@ -241,10 +249,18 @@ def _maybe_log(ax, values, name, which):
         (ax.set_xscale if which == "x" else ax.set_yscale)("log")
 
 
-def _front_panel(ax, objectives, is_pareto, is_anchor, i, j, names):
-    grid = ~is_pareto & ~is_anchor
+def _front_panel(ax, objectives, is_pareto, is_anchor, i, j, names, is_feasible=None):
+    if is_feasible is None:
+        is_feasible = np.ones(len(objectives), dtype=bool)
+    grid = ~is_pareto & ~is_anchor & is_feasible
     front = is_pareto & ~is_anchor
-    ax.scatter(objectives[grid, i], objectives[grid, j], c="0.7", s=36, label="grid")
+    dead = ~is_feasible & ~is_anchor
+    ax.scatter(objectives[grid, i], objectives[grid, j], c="0.7", s=36, label="dominated")
+    if dead.any():
+        ax.scatter(
+            objectives[dead, i], objectives[dead, j],
+            marker="x", c="0.55", s=36, label="fails a task",
+        )
     ax.scatter(objectives[front, i], objectives[front, j], c="C1", s=64, label="Pareto")
     if is_anchor.any():
         ax.scatter(
@@ -271,16 +287,17 @@ def plot_pareto_front(rows, out_path, pareto_objectives):
         [r["lambda_rate"] == 0 and r["lambda_connectivity"] == 0 for r in rows],
         dtype=bool,
     )
+    is_feasible = np.array([r.get("is_feasible", True) for r in rows], dtype=bool)
 
     if len(names) == 2:
         fig, ax = plt.subplots(figsize=(6, 5))
-        _front_panel(ax, objectives, is_pareto, is_anchor, 0, 1, names)
+        _front_panel(ax, objectives, is_pareto, is_anchor, 0, 1, names, is_feasible)
         ax.legend(loc="best", fontsize=8)
         fig.suptitle("Pareto front (2 objectives)")
     else:
         fig, axes = plt.subplots(1, 3, figsize=(14, 4))
         for ax, (i, j) in zip(axes, [(0, 1), (0, 2), (1, 2)]):
-            _front_panel(ax, objectives, is_pareto, is_anchor, i, j, names)
+            _front_panel(ax, objectives, is_pareto, is_anchor, i, j, names, is_feasible)
         axes[0].legend(loc="best", fontsize=8)
         fig.suptitle("Pareto front (3 objectives)")
     fig.tight_layout()
@@ -288,7 +305,8 @@ def plot_pareto_front(rows, out_path, pareto_objectives):
     plt.close(fig)
 
 
-def parse_args():
+def build_parser():
+    """CLI for the sweep. zoom_lambda reuses its training/eval flags from here."""
     parser = argparse.ArgumentParser(
         description="Pareto sweep over lambda_rate and lambda_connectivity."
     )
@@ -325,6 +343,28 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--device", type=str, default=None)
     parser.add_argument("--eval-batch-size", type=int, default=64)
+    parser.add_argument(
+        "--pareto-task-objective",
+        choices=["min_task_acc", "mean_acc"],
+        default="min_task_acc",
+        help="Task axis of the front. mean_acc lets a network abandon one task "
+        "and still score ~0.9; min_task_acc is only high if every task is done.",
+    )
+    parser.add_argument(
+        "--include-infeasible",
+        dest="exclude_infeasible",
+        action="store_false",
+        help="Let networks that fail a task (min_task_acc below "
+        "--feasible-min-task-acc) compete for the front. Default: excluded.",
+    )
+    parser.set_defaults(exclude_infeasible=True)
+    parser.add_argument(
+        "--feasible-min-task-acc",
+        type=float,
+        default=FEASIBLE_MIN_TASK_ACC,
+        help=f"Worst-task accuracy a network needs to be a front candidate "
+        f"(default {FEASIBLE_MIN_TASK_ACC}).",
+    )
     parser.add_argument(
         "--eval-seeds",
         type=str,
@@ -458,7 +498,11 @@ def parse_args():
         action="store_true",
         help="Save pareto_front.png at end (default: off, for headless/Slurm).",
     )
-    return parser.parse_args()
+    return parser
+
+
+def parse_args(argv=None):
+    return build_parser().parse_args(argv)
 
 
 def parse_eval_seeds(text):
@@ -467,11 +511,56 @@ def parse_eval_seeds(text):
     return tuple(int(s.strip()) for s in str(text).split(",") if s.strip())
 
 
-def finalize_results(rows, pareto_objectives):
-    objectives = np.array([[r[k] for k in pareto_objectives] for r in rows])
-    mask = pareto_mask(objectives, maximize=pareto_maximize_flags(pareto_objectives))
-    for row, is_p in zip(rows, mask):
-        row["is_pareto"] = bool(is_p)
+# A network only counts as a candidate solution if it is still doing EVERY task.
+# Without this, networks at chance sit on the front: they are the cheapest in the
+# grid, so nothing can dominate them on cost (35/37 points were "Pareto" in the
+# core5 6x6 run, 8 of them at chance). 0.6 is above always-fixate on the go/no-go
+# tasks (~0.5 on dmsgo) and far above the dead-network floor on the rest (~0.2-0.3).
+FEASIBLE_MIN_TASK_ACC = 0.6
+
+
+def feasible_mask(rows, min_task_acc=FEASIBLE_MIN_TASK_ACC):
+    """True where the network clears ``min_task_acc`` on its worst task."""
+    return np.array([r["min_task_acc"] >= min_task_acc for r in rows], dtype=bool)
+
+
+def compute_front(
+    rows,
+    pareto_objectives,
+    exclude_infeasible=True,
+    min_task_acc=FEASIBLE_MIN_TASK_ACC,
+):
+    """Return (is_pareto, is_feasible) boolean arrays aligned with ``rows``.
+
+    With ``exclude_infeasible`` the front is computed among feasible rows only,
+    and infeasible rows are never on it. Otherwise every row competes, as before.
+    """
+    rows = list(rows)
+    is_feasible = feasible_mask(rows, min_task_acc)
+    pool = is_feasible if exclude_infeasible else np.ones(len(rows), dtype=bool)
+    is_pareto = np.zeros(len(rows), dtype=bool)
+    if pool.any():
+        objectives = np.array(
+            [[r[k] for k in pareto_objectives] for r, keep in zip(rows, pool) if keep]
+        )
+        is_pareto[pool] = pareto_mask(
+            objectives, maximize=pareto_maximize_flags(pareto_objectives)
+        )
+    return is_pareto, is_feasible
+
+
+def finalize_results(
+    rows,
+    pareto_objectives,
+    exclude_infeasible=True,
+    min_task_acc=FEASIBLE_MIN_TASK_ACC,
+):
+    is_pareto, is_feasible = compute_front(
+        rows, pareto_objectives, exclude_infeasible, min_task_acc
+    )
+    for row, p, f in zip(rows, is_pareto, is_feasible):
+        row["is_pareto"] = bool(p)
+        row["is_feasible"] = bool(f)
     return rows
 
 
@@ -594,7 +683,12 @@ def main():
             f"time={train_time_s:.1f}s"
         )
 
-    rows = finalize_results(rows, pareto_objectives)
+    rows = finalize_results(
+        rows,
+        pareto_objectives,
+        exclude_infeasible=args.exclude_infeasible,
+        min_task_acc=args.feasible_min_task_acc,
+    )
 
     with csv_path.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
@@ -618,7 +712,10 @@ def main():
         "lambda_zero_anchor": bool(args.include_lambda_zero),
         "sweep_mode": sweep,
         "pareto_objectives": list(pareto_objectives),
-        "pareto_task_objective": "mean_acc",
+        "pareto_task_objective": args.pareto_task_objective,
+        "exclude_infeasible": bool(args.exclude_infeasible),
+        "feasible_min_task_acc": args.feasible_min_task_acc,
+        "n_feasible": int(sum(r["is_feasible"] for r in rows)),
         "eval_seeds": list(eval_seeds),
         "eval_easy_task": True,
         "fix_lambda_rate": args.fix_lambda_rate,
@@ -644,6 +741,12 @@ def main():
         json.dump(summary, f, indent=2)
 
     n_pareto = summary["n_pareto"]
+    if args.exclude_infeasible and summary["n_feasible"] == 0:
+        print(
+            f"WARNING: no network reached min_task_acc >= {args.feasible_min_task_acc}, "
+            "so the front is empty. Train longer, lower --feasible-min-task-acc, "
+            "or pass --include-infeasible."
+        )
     print(
         f"Done. {n_pareto}/{len(rows)} Pareto-optimal points "
         f"({len(runs)} training runs, {len(seeds)} seed(s) per point)."

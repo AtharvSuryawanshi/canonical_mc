@@ -18,12 +18,14 @@ cmc/                 installable package -- all the code that runs
   network.py         LeakyRNN and DaleRNN (sign-constrained, E-only readout)
   train_cog.py       objectives, regularizers, accuracy scoring, training loop, CLI
   pareto.py          (lambda_rate, lambda_connectivity) sweeps and Pareto fronts
+  zoom_lambda.py     many seeds at a few chosen lambdas, every network saved
   paths.py           repo-anchored checkpoints/ and pareto_runs/ locations
 notebooks/           analysis and exploration, imports the package
 slurm/               LRZ batch scripts (train.sjob, pareto.sjob)
 archives/            legacy code, kept for reference, not imported
 checkpoints/         trained weights (written by cmc.train_cog)
 pareto_runs/         one directory per sweep (written by cmc.pareto)
+zoom_lambda_runs/    saved networks for inspection (weights git-ignored)
 theory.md            the neuroscience the objectives are meant to encode
 FIXED_ISSUES.md      audited mismatches between that theory and the code
 ```
@@ -95,6 +97,19 @@ python -m cmc.pareto --model dale --task-battery core5 --n-lambda 8 --n-seeds 3
 Each sweep writes `pareto_runs/<run>/` containing `runs.csv` (one row per seed),
 `summary.csv` (seed means, which the notebooks read) and `summary.json` (the full
 configuration, including the regularizer settings the gradient actually saw).
+
+To inspect networks rather than locate the front, train many seeds at a few
+chosen points and keep every network (default: a control / rate / wiring / both
+2x2 design taken from the core5 front, 10 seeds each, ~5 h on a GPU):
+
+```bash
+python -m cmc.zoom_lambda
+sbatch slurm/zoom_lambda.sjob
+```
+
+Each network lands in `zoom_lambda_runs/<run>/<point>/seed_XX.pt`, loadable with
+`cmc.train_cog.load_checkpoint`, together with its metrics and per-neuron task
+variance; `runs.csv` lists which seeds still do every task.
 
 Analysis lives in `notebooks/`: `pareto_analysis.ipynb` for the fronts,
 `analysis_of_network.ipynb` for task variance and clustering,

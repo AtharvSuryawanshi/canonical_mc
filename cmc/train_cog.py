@@ -526,6 +526,11 @@ def make_yang_model(
     seed=0,
     device="cpu",
 ):
+    # `seed` alone must determine the network. numpy's RandomState(seed) covers
+    # w_in/w_rec, but w_out and the per-step training noise come from torch's
+    # global generator, which nothing seeded: the same command gave different
+    # networks on every run, and each one depended on what was trained before it.
+    torch.manual_seed(int(seed))
     model = LeakyRNN(
         n_input=config["n_input"],
         n_rnn=n_rnn,
@@ -552,6 +557,11 @@ def make_dale_model(
     seed=0,
     device="cpu",
 ):
+    # `seed` alone must determine the network. numpy's RandomState(seed) covers
+    # w_in/w_rec, but w_out and the per-step training noise come from torch's
+    # global generator, which nothing seeded: the same command gave different
+    # networks on every run, and each one depended on what was trained before it.
+    torch.manual_seed(int(seed))
     model = DaleRNN(
         n_input=config["n_input"],
         n_rnn=n_neurons,
@@ -601,8 +611,13 @@ def save_checkpoint(
     seed=0,
     train_steps=None,
     history=None,
+    extra=None,
+    verbose=True,
 ):
-    """Save trained weights plus metadata needed to reload and evaluate."""
+    """Save trained weights plus metadata needed to reload and evaluate.
+
+    ``extra`` is merged into the checkpoint dict (e.g. lambdas, eval metrics).
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     checkpoint = {
@@ -618,8 +633,11 @@ def save_checkpoint(
         checkpoint["train_steps"] = train_steps
     if history is not None:
         checkpoint["history"] = history
+    if extra:
+        checkpoint.update(extra)
     torch.save(checkpoint, path)
-    print(f"Saved checkpoint -> {path.resolve()}")
+    if verbose:
+        print(f"Saved checkpoint -> {path.resolve()}")
     return path
 
 
