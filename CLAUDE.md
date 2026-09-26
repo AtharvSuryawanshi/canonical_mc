@@ -84,10 +84,17 @@ before -- sweeps predating that are not bit-reproducible.
 **Multi-objective (`cmc.moo`):** NSGA-III (pymoo ask/tell), where each evaluation
 is one full training via `zoom_lambda.train_and_evaluate`. Objectives are
 (1 - min_task_acc, log10 metabolic, log10 wiring), with min_task_acc >= 0.6 as
-a constraint. Genome `lambda` = log lambdas: still a weighted sum, so it cannot
-reach non-convex parts of the front; it only validates the loop against the 6x6
-front. The goal is the planned `budget` genome: constrained training with cost
-ceilings, no hand-set lambdas. Output in `moo_runs/`.
+a constraint. Default genome `budget` = log cost ceilings (epsilon-constraint,
+no hand-set lambdas). The wiring budget is enforced exactly by projecting W_rec
+onto the L1 ball after every step (`project_w_rec_to_budget`). The rate budget
+uses a learned log-multiplier (`BudgetConstraint`). Don't switch wiring to the
+multiplier (`--conn-budget-mode lagrangian`): wiring responds to lambda with a
+lag and a threshold, so the multiplier winds up to 50-500x the needed value and
+prunes the network to death (tested; ramp and PI terms did not fix it). Checked
+at 3 reference-front costs: accuracy matches the grid networks within seed
+noise. Genome `lambda` (log lambdas, weighted sum) only validated the loop
+against the 6x6. Budget training is opt-in in `train()`; with no budgets it is
+bit-identical to before. Output in `moo_runs/`.
 
 **Important:** the fixes above changed what the loss functions numerically
 mean (wiring quantity, loss normalization, task difficulty). Old

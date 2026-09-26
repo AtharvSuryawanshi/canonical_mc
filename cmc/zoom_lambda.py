@@ -186,11 +186,13 @@ def resolve_run_settings(args):
 
 
 def train_and_evaluate(args, lambda_rate, lambda_connectivity, seed, active_tasks,
-                       device, noise_level, eval_seeds, reg_opts):
+                       device, noise_level, eval_seeds, reg_opts, budget_opts=None):
     """Train one network exactly as ``cmc.pareto`` does and evaluate it.
 
     Returns (model, config, history, metrics). Shared by zoom_lambda and cmc.moo,
     so every script produces the identical network for a given (lambda, seed).
+    ``budget_opts`` (``rate_budget``, ``conn_budget``, ``budget_lr``, ...) are
+    passed to ``train`` for budget-constrained training; pass zero lambdas then.
     """
     config = default_config(n_eachring=args.n_eachring, seed=seed, easy_task=True)
     model = make_fresh_model(args, config, device, seed=seed)
@@ -207,6 +209,7 @@ def train_and_evaluate(args, lambda_rate, lambda_connectivity, seed, active_task
         log_every=args.log_every,
         show_progress=False,
         loss_per_trial=args.loss_per_trial,
+        **(budget_opts or {}),
         **reg_opts,
     )
     model.eval()

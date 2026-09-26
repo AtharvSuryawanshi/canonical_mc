@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from tqdm import tqdm
-from cmc.network import DaleRNN, LeakyRNN
+from cmc.network import DaleRNN, LeakyRNN, _inv_softplus_torch
 from cmc.paths import CHECKPOINTS_DIR
 from cmc.task import default_config, generate_trials, generate_mixed_trials, rules_dict
 
@@ -726,6 +726,144 @@ def plot_preactivation_at_init(model, config, device="cpu", task="fdgo"):
     return fig
 
 
+def _project_l1_ball(z, radius):
+    """Euclidean projection of nonnegative ``z`` onto {z >= 0, sum(z) <= radius}.
+
+    Soft-thresholding by the one tau that makes the sum hit the radius (Duchi et
+    al. 2008, sort-based, exact). No-op if already inside.
+    """
+    total = z.sum()
+    if total <= radius * (1.0 + 1e-5):  # inside, up to softplus round-off
+        return z
+    u, _ = torch.sort(z.flatten(), descending=True)
+    css = torch.cumsum(u, dim=0) - radius
+    j = torch.arange(1, u.numel() + 1, device=z.device, dtype=z.dtype)
+    rho = int(torch.nonzero(u - css / j > 0).max()) + 1
+    tau = css[rho - 1] / rho
+    return torch.clamp(z - tau, min=0.0)
+
+
+def project_w_rec_to_budget(model, budget, inh_scale=1.0):
+    """Shrink W_rec in place so that ``connectivity_reg(model, "l1") <= budget``.
+
+    The wiring cost is ``sum(mask * |W| / row_scale) / sum(mask)``, so the
+    budget is an L1 ball in the normalized coordinates z = mask * |W| / row_scale.
+    Projecting there soft-thresholds every synapse by the same *normalized*
+    amount -- the same equal-fractional pressure on E and I rows the penalty
+    applies. Synapses thresholded to zero become softplus(w_raw) ~ 1e-8, i.e.
+    pruned. Only for DaleRNN with prune_eps == 0 (``w_raw`` -> magnitude is then
+    exactly softplus).
+    """
+    if not hasattr(model, "w_raw"):
+        raise ValueError("project_w_rec_to_budget: needs DaleRNN (softplus magnitudes)")
+    if getattr(model, "prune_eps", 0.0) > 0.0:
+        raise ValueError("project_w_rec_to_budget: prune_eps must be 0")
+    with torch.no_grad():
+        mag, mask = _w_rec_magnitude(model, inh_scale=inh_scale)
+        z = mag * mask
+        z_new = _project_l1_ball(z, budget * mask.sum().clamp_min(1.0))
+        if z_new is z:
+            return
+        counted = mask > 0
+        new_abs = torch.where(counted, z_new / mask.clamp_min(1e-12), mag) * model.ei_row_scale()[:, None]
+        model.w_raw.copy_(_inv_softplus_torch(new_abs).to(model.w_raw.dtype))
+
+
+BUDGET_DEFAULTS = {
+    "budget_lr": 0.01,
+    "budget_kp": 0.0,
+    "budget_ramp": 0.0,
+    "budget_rho": 1.0,
+    "budget_lambda_init": 0.01,
+    "budget_ema": 0.9,
+    "conn_budget_mode": "projection",
+}
+
+
+class BudgetConstraint:
+    """Keep a cost at or below a budget: ``cost <= budget``.
+
+    Instead of a hand-set weight, the weight ``lam`` is learned during training
+    (augmented Lagrangian, i.e. a multiplier plus a quadratic penalty). With
+    the relative violation ``v = cost / budget_t - 1`` the loss term is
+
+        lam * cost  +  (rho / 2) * budget_t * relu(v)**2
+
+    and ``lam`` is a PI controller on log(lam), stepped after every optimizer step:
+
+        integral += lr * clip(ema(v), -1, 1)
+        log(lam)  = integral + kp * clip(ema(v), -1, 1)
+
+    Over budget the weight grows, under budget it shrinks, so the cost is not
+    driven below what the budget asks for. Log space because the weights that
+    matter span decades (the weighted-sum sweeps used 0.02 - 40); the clip and
+    the EMA tame the large violation at init and the per-batch noise.
+
+    Lag is the failure mode: wiring cost falls only as fast as the weights
+    shrink, so a pure integral (kp=0) keeps raising lam while the cost is still
+    catching up, overshoots by ~100x and prunes the network to death. Two
+    remedies (Stooke et al. 2020, PID Lagrangian): the proportional term reacts
+    to the current violation without accumulating it, and ``ramp`` anneals the
+    budget geometrically from the cost at step 1 to the target over that
+    fraction of training, so the violation never gets large.
+
+    The quadratic term only acts above budget; it is what lets an augmented
+    Lagrangian settle on non-convex parts of the front, where a fixed weight (a
+    weighted sum) cannot.
+    """
+
+    LAM_MIN, LAM_MAX = 1e-6, 1e4
+
+    def __init__(self, budget, n_steps=None, lr=0.01, kp=0.0, ramp=0.0, rho=1.0,
+                 lambda_init=0.01, ema=0.9):
+        budget = float(budget)
+        if not budget > 0:
+            raise ValueError(f"BudgetConstraint: budget must be > 0, got {budget}")
+        self.budget = budget
+        self.lr = float(lr)
+        self.kp = float(kp)
+        self.ramp_steps = int(round(float(ramp) * n_steps)) if ramp and n_steps else 0
+        self.rho = float(rho)
+        self.ema = float(ema)
+        self.integral = float(np.log(np.clip(lambda_init, self.LAM_MIN, self.LAM_MAX)))
+        self.log_lam = self.integral
+        self.v_ema = None
+        self.start_cost = None
+        self.step = 0
+        self.last_cost = float("nan")
+
+    @property
+    def lam(self):
+        return float(np.exp(self.log_lam))
+
+    @property
+    def current_budget(self):
+        """The target, or during the ramp a geometric step from the initial cost."""
+        if self.step >= self.ramp_steps or self.start_cost is None or self.start_cost <= self.budget:
+            return self.budget
+        frac = self.step / self.ramp_steps
+        return float(self.start_cost ** (1.0 - frac) * self.budget ** frac)
+
+    def penalty(self, cost):
+        """Loss term for the current batch; ``cost`` is a differentiable scalar."""
+        self.last_cost = float(cost.detach())
+        if self.start_cost is None:
+            self.start_cost = self.last_cost
+        budget_t = self.current_budget
+        v = cost / budget_t - 1.0
+        return self.lam * cost + 0.5 * self.rho * budget_t * torch.relu(v).square()
+
+    def update(self):
+        """Dual step; call once per optimizer step, after penalty()."""
+        v = self.last_cost / self.current_budget - 1.0
+        self.v_ema = v if self.v_ema is None else self.ema * self.v_ema + (1 - self.ema) * v
+        e = float(np.clip(self.v_ema, -1.0, 1.0))
+        lo, hi = np.log(self.LAM_MIN), np.log(self.LAM_MAX)
+        self.integral = float(np.clip(self.integral + self.lr * e, lo, hi))
+        self.log_lam = float(np.clip(self.integral + self.kp * e, lo, hi))
+        self.step += 1
+
+
 def train(
     model,
     config,
@@ -743,10 +881,52 @@ def train(
     plot_results=True,
     show_progress=True,
     loss_per_trial=True,
+    rate_budget=None,
+    conn_budget=None,
+    budget_lr=BUDGET_DEFAULTS["budget_lr"],
+    budget_kp=BUDGET_DEFAULTS["budget_kp"],
+    budget_ramp=BUDGET_DEFAULTS["budget_ramp"],
+    budget_rho=BUDGET_DEFAULTS["budget_rho"],
+    budget_lambda_init=BUDGET_DEFAULTS["budget_lambda_init"],
+    budget_ema=BUDGET_DEFAULTS["budget_ema"],
+    conn_budget_mode=BUDGET_DEFAULTS["conn_budget_mode"],
     **reg_overrides,
 ):
-    """Multitask training. By default each batch mixes all active tasks."""
+    """Multitask training. By default each batch mixes all active tasks.
+
+    Cost terms come in two forms, per cost (rate / wiring), not both at once:
+
+    * fixed weight: ``lambda_rate`` / ``lambda_connectivity`` (weighted sum);
+    * budget: ``rate_budget`` / ``conn_budget``, a ceiling on the same quantity
+      (``rate_reg`` / ``connectivity_reg``), enforced by an augmented Lagrangian
+      whose multiplier adapts during training -- see ``BudgetConstraint``.
+      The wiring budget is by default enforced exactly instead
+      (``conn_budget_mode="projection"``): after every optimizer step W_rec is
+      projected back onto the budget (``project_w_rec_to_budget``), so it has
+      no multiplier and no lag. Rate depends on activity, not on the weights,
+      so it can only use the multiplier.
+
+    With both budgets ``None`` (the default) training is exactly the
+    weighted-sum training it always was.
+    """
     reg = _reg_opts(**reg_overrides)
+    if rate_budget is not None and lambda_rate:
+        raise ValueError("train: give lambda_rate or rate_budget, not both")
+    if conn_budget is not None and lambda_connectivity:
+        raise ValueError("train: give lambda_connectivity or conn_budget, not both")
+    budget_kw = dict(lr=budget_lr, kp=budget_kp, ramp=budget_ramp, rho=budget_rho,
+                     lambda_init=budget_lambda_init, ema=budget_ema)
+    rate_con = BudgetConstraint(rate_budget, n_steps, **budget_kw) if rate_budget is not None else None
+    if conn_budget_mode not in ("projection", "lagrangian"):
+        raise ValueError(f"train: conn_budget_mode must be 'projection' or 'lagrangian', got {conn_budget_mode!r}")
+    conn_con = conn_proj = None
+    if conn_budget is not None and conn_budget_mode == "lagrangian":
+        conn_con = BudgetConstraint(conn_budget, n_steps, **budget_kw)
+    elif conn_budget is not None:
+        if reg["conn_kind"] != "l1" or reg["conn_target"] != "w_rec":
+            raise ValueError("train: projection needs conn_kind='l1', conn_target='w_rec'")
+        # Only its ramp / budget bookkeeping is used; there is no multiplier.
+        conn_proj = BudgetConstraint(conn_budget, n_steps, **budget_kw)
     device = next(model.parameters()).device
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     history = {
@@ -769,6 +949,15 @@ def train(
         "reg": dict(reg),
         "loss_per_trial": bool(loss_per_trial),
     }
+    if rate_con is not None or conn_budget is not None:
+        history["budget"] = {
+            "rate_budget": rate_budget,
+            "conn_budget": conn_budget,
+            "conn_budget_mode": conn_budget_mode,
+            **budget_kw,
+            "rate": {"lambda": [], "cost": [], "budget_t": []},
+            "conn": {"lambda": [], "cost": [], "budget_t": []},
+        }
 
     steps = tqdm(range(1, n_steps + 1)) if show_progress else range(1, n_steps + 1)
     for step in steps:
@@ -795,6 +984,24 @@ def train(
                     target=reg["conn_target"],
                     inh_scale=reg["conn_inh_scale"],
                 )
+            if rate_con is not None:
+                total = total + rate_con.penalty(
+                    rate_reg(
+                        r_hist,
+                        model=model,
+                        kind=reg["rate_kind"],
+                        inh_scale=reg["rate_inh_scale"],
+                    )
+                )
+            if conn_con is not None:
+                total = total + conn_con.penalty(
+                    connectivity_reg(
+                        model,
+                        kind=reg["conn_kind"],
+                        target=reg["conn_target"],
+                        inh_scale=reg["conn_inh_scale"],
+                    )
+                )
             return total
 
         loss = model.train_step(
@@ -806,6 +1013,24 @@ def train(
         )
         history["loss"].append(loss.item())
         history["step"].append(step)
+        if conn_proj is not None:
+            if conn_proj.start_cost is None:
+                with torch.no_grad():
+                    conn_proj.start_cost = float(connectivity_reg(model, inh_scale=reg["conn_inh_scale"]))
+            budget_t = conn_proj.current_budget
+            project_w_rec_to_budget(model, budget_t, inh_scale=reg["conn_inh_scale"])
+            with torch.no_grad():
+                cost = float(connectivity_reg(model, inh_scale=reg["conn_inh_scale"]))
+            conn_proj.step += 1
+            history["budget"]["conn"]["budget_t"].append(budget_t)
+            history["budget"]["conn"]["lambda"].append(float("nan"))
+            history["budget"]["conn"]["cost"].append(cost)
+        for key, con in (("rate", rate_con), ("conn", conn_con)):
+            if con is not None:
+                history["budget"][key]["budget_t"].append(con.current_budget)
+                con.update()
+                history["budget"][key]["lambda"].append(con.lam)
+                history["budget"][key]["cost"].append(con.last_cost)
 
         if step == 1 or step % log_every == 0 or step == n_steps:
             history["eval_step"].append(step)

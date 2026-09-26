@@ -5,11 +5,14 @@
 # 2.13+cu130 has no kernels for V100 / CC 7.0).
 #
 # Submit from the repo root (log files land in the submit directory):
-#   sbatch slurm/moo.sjob --reference-run pareto_runs/dale_core5_6x6_2026_09_23_05_45_12_5802320
-# Default: NSGA-III over lambdas, pop 8 x 4 generations = 32 networks, ~4 h.
+#   sbatch slurm/moo.sjob --workers 4 --reference-run pareto_runs/dale_core5_6x6_2026_09_23_05_45_12_5802320
+# Default: NSGA-III over cost budgets, pop 12 x 6 generations = 72 networks
+# (~9 h one at a time; --workers 4 trains 4 at once on the same GPU slice).
+# The lambda-genome validation run used --genome lambda (pop 8 x 4).
 # Extra args are forwarded to cmc.moo. A job that hit its time limit resumes if
-# resubmitted with the same output dir (finished networks are taken from runs.csv):
-#   sbatch slurm/moo.sjob --output-dir moo_runs/<run> --reference-run ...
+# resubmitted with the same output dir and args (finished networks are taken
+# from runs.csv):
+#   sbatch slurm/moo.sjob --output-dir moo_runs/<run> --workers 4 --reference-run ...
 
 #SBATCH -J cmc_moo
 #SBATCH -D ./
@@ -21,9 +24,9 @@
 #SBATCH --qos=mig
 #SBATCH --gres=gpu:3g.20gb
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=8G
-#SBATCH --time=06:00:00
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=24G
+#SBATCH --time=12:00:00
 
 set -euo pipefail
 
@@ -37,7 +40,9 @@ source "${CONDA_ROOT}/etc/profile.d/conda.sh"
 conda activate "${CONDA_ENV:-cmc_env}"
 
 export MPLBACKEND=Agg
-export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"
+# Each --workers process has its own CUDA context (~1.5 GB host RAM) and
+# threads; 2 threads each keeps 4 workers within the 8 cores.
+export OMP_NUM_THREADS="${OMP_NUM_THREADS_PER_WORKER:-2}"
 
 echo "Host: $(hostname)  Date: $(date)"
 echo "Job: ${SLURM_JOB_NAME:-local}  ID: ${SLURM_JOB_ID:-none}  GPU: ${CUDA_VISIBLE_DEVICES:-unset}"

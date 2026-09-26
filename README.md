@@ -116,20 +116,25 @@ variance; `runs.csv` lists which seeds still do every task.
 
 Instead of a lambda grid, NSGA-III (pymoo) can choose which networks to train.
 Objectives are worst-task error and log metabolic / wiring cost, with
-`min_task_acc >= 0.6` as a constraint. The current genome is
-`(log lambda_rate, log lambda_connectivity)`, which validates the loop against
-the known 6x6 front (default: population 8 x 4 generations = 32 networks, ~4 h
-on a GPU). A budget genome with constrained training, which needs no lambdas,
-is next.
+`min_task_acc >= 0.6` as a constraint. The default genome is a pair of **cost
+budgets**, not lambdas. Each network is trained to do the tasks as well as it
+can while staying under its ceilings:
+- **Wiring:** W_rec is projected onto the budget after every step.
+- **Rate:** a learned multiplier.
+
+The default run is population 12 x 6 generations = 72 networks.
+`--genome lambda` (weighted sum, population 8 x 4) was used to validate the loop
+against the 6x6 grid.
 
 ```bash
-python -m cmc.moo --steps 200 --pop-size 6 --n-gen 2 --device cpu   # smoke test
-sbatch slurm/moo.sjob --reference-run pareto_runs/dale_core5_6x6_2026_09_23_05_45_12_5802320
+python -m cmc.moo --steps 200 --pop-size 10 --n-gen 2 --device cpu        # smoke test
+python -m cmc.moo --points "0.0087,0.0045; 0.0144,0.0056"                 # fixed budgets, no search
+sbatch slurm/moo.sjob --workers 4 --reference-run pareto_runs/dale_core5_6x6_2026_09_23_05_45_12_5802320
 ```
 
 `moo_vs_reference.png` and `summary.json` report how many of the found networks
 are dominated by a seed-0 network of the reference sweep. A job that hits its
-time limit resumes when resubmitted with the same `--output-dir`.
+time limit resumes when resubmitted with the same `--output-dir` and arguments.
 
 Analysis lives in `notebooks/`: `pareto_analysis.ipynb` for the fronts,
 `analysis_of_network.ipynb` for task variance and clustering,
