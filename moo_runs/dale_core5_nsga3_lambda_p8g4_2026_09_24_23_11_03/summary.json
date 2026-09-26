@@ -1,0 +1,162 @@
+{
+  "genome": "lambda",
+  "model": "dale",
+  "task_battery": "core5",
+  "active_tasks": [
+    "fdgo",
+    "fdanti",
+    "dm1",
+    "contextdm1",
+    "dmsgo"
+  ],
+  "n_evaluated": 32,
+  "n_feasible": 22,
+  "front": [
+    {
+      "lambda_rate": 0.2145615164776003,
+      "lambda_connectivity": 1.1070095123694954,
+      "min_task_acc": 0.7921875,
+      "metabolic_cost": 0.008925185920670629,
+      "wiring_cost": 0.011308583430945873,
+      "conn_frac": 0.39321383833885193,
+      "generation": 0
+    },
+    {
+      "lambda_rate": 0.0372681728618633,
+      "lambda_connectivity": 1.0358173323618092,
+      "min_task_acc": 0.83125,
+      "metabolic_cost": 0.03026306565850973,
+      "wiring_cost": 0.015569856390357018,
+      "conn_frac": 0.5574908256530762,
+      "generation": 1
+    },
+    {
+      "lambda_rate": 0.20936755432153265,
+      "lambda_connectivity": 4.766442597607552,
+      "min_task_acc": 0.621875,
+      "metabolic_cost": 0.010091169476509095,
+      "wiring_cost": 0.004511349834501743,
+      "conn_frac": 0.08322609961032867,
+      "generation": 2
+    },
+    {
+      "lambda_rate": 0.07078476131043232,
+      "lambda_connectivity": 1.1070095123694954,
+      "min_task_acc": 0.8140625,
+      "metabolic_cost": 0.020405514501035213,
+      "wiring_cost": 0.014164499007165432,
+      "conn_frac": 0.5093902945518494,
+      "generation": 2
+    },
+    {
+      "lambda_rate": 0.13338548775829073,
+      "lambda_connectivity": 5.330790499895369,
+      "min_task_acc": 0.6484375,
+      "metabolic_cost": 0.013234133217483759,
+      "wiring_cost": 0.004752115346491337,
+      "conn_frac": 0.09289215505123138,
+      "generation": 2
+    },
+    {
+      "lambda_rate": 0.13478211526922082,
+      "lambda_connectivity": 5.135150446606625,
+      "min_task_acc": 0.640625,
+      "metabolic_cost": 0.013223037216812372,
+      "wiring_cost": 0.00485403323546052,
+      "conn_frac": 0.09780943393707275,
+      "generation": 3
+    },
+    {
+      "lambda_rate": 0.09359703897824026,
+      "lambda_connectivity": 1.0342049392574888,
+      "min_task_acc": 0.8046875,
+      "metabolic_cost": 0.016545631233602764,
+      "wiring_cost": 0.014060557819902897,
+      "conn_frac": 0.5017616152763367,
+      "generation": 3
+    },
+    {
+      "lambda_rate": 0.19090790939728222,
+      "lambda_connectivity": 5.12750235292725,
+      "min_task_acc": 0.6140625,
+      "metabolic_cost": 0.010773949772119523,
+      "wiring_cost": 0.0044342284090816975,
+      "conn_frac": 0.07953431457281113,
+      "generation": 3
+    },
+    {
+      "lambda_rate": 0.04105288726747599,
+      "lambda_connectivity": 4.170055776650522,
+      "min_task_acc": 0.659375,
+      "metabolic_cost": 0.03087489604949951,
+      "wiring_cost": 0.007153395097702742,
+      "conn_frac": 0.21034006774425507,
+      "generation": 3
+    },
+    {
+      "lambda_rate": 0.06621012058645304,
+      "lambda_connectivity": 1.0238024844174478,
+      "min_task_acc": 0.8296875,
+      "metabolic_cost": 0.021351337321102618,
+      "wiring_cost": 0.014790911227464676,
+      "conn_frac": 0.5301777124404907,
+      "generation": 3
+    },
+    {
+      "lambda_rate": 0.1837570087021053,
+      "lambda_connectivity": 1.1070095123694954,
+      "min_task_acc": 0.8015625,
+      "metabolic_cost": 0.009995787451043726,
+      "wiring_cost": 0.011751092970371246,
+      "conn_frac": 0.411580890417099,
+      "generation": 3
+    }
+  ],
+  "args": {
+    "model": "dale",
+    "task_battery": "core5",
+    "tasks": null,
+    "steps": 4000,
+    "batch_size": 32,
+    "n_rnn": 256,
+    "n_neurons": 256,
+    "n_eachring": 16,
+    "frac_e": 0.8,
+    "g": 1.0,
+    "sigma_rec": 0.05,
+    "noise_level": null,
+    "lr": 0.001,
+    "log_every": 20,
+    "seed": 0,
+    "device": "cuda",
+    "eval_batch_size": 64,
+    "feasible_min_task_acc": 0.6,
+    "eval_seeds": null,
+    "rate_kind": "l2",
+    "rate_inh_scale": 1.0,
+    "conn_kind": "l1",
+    "conn_target": "w_rec",
+    "conn_inh_scale": 1.0,
+    "prune_eps": 0.0,
+    "loss_per_trial": true,
+    "eval_noise_level": 0.0,
+    "eval_input_noise": false,
+    "output_dir": null,
+    "genome": "lambda",
+    "lambda_rate_min": 0.02,
+    "lambda_rate_max": 1.5,
+    "lambda_connectivity_min": 1.0,
+    "lambda_connectivity_max": 40.0,
+    "pop_size": 8,
+    "n_gen": 4,
+    "n_partitions": 2,
+    "moo_seed": 1,
+    "reference_run": "pareto_runs/dale_core5_6x6_2026_09_23_05_45_12_5802320"
+  },
+  "reference_check": {
+    "reference_run": "pareto_runs/dale_core5_6x6_2026_09_23_05_45_12_5802320",
+    "n_found_feasible": 22,
+    "n_reference_feasible_seed0": 14,
+    "n_found_dominated_by_reference_seed0": 12
+  }
+}
