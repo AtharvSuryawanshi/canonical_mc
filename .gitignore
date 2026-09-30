@@ -80,9 +80,9 @@ target/
 
 # Trained model weights
 # checkpoints/
-# zoom_lambda saves every network (~40 MB per run): keep weights out of git,
-# commit only runs.csv / summary.json.
-zoom_lambda_runs/**/*.pt
+# All runs, including lambda_zoom weights (~1 MB per network), are committed:
+# long cluster sessions are unreliable, so git is the transfer. If runs/ grows
+# too large, move *.pt to git LFS rather than ignoring them.
 
 # IPython
 profile_default/

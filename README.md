@@ -13,23 +13,27 @@ look at the Pareto front that trades task performance against those two costs.
 ## Layout
 
 ```
-cmc/                 installable package -- all the code that runs
-  task.py            Yang et al. (2019) task battery, trial generation, c_mask
-  network.py         LeakyRNN and DaleRNN (sign-constrained, E-only readout)
-  train_cog.py       objectives, regularizers, accuracy scoring, training loop, CLI
-  pareto.py          (lambda_rate, lambda_connectivity) sweeps and Pareto fronts
-  zoom_lambda.py     many seeds at a few chosen lambdas, every network saved
-  moo.py             NSGA-III (pymoo) search of the front instead of a grid
-  paths.py           repo-anchored checkpoints/ and pareto_runs/ locations
-notebooks/           analysis and exploration, imports the package
-slurm/               LRZ batch scripts (train, pareto, zoom_lambda, moo)
-archives/            legacy code, kept for reference, not imported
-checkpoints/         trained weights (written by cmc.train_cog)
-pareto_runs/         one directory per sweep (written by cmc.pareto)
-zoom_lambda_runs/    saved networks for inspection (weights git-ignored)
-moo_runs/            one directory per NSGA-III search (written by cmc.moo)
-theory.md            the neuroscience the objectives are meant to encode
-FIXED_ISSUES.md      audited mismatches between that theory and the code
+cmc/                    installable package -- all the code that runs
+  task.py               Yang et al. (2019) task battery, trial generation, c_mask
+  network.py            LeakyRNN and DaleRNN (sign-constrained, E-only readout)
+  train_cog.py          objectives, regularizers, budgets, training loop, CLI
+  front.py              Pareto dominance and the feasibility rule (shared)
+  runner.py             train + evaluate one network, common CLI flags (shared)
+  lambda_pareto.py      lambda-grid sweeps (weighted sum) and their fronts
+  lambda_zoom.py        many seeds at a few chosen lambdas, every network saved
+  moo.py                NSGA-III (pymoo) search over cost budgets
+  paths.py              repo-anchored runs/ locations
+  pareto.py, zoom_lambda.py   deprecated aliases of lambda_pareto / lambda_zoom
+notebooks/              lambda_pareto_analysis, moo_pareto_analysis, network analysis
+slurm/                  LRZ batch scripts (train, lambda_pareto, lambda_zoom, moo)
+runs/                   all experiment output, committed (git is the cluster transfer)
+  checkpoints/          trained weights (written by cmc.train_cog)
+  lambda_pareto/<run>/  one directory per lambda sweep
+  lambda_zoom/<run>/    saved networks at chosen lambdas, weights included
+  moo/<run>/            one directory per NSGA-III search
+archives/               legacy code, kept for reference, not imported
+theory.md               the neuroscience the objectives are meant to encode
+FIXED_ISSUES.md         audited mismatches between that theory and the code
 ```
 
 ## Install
@@ -73,7 +77,7 @@ equivalent console script):
 python -m cmc.train_cog --model dale --task-battery sanity3 --n-neurons 256 --steps 5000
 ```
 
-Weights land in `checkpoints/{model}_{n_tasks}_{n_steps}_{timestamp}.pt`, regardless
+Weights land in `runs/checkpoints/{model}_{n_tasks}_{n_steps}_{timestamp}.pt`, regardless
 of which directory you launched from -- `cmc/paths.py` anchors the output directories
 to the repo root. Set `CMC_ROOT` to redirect them (e.g. to cluster scratch).
 
@@ -88,16 +92,16 @@ This reports at *initialization*. Between init and a trained solution the rate
 cost grows ~26x and the task loss falls ~30x, so the break-even lambdas it prints
 overshoot the useful range by ~500x (rate) and ~20x (wiring) -- treat it as a
 check that the terms are finite rather than as the centre of the grid. The
-`--lambda-*-min/max` defaults in `cmc/pareto.py` are already calibrated against
+`--lambda-*-min/max` defaults in `cmc/lambda_pareto.py` are already calibrated against
 trained lambda=0 solutions, and the comment above them records the measurements.
 
 Sweep the front:
 
 ```bash
-python -m cmc.pareto --model dale --task-battery core5 --n-lambda 8 --n-seeds 3
+python -m cmc.lambda_pareto --model dale --task-battery core5 --n-lambda 8 --n-seeds 3
 ```
 
-Each sweep writes `pareto_runs/<run>/` containing `runs.csv` (one row per seed),
+Each sweep writes `runs/lambda_pareto/<run>/` containing `runs.csv` (one row per seed),
 `summary.csv` (seed means, which the notebooks read) and `summary.json` (the full
 configuration, including the regularizer settings the gradient actually saw).
 
@@ -106,13 +110,14 @@ chosen points and keep every network (default: a control / rate / wiring / both
 2x2 design taken from the core5 front, 10 seeds each, ~5 h on a GPU):
 
 ```bash
-python -m cmc.zoom_lambda
-sbatch slurm/zoom_lambda.sjob
+python -m cmc.lambda_zoom
+sbatch slurm/lambda_zoom.sjob
 ```
 
-Each network lands in `zoom_lambda_runs/<run>/<point>/seed_XX.pt`, loadable with
+Each network lands in `runs/lambda_zoom/<run>/<point>/seed_XX.pt`, loadable with
 `cmc.train_cog.load_checkpoint`, together with its metrics and per-neuron task
-variance; `runs.csv` lists which seeds still do every task.
+variance; `runs.csv` lists which seeds still do every task. Weights are committed
+(about 1 MB per network).
 
 Instead of a lambda grid, NSGA-III (pymoo) can choose which networks to train.
 Objectives are worst-task error and log metabolic / wiring cost, with
@@ -129,14 +134,14 @@ against the 6x6 grid.
 ```bash
 python -m cmc.moo --steps 200 --pop-size 10 --n-gen 2 --device cpu        # smoke test
 python -m cmc.moo --points "0.0087,0.0045; 0.0144,0.0056"                 # fixed budgets, no search
-sbatch slurm/moo.sjob --workers 4 --reference-run pareto_runs/dale_core5_6x6_2026_09_23_05_45_12_5802320
+sbatch slurm/moo.sjob --workers 4 --reference-run runs/lambda_pareto/dale_core5_6x6_2026_09_23_05_45_12_5802320
 ```
 
 `moo_vs_reference.png` and `summary.json` report how many of the found networks
 are dominated by a seed-0 network of the reference sweep. A job that hits its
 time limit resumes when resubmitted with the same `--output-dir` and arguments.
 
-Analysis lives in `notebooks/`: `pareto_analysis.ipynb` for the fronts,
+Analysis lives in `notebooks/`: `lambda_pareto_analysis.ipynb` for the fronts,
 `analysis_of_network.ipynb` for task variance and clustering,
 `task_exploration.ipynb` for the task battery itself.
 
@@ -156,7 +161,7 @@ Pass extra flags straight through:
 
 ```bash
 sbatch slurm/train.sjob --steps 5000 --model dale --n-neurons 256
-sbatch slurm/pareto.sjob --n-lambda 5 --model dale
+sbatch slurm/lambda_pareto.sjob --n-lambda 5 --model dale
 ```
 
 Check the queue and follow logs (`%x.%j.%N` is job name, job ID, and node; they are

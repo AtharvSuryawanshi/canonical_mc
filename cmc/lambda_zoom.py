@@ -1,17 +1,17 @@
 """Zoom into a few (lambda_rate, lambda_connectivity) points and SAVE every network.
 
-``cmc.pareto`` answers *where* the cost/accuracy trade-off is: it trains a grid
+``cmc.lambda_pareto`` answers *where* the cost/accuracy trade-off is: it trains a grid
 with few seeds and keeps only metrics. This script answers *what the networks
 look like there*: it trains many seeds at a handful of hand-picked lambda points
 and keeps every trained network, so connectivity motifs and functional
 populations can be inspected afterwards.
 
-Training and evaluation are the exact functions ``cmc.pareto`` uses, and the
-training/eval flags (and their defaults) are inherited from its parser. A network
-is fully determined by (lambda, seed): zoom_lambda and a pareto sweep produce the
-identical network, whatever order or process it was trained in.
+Training and evaluation go through ``cmc.runner`` (the same path as the sweep
+and cmc.moo), with the same common flags. A network is fully determined by
+(lambda, seed): lambda_zoom and a lambda_pareto sweep produce the identical
+network, whatever order or process it was trained in.
 
-Output, under ``zoom_lambda_runs/<run>/``:
+Output, under ``runs/lambda_zoom/<run>/``:
 
     <point>/seed_00.pt ...   one checkpoint per network (loadable with
                              cmc.train_cog.load_checkpoint), additionally holding
@@ -23,12 +23,11 @@ Output, under ``zoom_lambda_runs/<run>/``:
 Full activity is deliberately NOT saved (~65 MB per network): it is reproduced
 exactly by re-simulating a checkpoint on the same eval seeds.
 
-    python -m cmc.zoom_lambda                      # default 4 points x 10 seeds
-    python -m cmc.zoom_lambda --points "knee=0.27,4.37; 0.02,9.15" --n-seeds 5
+    python -m cmc.lambda_zoom                      # default 4 points x 10 seeds
+    python -m cmc.lambda_zoom --points "knee=0.27,4.37; 0.02,9.15" --n-seeds 5
 """
 
 import argparse
-import copy
 import json
 import time
 from datetime import datetime
@@ -38,27 +37,23 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from cmc.pareto import (
+from cmc.paths import LAMBDA_ZOOM_RUNS_DIR
+from cmc.runner import (  # noqa: F401  (resolve_run_settings / train_and_evaluate re-exported)
+    add_common_args,
     append_csv_row,
-    build_parser as build_pareto_parser,
-    make_fresh_model,
-    parse_eval_seeds,
+    resolve_run_settings,
+    train_and_evaluate,
 )
-from cmc.paths import ZOOM_LAMBDA_DIR
-from cmc.task import default_config, generate_trials
+from cmc.task import generate_trials
 from cmc.train_cog import (
-    DALE_DEFAULT_NOISE_LEVEL,
     _model_kwargs_from_args,
     eval_config_from,
-    evaluate_pareto_metrics,
-    resolve_active_tasks,
     save_checkpoint,
-    train_without_plots,
     trial_to_tensors,
 )
 
 # A 2x2 design over the two constraints, picked from the corrected front of
-# pareto_runs/dale_core5_6x6_2026_09_23_05_45_12_5802320 (task axis min_task_acc,
+# runs/lambda_pareto/dale_core5_6x6_2026_09_23_05_45_12_5802320 (task axis min_task_acc,
 # networks with min_task_acc < 0.6 excluded), at the exact grid lambdas. They are
 # not bit-for-bit the sweep's networks: that sweep predates seeding torch, so its
 # readout init and training noise were unseeded (see FIXED_ISSUES.md). Each
@@ -85,25 +80,12 @@ DEFAULT_POINTS = (
     ("both", 0.2667268608396602, 4.373448295773113),
 )
 
-# Flags taken over from cmc.pareto's parser. Everything else there (lambda grid,
-# front construction, plotting) has no meaning for a fixed list of points.
-SHARED_FLAGS = {
-    "model", "task_battery", "tasks", "steps", "batch_size", "n_rnn",
-    "n_neurons", "n_eachring", "frac_e", "g", "sigma_rec", "noise_level", "lr",
-    "log_every", "seed", "device", "eval_batch_size", "eval_seeds",
-    "feasible_min_task_acc", "n_seeds", "rate_kind", "rate_inh_scale",
-    "conn_kind", "conn_target", "conn_inh_scale", "prune_eps", "loss_per_trial",
-    "eval_noise_level", "eval_input_noise", "output_dir",
-}
-
 
 def build_parser():
     parser = argparse.ArgumentParser(
         description="Train many seeds at chosen lambda points and save every network."
     )
-    for action in build_pareto_parser()._actions:
-        if action.dest in SHARED_FLAGS:
-            parser._add_action(copy.copy(action))
+    add_common_args(parser)
     parser.add_argument(
         "--points",
         type=str,
@@ -162,70 +144,7 @@ def activity_summary(model, train_config, active_tasks, device, eval_seeds, batc
 
 def default_output_dir(model, battery_label, n_points, n_seeds):
     stamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    return ZOOM_LAMBDA_DIR / f"{model}_{battery_label}_{n_points}pt_{n_seeds}seed_{stamp}"
-
-
-def resolve_run_settings(args):
-    """(active_tasks, battery_label, device, noise_level, eval_seeds, reg_opts)."""
-    active_tasks = resolve_active_tasks(args.task_battery, args.tasks)
-    battery_label = args.task_battery if args.tasks is None else "custom"
-    device = torch.device(args.device or ("cuda" if torch.cuda.is_available() else "cpu"))
-    noise_level = (
-        args.noise_level
-        if args.noise_level is not None
-        else (1.0 if args.model == "yang" else DALE_DEFAULT_NOISE_LEVEL)
-    )
-    reg_opts = {
-        "rate_kind": args.rate_kind,
-        "rate_inh_scale": args.rate_inh_scale,
-        "conn_kind": args.conn_kind,
-        "conn_target": args.conn_target,
-        "conn_inh_scale": args.conn_inh_scale,
-    }
-    return active_tasks, battery_label, device, noise_level, parse_eval_seeds(args.eval_seeds), reg_opts
-
-
-def train_and_evaluate(args, lambda_rate, lambda_connectivity, seed, active_tasks,
-                       device, noise_level, eval_seeds, reg_opts, budget_opts=None):
-    """Train one network exactly as ``cmc.pareto`` does and evaluate it.
-
-    Returns (model, config, history, metrics). Shared by zoom_lambda and cmc.moo,
-    so every script produces the identical network for a given (lambda, seed).
-    ``budget_opts`` (``rate_budget``, ``conn_budget``, ``budget_lr``, ...) are
-    passed to ``train`` for budget-constrained training; pass zero lambdas then.
-    """
-    config = default_config(n_eachring=args.n_eachring, seed=seed, easy_task=True)
-    model = make_fresh_model(args, config, device, seed=seed)
-    history = train_without_plots(
-        model,
-        config,
-        active_tasks=active_tasks,
-        n_steps=args.steps,
-        batch_size=args.batch_size,
-        lr=args.lr,
-        lambda_rate=float(lambda_rate),
-        lambda_connectivity=float(lambda_connectivity),
-        noise_level=noise_level,
-        log_every=args.log_every,
-        show_progress=False,
-        loss_per_trial=args.loss_per_trial,
-        **(budget_opts or {}),
-        **reg_opts,
-    )
-    model.eval()
-    metrics = evaluate_pareto_metrics(
-        model,
-        config,
-        active_tasks,
-        device,
-        eval_seeds=eval_seeds,
-        batch_size=args.eval_batch_size,
-        noise_level=args.eval_noise_level,
-        input_noise=args.eval_input_noise,
-        easy_task=True,
-        **reg_opts,
-    )
-    return model, config, history, metrics
+    return LAMBDA_ZOOM_RUNS_DIR / f"{model}_{battery_label}_{n_points}pt_{n_seeds}seed_{stamp}"
 
 
 def main(argv=None):
@@ -244,7 +163,7 @@ def main(argv=None):
     done_rows = runs_csv.exists()
 
     print(
-        f"zoom_lambda: {len(points)} points x {len(seeds)} seeds = "
+        f"lambda_zoom: {len(points)} points x {len(seeds)} seeds = "
         f"{len(points) * len(seeds)} networks  tasks={active_tasks}  "
         f"steps={args.steps}  device={device}\n  output={out_dir.resolve()}"
     )
@@ -253,7 +172,7 @@ def main(argv=None):
 
     rows = []
     jobs = [(p, s) for p in points for s in seeds]
-    for (name, lr, lc), seed in tqdm(jobs, desc="zoom_lambda", unit="net"):
+    for (name, lr, lc), seed in tqdm(jobs, desc="lambda_zoom", unit="net"):
         ckpt_path = out_dir / name / f"seed_{seed:02d}.pt"
         if ckpt_path.exists() and not args.overwrite:
             ck = torch.load(ckpt_path, map_location="cpu", weights_only=False)

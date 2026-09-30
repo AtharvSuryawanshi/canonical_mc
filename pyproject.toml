@@ -32,7 +32,9 @@ optim = ["pymoo>=0.6.2"]
 
 [project.scripts]
 cmc-train = "cmc.train_cog:main"
-cmc-pareto = "cmc.pareto:main"
+cmc-lambda-pareto = "cmc.lambda_pareto:main"
+cmc-lambda-zoom = "cmc.lambda_zoom:main"
+cmc-moo = "cmc.moo:main"
 
 [tool.setuptools]
 packages = ["cmc"]

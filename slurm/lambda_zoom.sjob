@@ -5,15 +5,15 @@
 # 2.13+cu130 has no kernels for V100 / CC 7.0).
 #
 # Submit from the repo root (log files land in the submit directory):
-#   sbatch slurm/zoom_lambda.sjob
+#   sbatch slurm/lambda_zoom.sjob
 # Default: 4 points x 10 seeds = 40 networks, ~5 h. Extra args are forwarded
-# to cmc.zoom_lambda:
-#   sbatch slurm/zoom_lambda.sjob --points "knee=0.27,4.37; 0.02,9.15"
+# to cmc.lambda_zoom:
+#   sbatch slurm/lambda_zoom.sjob --points "knee=0.27,4.37; 0.02,9.15"
 # A job that hit its time limit resumes if resubmitted with the same output dir
 # (finished networks are skipped):
-#   sbatch slurm/zoom_lambda.sjob --output-dir zoom_lambda_runs/<run>
+#   sbatch slurm/lambda_zoom.sjob --output-dir runs/lambda_zoom/<run>
 
-#SBATCH -J cmc_zoom_lambda
+#SBATCH -J cmc_lambda_zoom
 #SBATCH -D ./
 #SBATCH -o ./%x.%j.%N.out
 #SBATCH -e ./%x.%j.%N.err
@@ -46,6 +46,6 @@ echo "Job: ${SLURM_JOB_NAME:-local}  ID: ${SLURM_JOB_ID:-none}  GPU: ${CUDA_VISI
 which python
 python -c "import torch, cmc; print('torch', torch.__version__, 'cuda', torch.cuda.is_available(), 'cmc', cmc.__version__)"
 
-python -m cmc.zoom_lambda --device cuda "$@"
+python -m cmc.lambda_zoom --device cuda "$@"
 
 echo "Finished: $(date)"

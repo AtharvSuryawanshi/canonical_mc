@@ -1,8 +1,8 @@
 """Multi-objective search of the cost/accuracy trade-off with NSGA-III (pymoo).
 
-Instead of a fixed lambda grid (``cmc.pareto``), NSGA-III decides which networks
+Instead of a fixed lambda grid (``cmc.lambda_pareto``), NSGA-III decides which networks
 to train next. Every evaluation is one full training + evaluation, the exact
-functions ``cmc.pareto`` and ``cmc.zoom_lambda`` use.
+code path (``cmc.runner``) as ``cmc.lambda_pareto`` and ``cmc.lambda_zoom``.
 
 Objectives (all minimised):
 
@@ -27,9 +27,9 @@ Genomes (``--genome``):
              above the rate budget (eval trials differ from training batches).
     lambda   x = (log10 lambda_rate, log10 lambda_connectivity), weighted-sum
              training. Only the sampling is adaptive; kept to validate the loop
-             against the 6x6 grid (moo_runs/dale_core5_nsga3_lambda_p8g4_*).
+             against the 6x6 grid (runs/moo/dale_core5_nsga3_lambda_p8g4_*).
 
-Output, under ``moo_runs/<run>/``:
+Output, under ``runs/moo/<run>/``:
 
     runs.csv          one row per evaluated network: generation, genome, lambdas
                       or budgets (and the learned final lambdas), metrics,
@@ -46,11 +46,10 @@ each, sharing the GPU); results are identical to --workers 1.
 
     python -m cmc.moo --steps 200 --pop-size 6 --n-gen 2 --device cpu    # smoke test
     python -m cmc.moo --points "0.0087,0.0045; 0.0144,0.0056"            # fixed budgets only
-    python -m cmc.moo --reference-run pareto_runs/<6x6 run> --workers 4  # NSGA-III search
+    python -m cmc.moo --reference-run runs/lambda_pareto/<6x6 run> --workers 4  # NSGA-III search
 """
 
 import argparse
-import copy
 import csv
 import json
 import multiprocessing
@@ -61,15 +60,10 @@ from pathlib import Path
 
 import numpy as np
 
-from cmc.pareto import (
-    append_csv_row,
-    build_parser as build_pareto_parser,
-    compute_front,
-    pareto_mask,
-)
+from cmc.front import compute_front, pareto_mask
 from cmc.paths import MOO_RUNS_DIR
+from cmc.runner import add_common_args, append_csv_row, resolve_run_settings, train_and_evaluate
 from cmc.train_cog import BUDGET_DEFAULTS
-from cmc.zoom_lambda import SHARED_FLAGS, resolve_run_settings, train_and_evaluate
 
 OBJECTIVE_NAMES = ("task_error", "log10_metabolic_cost", "log10_wiring_cost")
 
@@ -85,9 +79,7 @@ def build_parser():
     parser = argparse.ArgumentParser(
         description="NSGA-III search of the accuracy / metabolic / wiring trade-off."
     )
-    for action in build_pareto_parser()._actions:
-        if action.dest in SHARED_FLAGS - {"n_seeds"}:
-            parser._add_action(copy.copy(action))
+    add_common_args(parser, n_seeds=False)
     parser.add_argument("--genome", choices=sorted(GENOME_DEFAULTS), default="budget")
     # lambda genome: the core5 6x6 sweep's box, so the two are directly comparable.
     parser.add_argument("--lambda-rate-min", type=float, default=0.02)
@@ -154,7 +146,7 @@ def build_parser():
         "--reference-run",
         type=str,
         default=None,
-        help="A cmc.pareto run dir; compare the found points against its per-seed "
+        help="A cmc.lambda_pareto run dir; compare the found points against its per-seed "
         "feasible front.",
     )
     # One training seed for every genome: the objective is then a deterministic

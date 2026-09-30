@@ -1,6 +1,6 @@
 # Fixed issues
 
-Audit of `cmc/task.py` / `cmc/network.py` / `cmc/train_cog.py` / `cmc/pareto.py` for places where the
+Audit of `cmc/task.py` / `cmc/network.py` / `cmc/train_cog.py` / `cmc/lambda_pareto.py` for places where the
 neuroscience intent and the code disagreed. Each entry states the issue, why it
 matters, and what was changed.
 
@@ -28,7 +28,7 @@ live `DaleRNN(N=128)`: the penalized tensor was `(53, 128)` = `W_in`, while
 wiring. `W_in` is the input projection -- a thalamocortical-style afferent, not
 part of the local circuit. And L2 shrinks every synapse toward small-but-present,
 which is not what "fewer wires" means. Every `wiring_cost` column in the existing
-`pareto_runs/*` is that W_in quantity, so the reported front axis was wrong too,
+`runs/lambda_pareto/*` is that W_in quantity, so the reported front axis was wrong too,
 not just the training signal.
 
 **Fix.** `connectivity_reg(model, kind="l1", target="w_rec", inh_scale=1.0)`:
@@ -283,7 +283,7 @@ recalibrating.
 
 ## 9. Dale trained and evaluated with zero recurrent noise
 
-**Files:** `cmc/train_cog.py` (`DALE_DEFAULT_NOISE_LEVEL`), `cmc/pareto.py`
+**Files:** `cmc/train_cog.py` (`DALE_DEFAULT_NOISE_LEVEL`), `cmc/lambda_pareto.py`
 
 **Issue.** `noise_level` defaulted to `0.0` for `dale`, and
 `evaluate_pareto_metrics` used `noise_on=False` plus `noise_level=0.0`. The Dale
@@ -304,7 +304,7 @@ reward robustness when you want that.
 
 ## 10. One seed per lambda, and no lambda = 0 anchor
 
-**File:** `cmc/pareto.py`
+**File:** `cmc/lambda_pareto.py`
 
 **Issue.** Every grid point used `seed=args.seed` for both init and trial stream,
 with no replication. And with log spacing from `1e-3` there was no `lambda = 0`
@@ -329,11 +329,11 @@ missing (a log axis cannot contain 0).
 
 ## 11. `OBJECTIVE_MAXIMIZE` was missing `min_task_acc`
 
-**File:** `cmc/pareto.py`
+**File:** `cmc/lambda_pareto.py`
 
 **Issue.** `pareto_maximize_flags` uses `OBJECTIVE_MAXIMIZE.get(name, False)`, and
 `min_task_acc` had no entry -- so naming it as an objective would silently
-**minimize** it and produce an inverted front. `notebooks/pareto_analysis.ipynb` already
+**minimize** it and produce an inverted front. `notebooks/lambda_pareto_analysis.ipynb` already
 lists `min_task_acc` in `OBJECTIVE_LABELS`, so this was one edit from happening.
 
 **Why it matters.** `min_task_acc` is the neuroscience-faithful task objective:
@@ -358,13 +358,13 @@ is a separate analysis decision.
 | `cmc/task.py` `concat_trials` | kept `trials[0].epochs`, so a mixed trial's epoch dict silently described only the first task | `epochs = {}` plus `epochs_by_task` per rule (captured *before* mutating, since `merged is trials[0]`) |
 | `cmc/train_cog.py` `evaluate_pareto_metrics` | rebuilt the eval config from `default_config()` defaults, silently discarding any non-default `dt`/`tau`/`sigma_x`/`ruleset` the model was trained with | new `eval_config_from()` copies the training config and swaps only the RNG; `n_eachring` mismatches now raise instead of passing silently |
 | `cmc/train_cog.py` | no way to pick lambda ranges after the cost definitions changed | new `penalty_scales()` and `--report-scales`: prints each term's magnitude and the break-even lambdas |
-| `cmc/train_cog.py` / `cmc/pareto.py` | training and the reported Pareto costs could drift apart | single `DEFAULT_REG` dict threaded through `train()` and `evaluate_pareto_metrics()`, so the front plots the functional the gradient saw; `summary.json` records it under `reg` |
+| `cmc/train_cog.py` / `cmc/lambda_pareto.py` | training and the reported Pareto costs could drift apart | single `DEFAULT_REG` dict threaded through `train()` and `evaluate_pareto_metrics()`, so the front plots the functional the gradient saw; `summary.json` records it under `reg` |
 
 ---
 
 ## 13. The Pareto front was mostly networks that had stopped doing the task
 
-**File:** `cmc/pareto.py` (`compute_front`, `FEASIBLE_MIN_TASK_ACC`)
+**File:** `cmc/lambda_pareto.py` (`compute_front`, `FEASIBLE_MIN_TASK_ACC`)
 
 **Issue.** The front used `mean_acc` and let every network compete. In the core5
 6x6 run, 35 of 37 points were "Pareto-optimal", 8 of them at chance.
@@ -399,7 +399,7 @@ retrained to inspect it.
 
 **Fix.** `torch.manual_seed(seed)` right before each model is built. A network is
 now fully determined by (lambda, seed): verified identical metrics (difference
-0.0) between `cmc.pareto` and `cmc.zoom_lambda`, across repeated runs, and for a
+0.0) between `cmc.lambda_pareto` and `cmc.lambda_zoom`, across repeated runs, and for a
 network trained alone vs after others. Sweeps run before this fix are
 statistically valid but not bit-reproducible.
 

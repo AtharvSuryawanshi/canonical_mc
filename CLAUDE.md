@@ -11,12 +11,14 @@ metabolic cost vs. wiring cost).
 
 ```
 cmc/            installable package: task.py, network.py, train_cog.py,
-                pareto.py, zoom_lambda.py, moo.py, paths.py — see README.md for install/run commands
-notebooks/      analysis, imports cmc.*
+                front.py (dominance, feasibility), runner.py (train+eval one
+                network, common flags), lambda_pareto.py, lambda_zoom.py, moo.py,
+                paths.py. pareto.py / zoom_lambda.py are deprecated shims.
+notebooks/      lambda_pareto_analysis, moo_pareto_analysis, ...; import cmc.*
 slurm/          LRZ batch scripts
+runs/           ALL output, committed incl. weights (git is the cluster transfer):
+                checkpoints/, lambda_pareto/, lambda_zoom/, moo/
 archives/       legacy code, not imported by anything
-checkpoints/    trained weights (small ones only — don't bloat this)
-pareto_runs/    one dir per sweep: runs.csv (per-seed) + summary.csv/json
 theory.md       the neuroscience the objectives are meant to encode
 FIXED_ISSUES.md audit of past mismatches between that theory and the code
 ```
@@ -24,6 +26,10 @@ FIXED_ISSUES.md audit of past mismatches between that theory and the code
 Env: `conda create -n cmc_env python=3.12 && pip install -r requirements.txt
 && pip install -e .`. Full install/run instructions are in README.md —
 don't duplicate them here.
+
+Naming: `lambda_*` = anything driven by hand-set lambdas (weighted sum),
+`moo_*` = the NSGA-III budget search. Shared, method-agnostic code lives in
+`cmc.front` / `cmc.runner`, never in a `lambda_*` or `moo` module.
 
 ## Model
 
@@ -63,7 +69,7 @@ and can drift during training; L1 is a proxy for connection count, not
 actual wire length (no spatial embedding); L0 / connection-probability
 formulation deferred, would need a probability-of-connection parameterization.
 
-**Pareto front rules** (`cmc/pareto.py` `compute_front`, mirrored in the
+**Pareto front rules** (`cmc/lambda_pareto.py` `compute_front`, mirrored in the
 notebook): task axis is `min_task_acc` (worst task), not `mean_acc` -- a
 network can abandon one task and still score ~0.9 mean. Networks with
 `min_task_acc < 0.6` (`FEASIBLE_MIN_TASK_ACC`) are excluded from the front by
@@ -72,17 +78,17 @@ default, otherwise chance-level networks sit on it as the cheapest points
 `--include-infeasible`, `--pareto-task-objective mean_acc`,
 `--feasible-min-task-acc`; notebook `EXCLUDE_INFEASIBLE` / `TASK_OBJECTIVE`.
 
-**Inspecting networks:** `cmc.pareto` keeps only metrics. `cmc.zoom_lambda`
+**Inspecting networks:** `cmc.lambda_pareto` keeps only metrics. `cmc.lambda_zoom`
 trains many seeds (default 10) at a few chosen lambda points (default: a 2x2
 control / rate / wiring / both design from the corrected core5 6x6 front) and
 saves every network with its lambdas, metrics, feasibility and per-neuron task
 variance; full activity is re-simulated, not stored. Output in
-`zoom_lambda_runs/`, weights git-ignored. A network is fully determined by
+`runs/lambda_zoom/`, weights committed. A network is fully determined by
 (lambda, seed): torch is seeded in the model constructors, which it was not
 before -- sweeps predating that are not bit-reproducible.
 
 **Multi-objective (`cmc.moo`):** NSGA-III (pymoo ask/tell), where each evaluation
-is one full training via `zoom_lambda.train_and_evaluate`. Objectives are
+is one full training via `runner.train_and_evaluate`. Objectives are
 (1 - min_task_acc, log10 metabolic, log10 wiring), with min_task_acc >= 0.6 as
 a constraint. Default genome `budget` = log cost ceilings (epsilon-constraint,
 no hand-set lambdas). The wiring budget is enforced exactly by projecting W_rec
@@ -94,7 +100,7 @@ prunes the network to death (tested; ramp and PI terms did not fix it). Checked
 at 3 reference-front costs: accuracy matches the grid networks within seed
 noise. Genome `lambda` (log lambdas, weighted sum) only validated the loop
 against the 6x6. Budget training is opt-in in `train()`; with no budgets it is
-bit-identical to before. Output in `moo_runs/`. Analysis:
+bit-identical to before. Output in `runs/moo/`. Analysis:
 `notebooks/moo_pareto_analysis.ipynb`. For the core5 p24g10 budget run: front
 ~50% larger than the 6x6 by hypervolume. Non-convex (unreachable by any
 lambda) only at the feasibility cliff. The feasibility edge follows
@@ -103,9 +109,9 @@ other 4 tasks at ceiling, so on core5 min_task_acc == dmsgo accuracy.
 
 **Important:** the fixes above changed what the loss functions numerically
 mean (wiring quantity, loss normalization, task difficulty). Old
-checkpoints/sweeps from before this fix are **not directly comparable** to
+runs/checkpoints/sweeps from before this fix are **not directly comparable** to
 new ones. Lambda ranges have been recalibrated for the new objectives --
-the defaults in `cmc/pareto.py` carry both the measurements and the
+the defaults in `cmc/lambda_pareto.py` carry both the measurements and the
 reasoning. Note that `--report-scales` measures at *init*, where the rate
 cost is 26x smaller and the task loss 30x larger than at a trained
 solution, so its break-even lambdas overshoot by ~500x (rate) / ~20x

@@ -5,11 +5,11 @@
 # 2.13+cu130 has no kernels for V100 / CC 7.0).
 #
 # Submit from the repo root (log files land in the submit directory):
-#   sbatch slurm/pareto.sjob
-# Extra args are forwarded to cmc.pareto:
-#   sbatch slurm/pareto.sjob --n-lambda 5 --model dale
+#   sbatch slurm/lambda_pareto.sjob
+# Extra args are forwarded to cmc.lambda_pareto:
+#   sbatch slurm/lambda_pareto.sjob --n-lambda 5 --model dale
 
-#SBATCH -J cmc_pareto
+#SBATCH -J cmc_lambda_pareto
 #SBATCH -D ./
 #SBATCH -o ./%x.%j.%N.out
 #SBATCH -e ./%x.%j.%N.err
@@ -42,6 +42,6 @@ echo "Job: ${SLURM_JOB_NAME:-local}  ID: ${SLURM_JOB_ID:-none}  GPU: ${CUDA_VISI
 which python
 python -c "import torch, cmc; print('torch', torch.__version__, 'cuda', torch.cuda.is_available(), 'cmc', cmc.__version__)"
 
-python -m cmc.pareto --device cuda "$@"
+python -m cmc.lambda_pareto --device cuda "$@"
 
 echo "Finished: $(date)"

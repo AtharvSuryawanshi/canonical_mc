@@ -1,4 +1,7 @@
-"""Pareto sweep over (lambda_rate, lambda_connectivity) for multitask RNN training."""
+"""Pareto sweep over a grid of (lambda_rate, lambda_connectivity) -- weighted-sum training.
+
+The front machinery lives in ``cmc.front``, the per-network training in ``cmc.runner``.
+"""
 
 import argparse
 import csv
@@ -14,34 +17,30 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from cmc.paths import PARETO_RUNS_DIR
-from cmc.task import default_config, rules_dict
+from cmc.front import (  # noqa: F401  (re-exported: notebooks import these from here)
+    FEASIBLE_MIN_TASK_ACC,
+    OBJECTIVE_MAXIMIZE,
+    compute_front,
+    feasible_mask,
+    finalize_results,
+    pareto_mask,
+    pareto_maximize_flags,
+)
+from cmc.paths import LAMBDA_PARETO_RUNS_DIR
+from cmc.runner import (  # noqa: F401
+    DEFAULT_EVAL_SEEDS,
+    add_common_args,
+    append_csv_row,
+    make_fresh_model,
+    parse_eval_seeds,
+)
+from cmc.task import default_config
 from cmc.train_cog import (
     DALE_DEFAULT_NOISE_LEVEL,
-    _model_kwargs_from_args,
     evaluate_pareto_metrics,
-    make_dale_model,
-    make_yang_model,
     resolve_active_tasks,
     train_without_plots,
 )
-
-# Fixed eval seeds for comparable Pareto runs (see pareto_analysis.ipynb calibration).
-DEFAULT_EVAL_SEEDS = tuple(10000 + i for i in range(10))
-
-# pareto_maximize_flags() falls back to False (minimize) for unknown names, so a
-# missing entry here silently inverts the front. min_task_acc in particular is
-# the neuroscience-faithful task objective (mean_acc lets the network abandon a
-# hard task and still look good), and it was absent.
-OBJECTIVE_MAXIMIZE = {
-    "mean_acc": True,
-    "min_task_acc": True,
-    "task_loss": False,
-    "metabolic_cost": False,
-    "wiring_cost": False,
-    "conn_frac": False,
-    "wiring_cost_w_in_l2": False,
-}
 
 
 def _lambda_axis(min_val, max_val, n_lambda, scale):
@@ -116,15 +115,6 @@ def build_grid_pairs(args):
     )
 
 
-def make_fresh_model(args, config, device, seed=None):
-    model_kwargs = _model_kwargs_from_args(args)
-    if seed is not None:
-        model_kwargs["seed"] = int(seed)
-    if args.model == "yang":
-        return make_yang_model(config, device=device, **model_kwargs)
-    return make_dale_model(config, device=device, **model_kwargs)
-
-
 def default_output_dir(model, battery_label, n_lambda, sweep="both"):
     stamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
     if sweep == "connectivity":
@@ -137,46 +127,7 @@ def default_output_dir(model, battery_label, n_lambda, sweep="both"):
     # timestamp; the Slurm job id keeps them distinct.
     job_id = os.environ.get("SLURM_JOB_ID", "").strip()
     suffix = f"_{job_id}" if job_id else ""
-    return PARETO_RUNS_DIR / f"{model}_{battery_label}_{tag}_{stamp}{suffix}"
-
-
-def pareto_maximize_flags(pareto_objectives):
-    return tuple(OBJECTIVE_MAXIMIZE.get(name, False) for name in pareto_objectives)
-
-
-def pareto_mask(objectives, maximize=None):
-    """Mark nondominated rows. objectives: (n, k); maximize per column where True."""
-    n, k = objectives.shape
-    if maximize is None:
-        maximize = (False,) * k
-    else:
-        maximize = tuple(maximize)
-    mask = np.ones(n, dtype=bool)
-    for i in range(n):
-        if not mask[i]:
-            continue
-        for j in range(n):
-            if i == j or not mask[j]:
-                continue
-            better_or_equal = True
-            strictly_better = False
-            for d in range(k):
-                if maximize[d]:
-                    if objectives[j, d] < objectives[i, d]:
-                        better_or_equal = False
-                        break
-                    if objectives[j, d] > objectives[i, d]:
-                        strictly_better = True
-                else:
-                    if objectives[j, d] > objectives[i, d]:
-                        better_or_equal = False
-                        break
-                    if objectives[j, d] < objectives[i, d]:
-                        strictly_better = True
-            if better_or_equal and strictly_better:
-                mask[i] = False
-                break
-    return mask
+    return LAMBDA_PARETO_RUNS_DIR / f"{model}_{battery_label}_{tag}_{stamp}{suffix}"
 
 
 AGG_METRIC_KEYS = (
@@ -210,15 +161,6 @@ def aggregate_seed_runs(lr, lc, objs, train_time_s):
     row["train_time_s"] = float(train_time_s)
     row["is_pareto"] = False
     return row
-
-
-def append_csv_row(csv_path, row, write_header=False):
-    fieldnames = list(row.keys())
-    with csv_path.open("a", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        if write_header:
-            writer.writeheader()
-        writer.writerow(row)
 
 
 def _objective_label(name):
@@ -306,43 +248,11 @@ def plot_pareto_front(rows, out_path, pareto_objectives):
 
 
 def build_parser():
-    """CLI for the sweep. zoom_lambda reuses its training/eval flags from here."""
+    """CLI for the sweep: the common flags (cmc.runner) plus the lambda grid and front options."""
     parser = argparse.ArgumentParser(
         description="Pareto sweep over lambda_rate and lambda_connectivity."
     )
-    parser.add_argument("--model", choices=["yang", "dale"], default="dale")
-    parser.add_argument(
-        "--task-battery",
-        choices=["all", "core5", "sanity3"],
-        default="all",
-        help="Preset task subset (ignored when --tasks is set).",
-    )
-    parser.add_argument(
-        "--tasks",
-        nargs="+",
-        default=None,
-        choices=rules_dict["all"],
-        help="Explicit task list (overrides --task-battery).",
-    )
-    parser.add_argument("--steps", type=int, default=1000)
-    parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--n-rnn", type=int, default=256)
-    parser.add_argument("--n-neurons", type=int, default=256)
-    parser.add_argument("--n-eachring", type=int, default=16)
-    parser.add_argument("--frac-e", type=float, default=0.8)
-    parser.add_argument("--g", type=float, default=1.0)
-    parser.add_argument("--sigma-rec", type=float, default=0.05)
-    parser.add_argument(
-        "--noise-level",
-        type=float,
-        default=None,
-        help="Default: 1.0 for yang, 0.1 for dale.",
-    )
-    parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--log-every", type=int, default=20)
-    parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--device", type=str, default=None)
-    parser.add_argument("--eval-batch-size", type=int, default=64)
+    add_common_args(parser)
     parser.add_argument(
         "--pareto-task-objective",
         choices=["min_task_acc", "mean_acc"],
@@ -358,19 +268,6 @@ def build_parser():
         "--feasible-min-task-acc) compete for the front. Default: excluded.",
     )
     parser.set_defaults(exclude_infeasible=True)
-    parser.add_argument(
-        "--feasible-min-task-acc",
-        type=float,
-        default=FEASIBLE_MIN_TASK_ACC,
-        help=f"Worst-task accuracy a network needs to be a front candidate "
-        f"(default {FEASIBLE_MIN_TASK_ACC}).",
-    )
-    parser.add_argument(
-        "--eval-seeds",
-        type=str,
-        default=None,
-        help=f"Comma-separated trial RNG seeds for eval (default: {len(DEFAULT_EVAL_SEEDS)} fixed seeds).",
-    )
 
     # Lambda ranges recalibrated against the CURRENT objectives: L1 on W_rec for
     # wiring, per-trial task loss, noise_level=0.1. The pre-fix ranges were
@@ -446,15 +343,6 @@ def build_parser():
     )
 
     parser.add_argument(
-        "--n-seeds",
-        type=int,
-        default=1,
-        help="Independent training seeds per lambda point. Every grid point used "
-        "the same init and the same data stream, so a single unlucky init became "
-        "a 'Pareto point' with no error bar. >1 gives mean +- std per lambda; the "
-        "front is computed on the per-lambda means.",
-    )
-    parser.add_argument(
         "--include-lambda-zero",
         dest="include_lambda_zero",
         action="store_true",
@@ -468,31 +356,6 @@ def build_parser():
         dest="include_lambda_zero",
         action="store_false",
     )
-    parser.add_argument("--rate-kind", choices=["l1", "l2"], default="l2")
-    parser.add_argument("--rate-inh-scale", type=float, default=1.0)
-    parser.add_argument("--conn-kind", choices=["l1", "l2"], default="l1")
-    parser.add_argument("--conn-target", choices=["w_rec", "w_in"], default="w_rec")
-    parser.add_argument("--conn-inh-scale", type=float, default=1.0)
-    parser.add_argument("--prune-eps", type=float, default=0.0)
-    parser.add_argument(
-        "--loss-per-trial", dest="loss_per_trial", action="store_true", default=True
-    )
-    parser.add_argument(
-        "--no-loss-per-trial", dest="loss_per_trial", action="store_false"
-    )
-    parser.add_argument(
-        "--eval-noise-level",
-        type=float,
-        default=0.0,
-        help="Recurrent noise during Pareto eval. 0.0 (default) keeps the clean, "
-        "reproducible readout; raise it to make the front reward noise robustness.",
-    )
-    parser.add_argument(
-        "--eval-input-noise",
-        action="store_true",
-        help="Also apply input noise during Pareto eval.",
-    )
-    parser.add_argument("--output-dir", type=str, default=None)
     parser.add_argument(
         "--plot",
         action="store_true",
@@ -503,65 +366,6 @@ def build_parser():
 
 def parse_args(argv=None):
     return build_parser().parse_args(argv)
-
-
-def parse_eval_seeds(text):
-    if text is None or str(text).strip() == "":
-        return DEFAULT_EVAL_SEEDS
-    return tuple(int(s.strip()) for s in str(text).split(",") if s.strip())
-
-
-# A network only counts as a candidate solution if it is still doing EVERY task.
-# Without this, networks at chance sit on the front: they are the cheapest in the
-# grid, so nothing can dominate them on cost (35/37 points were "Pareto" in the
-# core5 6x6 run, 8 of them at chance). 0.6 is above always-fixate on the go/no-go
-# tasks (~0.5 on dmsgo) and far above the dead-network floor on the rest (~0.2-0.3).
-FEASIBLE_MIN_TASK_ACC = 0.6
-
-
-def feasible_mask(rows, min_task_acc=FEASIBLE_MIN_TASK_ACC):
-    """True where the network clears ``min_task_acc`` on its worst task."""
-    return np.array([r["min_task_acc"] >= min_task_acc for r in rows], dtype=bool)
-
-
-def compute_front(
-    rows,
-    pareto_objectives,
-    exclude_infeasible=True,
-    min_task_acc=FEASIBLE_MIN_TASK_ACC,
-):
-    """Return (is_pareto, is_feasible) boolean arrays aligned with ``rows``.
-
-    With ``exclude_infeasible`` the front is computed among feasible rows only,
-    and infeasible rows are never on it. Otherwise every row competes, as before.
-    """
-    rows = list(rows)
-    is_feasible = feasible_mask(rows, min_task_acc)
-    pool = is_feasible if exclude_infeasible else np.ones(len(rows), dtype=bool)
-    is_pareto = np.zeros(len(rows), dtype=bool)
-    if pool.any():
-        objectives = np.array(
-            [[r[k] for k in pareto_objectives] for r, keep in zip(rows, pool) if keep]
-        )
-        is_pareto[pool] = pareto_mask(
-            objectives, maximize=pareto_maximize_flags(pareto_objectives)
-        )
-    return is_pareto, is_feasible
-
-
-def finalize_results(
-    rows,
-    pareto_objectives,
-    exclude_infeasible=True,
-    min_task_acc=FEASIBLE_MIN_TASK_ACC,
-):
-    is_pareto, is_feasible = compute_front(
-        rows, pareto_objectives, exclude_infeasible, min_task_acc
-    )
-    for row, p, f in zip(rows, is_pareto, is_feasible):
-        row["is_pareto"] = bool(p)
-        row["is_feasible"] = bool(f)
-    return rows
 
 
 def main():
