@@ -94,7 +94,12 @@ prunes the network to death (tested; ramp and PI terms did not fix it). Checked
 at 3 reference-front costs: accuracy matches the grid networks within seed
 noise. Genome `lambda` (log lambdas, weighted sum) only validated the loop
 against the 6x6. Budget training is opt-in in `train()`; with no budgets it is
-bit-identical to before. Output in `moo_runs/`.
+bit-identical to before. Output in `moo_runs/`. Analysis:
+`notebooks/moo_pareto_analysis.ipynb`. For the core5 p24g10 budget run: front
+~50% larger than the 6x6 by hypervolume. Non-convex (unreachable by any
+lambda) only at the feasibility cliff. The feasibility edge follows
+rate x wiring ~ const. **dmsgo is the bottleneck in every network**, with the
+other 4 tasks at ceiling, so on core5 min_task_acc == dmsgo accuracy.
 
 **Important:** the fixes above changed what the loss functions numerically
 mean (wiring quantity, loss normalization, task difficulty). Old
