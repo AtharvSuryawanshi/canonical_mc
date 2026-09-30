@@ -8,18 +8,21 @@ the same network whichever script produced it.
 import argparse
 import csv
 
+import numpy as np
 import torch
 
 from cmc.front import FEASIBLE_MIN_TASK_ACC
-from cmc.task import default_config, rules_dict
+from cmc.task import default_config, generate_trials, rules_dict
 from cmc.train_cog import (
     DALE_DEFAULT_NOISE_LEVEL,
     _model_kwargs_from_args,
+    eval_config_from,
     evaluate_pareto_metrics,
     make_dale_model,
     make_yang_model,
     resolve_active_tasks,
     train_without_plots,
+    trial_to_tensors,
 )
 
 
@@ -204,3 +207,27 @@ def train_and_evaluate(args, lambda_rate, lambda_connectivity, seed, active_task
         **reg_opts,
     )
     return model, config, history, metrics
+
+
+def activity_summary(model, train_config, active_tasks, device, eval_seeds, batch_size):
+    """Per-neuron task variance and mean rate, shape (n_tasks, N) each.
+
+    Task variance follows notebooks/analysis_of_network.ipynb (Yang et al. 2019):
+    variance across trials at each time step after fixation onset, averaged over
+    time, then over eval seeds. Noise-free, on the same eval trials as the metrics.
+    """
+    tvs, rates = [], []
+    with torch.no_grad():
+        for rule in active_tasks:
+            per_seed_tv, per_seed_rate = [], []
+            for seed_k in eval_seeds:
+                cfg = eval_config_from(train_config, seed_k, easy_task=True)
+                trial = generate_trials(rule, cfg, batch_size, noise_on=False)
+                x, _, _, _ = trial_to_tensors(trial, device)
+                r_hist, _, _ = model.simulate(x, noise_level=0.0)
+                h = r_hist[:, trial.epochs["fix1"][1]:, :]      # (B, T, N)
+                per_seed_tv.append(h.var(dim=0).mean(dim=0).cpu().numpy())
+                per_seed_rate.append(h.mean(dim=(0, 1)).cpu().numpy())
+            tvs.append(np.mean(per_seed_tv, axis=0))
+            rates.append(np.mean(per_seed_rate, axis=0))
+    return np.stack(tvs).astype(np.float32), np.stack(rates).astype(np.float32)

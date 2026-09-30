@@ -22,15 +22,17 @@ cmc/                    installable package -- all the code that runs
   lambda_pareto.py      lambda-grid sweeps (weighted sum) and their fronts
   lambda_zoom.py        many seeds at a few chosen lambdas, every network saved
   moo.py                NSGA-III (pymoo) search over cost budgets
+  moo_zoom.py           many seeds at a few chosen budget points, every network saved
   paths.py              repo-anchored runs/ locations
   pareto.py, zoom_lambda.py   deprecated aliases of lambda_pareto / lambda_zoom
 notebooks/              lambda_pareto_analysis, moo_pareto_analysis, network analysis
-slurm/                  LRZ batch scripts (train, lambda_pareto, lambda_zoom, moo)
+slurm/                  LRZ batch scripts (train, lambda_pareto, lambda_zoom, moo, moo_zoom)
 runs/                   all experiment output, committed (git is the cluster transfer)
   checkpoints/          trained weights (written by cmc.train_cog)
   lambda_pareto/<run>/  one directory per lambda sweep
   lambda_zoom/<run>/    saved networks at chosen lambdas, weights included
   moo/<run>/            one directory per NSGA-III search
+  moo_zoom/<run>/       saved networks at chosen budget points, weights included
 archives/               legacy code, kept for reference, not imported
 theory.md               the neuroscience the objectives are meant to encode
 FIXED_ISSUES.md         audited mismatches between that theory and the code
@@ -140,6 +142,20 @@ sbatch slurm/moo.sjob --workers 4 --reference-run runs/lambda_pareto/dale_core5_
 `moo_vs_reference.png` and `summary.json` report how many of the found networks
 are dominated by a seed-0 network of the reference sweep. A job that hits its
 time limit resumes when resubmitted with the same `--output-dir` and arguments.
+
+To inspect networks on the budget front, `cmc.moo_zoom` trains 10 seeds at each of 5
+budget points and saves every network: an unconstrained control, three points along
+the ~0.65 iso-accuracy curve (rate-limited, middle, wiring-limited: equally competent,
+different cost binding) and the knee. That's 50 networks, ~6-7 h one at a time.
+
+```bash
+python -m cmc.moo_zoom --steps 40 --n-seeds 2 --device cpu --eval-seeds 10000   # smoke test
+sbatch slurm/moo_zoom.sjob --workers 4 --output-dir runs/moo_zoom/dale_core5_5pt_10seed
+```
+
+Seed 0 at a point is the exact network `cmc.moo` trained there. Each
+`runs/moo_zoom/<run>/<point>/seed_XX.pt` holds the weights, budgets, the learned
+rate multiplier per step, metrics and per-neuron task variance.
 
 Analysis lives in `notebooks/`: `lambda_pareto_analysis.ipynb` for the fronts,
 `analysis_of_network.ipynb` for task variance and clustering,

@@ -1,0 +1,52 @@
+#!/bin/bash
+# Batch script following the LRZ large-memory job template:
+# https://doku.lrz.de/running-large-memory-jobs-on-the-linux-cluster-1311572409.html
+# Adapted for one A100 MIG slice on the LRZ AI Systems (base torch
+# 2.13+cu130 has no kernels for V100 / CC 7.0).
+#
+# Submit from the repo root (log files land in the submit directory):
+#   sbatch slurm/moo_zoom.sjob --workers 4
+# Default: 5 budget points x 10 seeds = 50 networks, every network saved
+# (~6-7 h one at a time; --workers 4 trains 4 at once on the same GPU slice).
+# Extra args are forwarded to cmc.moo_zoom. A job that hit its time limit
+# resumes when resubmitted with the same output dir (saved networks are skipped):
+#   sbatch slurm/moo_zoom.sjob --workers 4 --output-dir runs/moo_zoom/<run>
+
+#SBATCH -J cmc_moo_zoom
+#SBATCH -D ./
+#SBATCH -o ./%x.%j.%N.out
+#SBATCH -e ./%x.%j.%N.err
+#SBATCH --get-user-env
+#SBATCH --export=NONE
+#SBATCH --partition=lrz-dgx-a100-40x8-mig
+#SBATCH --qos=mig
+#SBATCH --gres=gpu:3g.20gb
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=24G
+#SBATCH --time=12:00:00
+
+set -euo pipefail
+
+if command -v module >/dev/null 2>&1; then
+    module load slurm_setup 2>/dev/null || true
+fi
+
+CONDA_ROOT="${CONDA_ROOT:-$HOME/miniconda3}"
+# shellcheck source=/dev/null
+source "${CONDA_ROOT}/etc/profile.d/conda.sh"
+conda activate "${CONDA_ENV:-cmc_env}"
+
+export MPLBACKEND=Agg
+# Each --workers process has its own CUDA context (~1.5 GB host RAM) and
+# threads; 2 threads each keeps 4 workers within the 8 cores.
+export OMP_NUM_THREADS="${OMP_NUM_THREADS_PER_WORKER:-2}"
+
+echo "Host: $(hostname)  Date: $(date)"
+echo "Job: ${SLURM_JOB_NAME:-local}  ID: ${SLURM_JOB_ID:-none}  GPU: ${CUDA_VISIBLE_DEVICES:-unset}"
+which python
+python -c "import torch, cmc; print('torch', torch.__version__, 'cuda', torch.cuda.is_available(), 'cmc', cmc.__version__)"
+
+python -m cmc.moo_zoom --device cuda "$@"
+
+echo "Finished: $(date)"

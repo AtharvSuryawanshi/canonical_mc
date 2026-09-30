@@ -75,24 +75,8 @@ GENOME_DEFAULTS = {
 }
 
 
-def build_parser():
-    parser = argparse.ArgumentParser(
-        description="NSGA-III search of the accuracy / metabolic / wiring trade-off."
-    )
-    add_common_args(parser, n_seeds=False)
-    parser.add_argument("--genome", choices=sorted(GENOME_DEFAULTS), default="budget")
-    # lambda genome: the core5 6x6 sweep's box, so the two are directly comparable.
-    parser.add_argument("--lambda-rate-min", type=float, default=0.02)
-    parser.add_argument("--lambda-rate-max", type=float, default=1.5)
-    parser.add_argument("--lambda-connectivity-min", type=float, default=1.0)
-    parser.add_argument("--lambda-connectivity-max", type=float, default=40.0)
-    # budget genome: brackets the costs of every network in the core5 6x6 sweep
-    # and the lambda-genome run that did all tasks (metabolic 0.0047-0.055,
-    # wiring 0.0045-0.0165), with room on both sides.
-    parser.add_argument("--rate-budget-min", type=float, default=0.002)
-    parser.add_argument("--rate-budget-max", type=float, default=0.08)
-    parser.add_argument("--conn-budget-min", type=float, default=0.002)
-    parser.add_argument("--conn-budget-max", type=float, default=0.025)
+def add_budget_args(parser):
+    """How budgets are enforced during training (shared with cmc.moo_zoom)."""
     parser.add_argument("--budget-lr", type=float, default=BUDGET_DEFAULTS["budget_lr"],
                         help="Step size of the log-multiplier update.")
     parser.add_argument("--budget-kp", type=float, default=BUDGET_DEFAULTS["budget_kp"],
@@ -111,6 +95,43 @@ def build_parser():
                         help="Initial multiplier of each budget.")
     parser.add_argument("--budget-ema", type=float, default=BUDGET_DEFAULTS["budget_ema"],
                         help="EMA factor smoothing the violation fed to the multiplier.")
+    return parser
+
+
+def budget_opts_from_args(args, rate_budget, conn_budget):
+    """The ``budget_opts`` for ``runner.train_and_evaluate`` at one budget point."""
+    return {
+        "rate_budget": rate_budget,
+        "conn_budget": conn_budget,
+        "budget_lr": args.budget_lr,
+        "budget_kp": args.budget_kp,
+        "budget_ramp": args.budget_ramp,
+        "budget_rho": args.budget_rho,
+        "budget_lambda_init": args.budget_lambda_init,
+        "budget_ema": args.budget_ema,
+        "conn_budget_mode": args.conn_budget_mode,
+    }
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(
+        description="NSGA-III search of the accuracy / metabolic / wiring trade-off."
+    )
+    add_common_args(parser, n_seeds=False)
+    parser.add_argument("--genome", choices=sorted(GENOME_DEFAULTS), default="budget")
+    # lambda genome: the core5 6x6 sweep's box, so the two are directly comparable.
+    parser.add_argument("--lambda-rate-min", type=float, default=0.02)
+    parser.add_argument("--lambda-rate-max", type=float, default=1.5)
+    parser.add_argument("--lambda-connectivity-min", type=float, default=1.0)
+    parser.add_argument("--lambda-connectivity-max", type=float, default=40.0)
+    # budget genome: brackets the costs of every network in the core5 6x6 sweep
+    # and the lambda-genome run that did all tasks (metabolic 0.0047-0.055,
+    # wiring 0.0045-0.0165), with room on both sides.
+    parser.add_argument("--rate-budget-min", type=float, default=0.002)
+    parser.add_argument("--rate-budget-max", type=float, default=0.08)
+    parser.add_argument("--conn-budget-min", type=float, default=0.002)
+    parser.add_argument("--conn-budget-max", type=float, default=0.025)
+    add_budget_args(parser)
 
     parser.add_argument("--pop-size", type=int, default=None,
                         help="Default: 12 (budget), 8 (lambda).")
@@ -232,17 +253,7 @@ def evaluate_genome(args, x, generation, index):
         genome_cols = {"lambda_rate": lr, "lambda_connectivity": lc}
     else:
         lr = lc = 0.0
-        budget_opts = {
-            "rate_budget": a,
-            "conn_budget": b,
-            "budget_lr": args.budget_lr,
-            "budget_kp": args.budget_kp,
-            "budget_ramp": args.budget_ramp,
-            "budget_rho": args.budget_rho,
-            "budget_lambda_init": args.budget_lambda_init,
-            "budget_ema": args.budget_ema,
-            "conn_budget_mode": args.conn_budget_mode,
-        }
+        budget_opts = budget_opts_from_args(args, a, b)
         genome_cols = {"rate_budget": a, "conn_budget": b}
 
     # Training draws from numpy's global RNG in places; keep it from shifting

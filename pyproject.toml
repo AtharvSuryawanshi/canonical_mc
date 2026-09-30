@@ -35,6 +35,7 @@ cmc-train = "cmc.train_cog:main"
 cmc-lambda-pareto = "cmc.lambda_pareto:main"
 cmc-lambda-zoom = "cmc.lambda_zoom:main"
 cmc-moo = "cmc.moo:main"
+cmc-moo-zoom = "cmc.moo_zoom:main"
 
 [tool.setuptools]
 packages = ["cmc"]

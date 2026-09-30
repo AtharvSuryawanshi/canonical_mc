@@ -2,7 +2,7 @@
 
 Everything is pinned to the repo root (not the launch directory), so a
 notebook in ``notebooks/``, a slurm job and an interactive run all read and
-write the same place: ``runs/{checkpoints,lambda_pareto,lambda_zoom,moo}``.
+write the same place: ``runs/{checkpoints,lambda_pareto,lambda_zoom,moo,moo_zoom}``.
 
 Set ``CMC_ROOT`` to override (useful on a cluster where scratch is elsewhere).
 """
@@ -28,11 +28,14 @@ LAMBDA_ZOOM_RUNS_DIR = RUNS_DIR / "lambda_zoom"
 #: NSGA-III searches, written by ``cmc.moo``.
 MOO_RUNS_DIR = RUNS_DIR / "moo"
 
+#: Saved networks at chosen budget points, written by ``cmc.moo_zoom``.
+MOO_ZOOM_RUNS_DIR = RUNS_DIR / "moo_zoom"
+
 # Deprecated names (before the runs/ layout), kept so old notebooks still import.
 PARETO_RUNS_DIR = LAMBDA_PARETO_RUNS_DIR
 ZOOM_LAMBDA_DIR = LAMBDA_ZOOM_RUNS_DIR
 
 __all__ = [
     "REPO_ROOT", "RUNS_DIR", "CHECKPOINTS_DIR", "LAMBDA_PARETO_RUNS_DIR",
-    "LAMBDA_ZOOM_RUNS_DIR", "MOO_RUNS_DIR", "PARETO_RUNS_DIR", "ZOOM_LAMBDA_DIR",
+    "LAMBDA_ZOOM_RUNS_DIR", "MOO_RUNS_DIR", "MOO_ZOOM_RUNS_DIR", "PARETO_RUNS_DIR", "ZOOM_LAMBDA_DIR",
 ]

@@ -13,11 +13,11 @@ metabolic cost vs. wiring cost).
 cmc/            installable package: task.py, network.py, train_cog.py,
                 front.py (dominance, feasibility), runner.py (train+eval one
                 network, common flags), lambda_pareto.py, lambda_zoom.py, moo.py,
-                paths.py. pareto.py / zoom_lambda.py are deprecated shims.
+                moo_zoom.py, paths.py. pareto.py / zoom_lambda.py are deprecated shims.
 notebooks/      lambda_pareto_analysis, moo_pareto_analysis, ...; import cmc.*
 slurm/          LRZ batch scripts
 runs/           ALL output, committed incl. weights (git is the cluster transfer):
-                checkpoints/, lambda_pareto/, lambda_zoom/, moo/
+                checkpoints/, lambda_pareto/, lambda_zoom/, moo/, moo_zoom/
 archives/       legacy code, not imported by anything
 theory.md       the neuroscience the objectives are meant to encode
 FIXED_ISSUES.md audit of past mismatches between that theory and the code
@@ -106,6 +106,10 @@ bit-identical to before. Output in `runs/moo/`. Analysis:
 lambda) only at the feasibility cliff. The feasibility edge follows
 rate x wiring ~ const. **dmsgo is the bottleneck in every network**, with the
 other 4 tasks at ceiling, so on core5 min_task_acc == dmsgo accuracy.
+`cmc.moo_zoom` saves 10 seeds at 5 budget points: control, then
+rate_limited / middle / wiring_limited along the ~0.65 iso-accuracy curve
+(equal competence, different binding cost: the key contrast for motifs), and
+the knee. Seed 0 at a point reproduces the cmc.moo network exactly.
 
 **Important:** the fixes above changed what the loss functions numerically
 mean (wiring quantity, loss normalization, task difficulty). Old
