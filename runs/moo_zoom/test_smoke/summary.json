@@ -1,0 +1,90 @@
+{
+  "model": "dale",
+  "task_battery": "core5",
+  "active_tasks": [
+    "fdgo",
+    "fdanti",
+    "dm1",
+    "contextdm1",
+    "dmsgo"
+  ],
+  "steps": 100,
+  "seeds": [
+    0
+  ],
+  "points": {
+    "control": {
+      "rate_budget": null,
+      "conn_budget": null,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "rate_limited": {
+      "rate_budget": 0.0021304559660999,
+      "conn_budget": 0.0228159943899826,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "middle": {
+      "rate_budget": 0.0061202096772596,
+      "conn_budget": 0.0083127308558332,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "wiring_limited": {
+      "rate_budget": 0.0322022890202443,
+      "conn_budget": 0.0027038098412398,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "knee": {
+      "rate_budget": 0.0199479117560131,
+      "conn_budget": 0.0045022532148749,
+      "n_trained": 1,
+      "n_feasible": 0
+    }
+  },
+  "feasible_min_task_acc": 0.6,
+  "args": {
+    "model": "dale",
+    "task_battery": "core5",
+    "tasks": null,
+    "steps": 100,
+    "batch_size": 32,
+    "n_rnn": 256,
+    "n_neurons": 256,
+    "n_eachring": 16,
+    "frac_e": 0.8,
+    "g": 1.0,
+    "sigma_rec": 0.05,
+    "noise_level": null,
+    "lr": 0.001,
+    "log_every": 20,
+    "seed": 0,
+    "device": "cuda",
+    "eval_batch_size": 64,
+    "feasible_min_task_acc": 0.6,
+    "eval_seeds": "10000,10001",
+    "n_seeds": 1,
+    "rate_kind": "l2",
+    "rate_inh_scale": 1.0,
+    "conn_kind": "l1",
+    "conn_target": "w_rec",
+    "conn_inh_scale": 1.0,
+    "prune_eps": 0.0,
+    "loss_per_trial": true,
+    "eval_noise_level": 0.0,
+    "eval_input_noise": false,
+    "output_dir": "runs/moo_zoom/test_smoke",
+    "budget_lr": 0.01,
+    "budget_kp": 0.0,
+    "budget_ramp": 0.0,
+    "conn_budget_mode": "projection",
+    "budget_rho": 1.0,
+    "budget_lambda_init": 0.01,
+    "budget_ema": 0.9,
+    "points": null,
+    "overwrite": false,
+    "workers": 4
+  }
+}
