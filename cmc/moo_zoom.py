@@ -7,7 +7,8 @@ the budget counterpart of ``cmc.lambda_zoom``.
 
 Training is ``runner.train_and_evaluate`` with the same budget enforcement as
 ``cmc.moo`` (``--budget-*`` flags, same defaults), so seed 0 at a point is the
-exact network ``cmc.moo`` trained there. A point with no budgets (``control``)
+network ``cmc.moo`` trained there -- bit-identical on CPU; on GPU only up to
+CUDA nondeterminism (seen: |d acc| <= 0.3 seed std). A point with no budgets (``control``)
 is the unconstrained network, identical to the lambda grid's lambda=0 anchor.
 
 Output, under ``runs/moo_zoom/<run>/``:

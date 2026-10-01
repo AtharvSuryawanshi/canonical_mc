@@ -153,7 +153,8 @@ python -m cmc.moo_zoom --steps 40 --n-seeds 2 --device cpu --eval-seeds 10000   
 sbatch slurm/moo_zoom.sjob --workers 4 --output-dir runs/moo_zoom/dale_core5_5pt_10seed
 ```
 
-Seed 0 at a point is the exact network `cmc.moo` trained there. Each
+Seed 0 at a point is the network `cmc.moo` trained there: bit-identical on CPU, and on
+the GPU equal up to CUDA nondeterminism (well within seed noise). Each
 `runs/moo_zoom/<run>/<point>/seed_XX.pt` holds the weights, budgets, the learned
 rate multiplier per step, metrics and per-neuron task variance.
 

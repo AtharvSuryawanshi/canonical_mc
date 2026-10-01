@@ -109,7 +109,10 @@ other 4 tasks at ceiling, so on core5 min_task_acc == dmsgo accuracy.
 `cmc.moo_zoom` saves 10 seeds at 5 budget points: control, then
 rate_limited / middle / wiring_limited along the ~0.65 iso-accuracy curve
 (equal competence, different binding cost: the key contrast for motifs), and
-the knee. Seed 0 at a point reproduces the cmc.moo network exactly.
+the knee. Seed 0 reproduces the cmc.moo network bit-for-bit on CPU; on GPU
+(CUDA nondeterminism, different MIG slices) only to within ~0.3 seed std
+(checked in notebooks/moo_zoom_analysis.ipynb). Same caveat for every
+"network is determined by (lambda, seed)" statement here: exact on CPU only.
 
 **Important:** the fixes above changed what the loss functions numerically
 mean (wiring quantity, loss normalization, task difficulty). Old
