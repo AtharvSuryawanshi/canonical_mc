@@ -217,3 +217,121 @@ def group_null_stats(A, n_e, groups, n_groups, n_perm=200, seed=0):
         with np.errstate(invalid="ignore", divide="ignore"):
             res[k] = dict(obs=v, ratio=v / mu, z=(v - mu) / sd)
     return res
+
+
+# ---------------------------------------------------------------------------
+# What learning changed: motifs in dW
+
+def _project_l1_ball_np(z, radius):
+    """Euclidean projection of nonnegative z onto {sum <= radius} (soft threshold)."""
+    if z.sum() <= radius:
+        return z
+    u = np.sort(z.ravel())[::-1]
+    css = np.cumsum(u) - radius
+    j = np.arange(1, u.size + 1)
+    rho = np.flatnonzero(u - css / j > 0).max() + 1
+    return np.clip(z - css[rho - 1] / rho, 0.0, None)
+
+
+def learned_change(W, W0, row_scale):
+    """Per-synapse magnitude change that is *not* explained by an overall shrink.
+
+    Both matrices are taken as E/I-normalised magnitudes (|W| / row_scale, the
+    units of the wiring cost). The init is first brought to the trained
+    network's total wiring cost the way the budget does it: soft-thresholded
+    (L1 projection) if it has more, scaled up if it has less. Then
+    ``D = |W| - matched(|W0|)``: D > 0 means learning strengthened the synapse
+    beyond the uniform shrink, D < 0 weakened or pruned it. Diagonal is 0.
+    """
+    rs = np.asarray(row_scale, dtype=np.float64)[:, None]
+    M = np.abs(np.asarray(W, dtype=np.float64)) / rs
+    M0 = np.abs(np.asarray(W0, dtype=np.float64)) / rs
+    np.fill_diagonal(M, 0.0)
+    np.fill_diagonal(M0, 0.0)
+    target = M.sum()
+    P = _project_l1_ball_np(M0, target) if M0.sum() > target else M0 * (target / M0.sum())
+    return M - P
+
+
+def _corr(a, b):
+    a = a - a.mean()
+    b = b - b.mean()
+    d = np.sqrt((a * a).sum() * (b * b).sum())
+    return float((a * b).sum() / d) if d > 0 else np.nan
+
+
+def _offdiag_pairs(X):
+    iu = np.triu_indices(X.shape[0], 1)
+    return X[iu], X.T[iu]
+
+
+def _same_task_pref(X, ga, gb, square):
+    """(mean X within group - mean X between groups) / std X, over assigned neurons."""
+    ok = (ga[:, None] >= 0) & (gb[None, :] >= 0)
+    same = (ga[:, None] == gb[None, :]) & ok
+    diff = (ga[:, None] != gb[None, :]) & ok
+    if square:
+        np.fill_diagonal(same, False)
+        np.fill_diagonal(diff, False)
+    if not same.any() or not diff.any():
+        return np.nan
+    return float((X[same].mean() - X[diff].mean()) / X[same | diff].std())
+
+
+DELTA_STATS = (
+    "recip E↔E", "recip E↔I (back inhibition)", "recip I↔I",
+    "hub lateral (I in-change vs out-to-E change)", "hub disinhibition (I in-from-I vs out-to-E)",
+    "same-task E→E", "same-task E→I", "same-task I→E", "same-task I→I",
+)
+
+
+def delta_stats(D, n_e, groups=None):
+    """Correlation-type motif statistics of a signed change matrix D[pre, post].
+
+    * reciprocity: corr(D[a,b], D[b,a]) -- do the two directions of a pair
+      change together? (E<->I reciprocity is back inhibition E1 -> I -> E1.)
+    * hub: corr over interneurons of the total change of their inputs and of
+      their outputs to E -- interneurons that gain input also gain output?
+    * same-task: within-task minus between-task mean change, in std units
+      (needs ``groups``, e.g. the preferred task of each neuron's cluster).
+    """
+    EE, EI, IE, II = D[:n_e, :n_e], D[:n_e, n_e:], D[n_e:, :n_e], D[n_e:, n_e:]
+    out = {
+        DELTA_STATS[0]: _corr(*_offdiag_pairs(EE)),
+        DELTA_STATS[1]: _corr(EI.ravel(), IE.T.ravel()),
+        DELTA_STATS[2]: _corr(*_offdiag_pairs(II)),
+        DELTA_STATS[3]: _corr(EI.sum(0), IE.sum(1)),
+        DELTA_STATS[4]: _corr(II.sum(0), IE.sum(1)),
+    }
+    if groups is not None:
+        g = np.asarray(groups)
+        gE, gI = g[:n_e], g[n_e:]
+        out[DELTA_STATS[5]] = _same_task_pref(EE, gE, gE, True)
+        out[DELTA_STATS[6]] = _same_task_pref(EI, gE, gI, False)
+        out[DELTA_STATS[7]] = _same_task_pref(IE, gI, gE, False)
+        out[DELTA_STATS[8]] = _same_task_pref(II, gI, gI, True)
+    return out
+
+
+def delta_null_stats(D, n_e, groups=None, n_perm=200, seed=0):
+    """``delta_stats`` against the target null: every neuron keeps the changes of
+    its inputs, which presynaptic neuron they come from is shuffled within each
+    E/I block. Returns {stat: dict(obs, null_mean, null_std, z)}."""
+    rng = np.random.default_rng(seed)
+    obs = delta_stats(D, n_e, groups)
+    samples = {k: [] for k in obs}
+    for _ in range(n_perm):
+        P = np.empty_like(D)
+        P[:n_e, :n_e] = _permute_columns_offdiag(D[:n_e, :n_e], rng)
+        P[:n_e, n_e:] = _permute_columns(D[:n_e, n_e:], rng)
+        P[n_e:, :n_e] = _permute_columns(D[n_e:, :n_e], rng)
+        P[n_e:, n_e:] = _permute_columns_offdiag(D[n_e:, n_e:], rng)
+        for k, v in delta_stats(P, n_e, groups).items():
+            samples[k].append(v)
+    res = {}
+    for k, v in obs.items():
+        s = np.asarray(samples[k], dtype=float)
+        mu, sd = np.nanmean(s), np.nanstd(s)
+        res[k] = dict(obs=v, null_mean=float(mu), null_std=float(sd),
+                      z=(v - mu) / sd if sd > 0 else np.nan)
+    return res
