@@ -23,6 +23,12 @@ Output, under ``runs/moo_zoom/<run>/``:
 
     python -m cmc.moo_zoom                                  # default 5 points x 10 seeds
     python -m cmc.moo_zoom --points "a=0.01,0.005; control=none" --n-seeds 5 --workers 4
+    python -m cmc.moo_zoom --steps 32000 --save-at 4000,8000,16000   # training-length series
+
+With ``--save-at`` the network is also saved at those steps, under
+``<point>/step_XXXXXX/seed_XX.pt``, with one row per saved step in
+``runs_by_step.csv``. A run stopped mid-training restarts that network from
+step 0 when resumed (only finished networks are skipped).
 """
 
 import argparse
@@ -45,7 +51,7 @@ from cmc.runner import (
     resolve_run_settings,
     train_and_evaluate,
 )
-from cmc.train_cog import _model_kwargs_from_args, save_checkpoint
+from cmc.train_cog import _model_kwargs_from_args, evaluate_pareto_metrics, save_checkpoint
 
 # A walk along the iso-accuracy curve (min_task_acc ~0.65-0.72) of
 # runs/moo/dale_core5_nsga3_budget_p24g10 (notebooks/moo_pareto_analysis.ipynb
@@ -91,6 +97,15 @@ def build_parser():
     )
     parser.add_argument("--workers", type=int, default=1,
                         help="Networks trained in parallel (one process each).")
+    parser.add_argument(
+        "--save-at",
+        type=str,
+        default=None,
+        help='Comma-separated training steps at which to also save the network, e.g. '
+        '"4000,8000,16000" with --steps 32000: one run gives the whole training-length '
+        "series. Saved as <point>/step_XXXXXX/seed_XX.pt, one row each in runs_by_step.csv "
+        "(the final step included). Training is unaffected (eval uses its own RNGs).",
+    )
     parser.set_defaults(task_battery="core5", steps=4000, n_seeds=10)
     return parser
 
@@ -118,25 +133,8 @@ def default_output_dir(model, battery_label, n_points, n_seeds):
     return MOO_ZOOM_RUNS_DIR / f"{model}_{battery_label}_{n_points}pt_{n_seeds}seed_{stamp}"
 
 
-def train_point(args, name, rate_budget, conn_budget, seed, out_dir):
-    """Train, evaluate and save one network; returns its runs.csv row.
-
-    Top-level so it can run in a worker process.
-    """
-    active_tasks, _, device, noise_level, eval_seeds, reg_opts = resolve_run_settings(args)
-    out_dir = Path(out_dir)
-    ckpt_path = out_dir / name / f"seed_{seed:02d}.pt"
-    budget_opts = None
-    if rate_budget is not None:
-        budget_opts = budget_opts_from_args(args, rate_budget, conn_budget)
-
-    t0 = time.perf_counter()
-    model, config, history, metrics = train_and_evaluate(
-        args, 0.0, 0.0, seed, active_tasks, device, noise_level, eval_seeds, reg_opts, budget_opts
-    )
-    task_var, mean_rate = activity_summary(
-        model, config, active_tasks, device, eval_seeds, args.eval_batch_size
-    )
+def _summarize(args, name, rate_budget, conn_budget, seed, history, metrics, budget_opts, ckpt_rel, t0):
+    """runs.csv row for a network: point, budgets, learned multiplier, metrics."""
     row = {
         "point": name,
         "seed": seed,
@@ -157,9 +155,14 @@ def train_point(args, name, rate_budget, conn_budget, seed, out_dir):
     row.update({
         **metrics,
         "is_feasible": bool(metrics["min_task_acc"] >= args.feasible_min_task_acc),
-        "checkpoint": ckpt_path.relative_to(out_dir).as_posix(),
+        "checkpoint": ckpt_rel,
         "train_time_s": time.perf_counter() - t0,
     })
+    return row
+
+
+def _save(args, ckpt_path, model, config, active_tasks, seed, steps, history, name, rate_budget,
+          conn_budget, budget_opts, metrics, row, reg_opts, noise_level, eval_seeds, task_var, mean_rate):
     model_kwargs = _model_kwargs_from_args(args)
     model_kwargs["seed"] = int(seed)
     save_checkpoint(
@@ -170,7 +173,7 @@ def train_point(args, name, rate_budget, conn_budget, seed, out_dir):
         active_tasks,
         model_kwargs=model_kwargs,
         seed=seed,
-        train_steps=args.steps,
+        train_steps=steps,
         history=history,  # includes history["budget"]: learned multiplier + cost per step
         verbose=False,
         extra={
@@ -188,7 +191,69 @@ def train_point(args, name, rate_budget, conn_budget, seed, out_dir):
             "run_row": row,
         },
     )
-    return row
+
+
+def step_checkpoint_path(out_dir, name, seed, step):
+    """Intermediate network saved by --save-at: <point>/step_XXXXXX/seed_XX.pt."""
+    return Path(out_dir) / name / f"step_{step:06d}" / f"seed_{seed:02d}.pt"
+
+
+def train_point(args, name, rate_budget, conn_budget, seed, out_dir):
+    """Train, evaluate and save one network.
+
+    Returns (row, step_rows): its runs.csv row and one row per saved step
+    (``--save-at`` steps plus the final one, with a ``step`` column).
+    Top-level so it can run in a worker process.
+    """
+    active_tasks, _, device, noise_level, eval_seeds, reg_opts = resolve_run_settings(args)
+    out_dir = Path(out_dir)
+    ckpt_path = out_dir / name / f"seed_{seed:02d}.pt"
+    budget_opts = None
+    if rate_budget is not None:
+        budget_opts = budget_opts_from_args(args, rate_budget, conn_budget)
+    save_at = set(parse_save_at(args.save_at, args.steps))
+    step_rows = []
+    t0 = time.perf_counter()
+
+    def evaluate_and_save(model, config, history, step, path, metrics=None):
+        """Noise-free eval on the fixed eval seeds (own RNGs, so training is unaffected)."""
+        if metrics is None:
+            metrics = evaluate_pareto_metrics(
+                model, config, active_tasks, device, eval_seeds=eval_seeds,
+                batch_size=args.eval_batch_size, noise_level=args.eval_noise_level,
+                input_noise=args.eval_input_noise, easy_task=True, **reg_opts,
+            )
+        task_var, mean_rate = activity_summary(
+            model, config, active_tasks, device, eval_seeds, args.eval_batch_size
+        )
+        row = _summarize(args, name, rate_budget, conn_budget, seed, history, metrics, budget_opts,
+                         path.relative_to(out_dir).as_posix(), t0)
+        _save(args, path, model, config, active_tasks, seed, step, history, name, rate_budget,
+              conn_budget, budget_opts, metrics, row, reg_opts, noise_level, eval_seeds, task_var, mean_rate)
+        step_rows.append({"step": step, **row})
+        return row
+
+    def on_step(step, history, model, config):
+        if step in save_at:
+            evaluate_and_save(model, config, history, step, step_checkpoint_path(out_dir, name, seed, step))
+
+    model, config, history, metrics = train_and_evaluate(
+        args, 0.0, 0.0, seed, active_tasks, device, noise_level, eval_seeds, reg_opts, budget_opts,
+        step_callback=on_step if save_at else None,
+    )
+    row = evaluate_and_save(model, config, history, args.steps, ckpt_path, metrics)
+    return row, step_rows
+
+
+def parse_save_at(text, steps):
+    """'4000,8000' -> [4000, 8000]; steps must lie strictly before the final step."""
+    if not text:
+        return []
+    vals = sorted({int(v) for v in str(text).split(",") if v.strip()})
+    bad = [v for v in vals if not 0 < v < steps]
+    if bad:
+        raise ValueError(f"--save-at {bad}: must be between 0 and --steps ({steps}), exclusive")
+    return vals
 
 
 def main(argv=None):
@@ -200,8 +265,12 @@ def main(argv=None):
     out_dir = Path(args.output_dir or default_output_dir(args.model, battery_label, len(points), len(seeds)))
     out_dir.mkdir(parents=True, exist_ok=True)
     runs_csv = out_dir / "runs.csv"
-    if args.overwrite and runs_csv.exists():
-        runs_csv.unlink()
+    steps_csv = out_dir / "runs_by_step.csv"
+    parse_save_at(args.save_at, args.steps)  # fail fast on bad steps
+    if args.overwrite:
+        for f in (runs_csv, steps_csv):
+            if f.exists():
+                f.unlink()
 
     print(
         f"moo_zoom: {len(points)} points x {len(seeds)} seeds = "
@@ -224,8 +293,12 @@ def main(argv=None):
                 todo.append((name, rb, cb, seed))
     print(f"  {len(rows)} already trained, {len(todo)} to train")
 
-    def record(row):
+    def record(result):
+        row, step_rows = result
         append_csv_row(runs_csv, row, write_header=not runs_csv.exists())
+        if args.save_at:
+            for sr in step_rows:
+                append_csv_row(steps_csv, sr, write_header=not steps_csv.exists())
         rows.append(row)
         print(
             f"{row['point']:15s} seed {row['seed']:2d}  min_task_acc={row['min_task_acc']:.3f}  "
@@ -261,6 +334,7 @@ def main(argv=None):
         "active_tasks": list(active_tasks),
         "steps": args.steps,
         "seeds": seeds,
+        "save_at": parse_save_at(args.save_at, args.steps),
         "points": per_point,
         "feasible_min_task_acc": args.feasible_min_task_acc,
         "args": vars(args),

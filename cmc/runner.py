@@ -166,7 +166,8 @@ def resolve_run_settings(args):
 
 
 def train_and_evaluate(args, lambda_rate, lambda_connectivity, seed, active_tasks,
-                       device, noise_level, eval_seeds, reg_opts, budget_opts=None):
+                       device, noise_level, eval_seeds, reg_opts, budget_opts=None,
+                       step_callback=None):
     """Train one network and evaluate it on the fixed eval seeds.
 
     Returns (model, config, history, metrics). Used by lambda_pareto, lambda_zoom
@@ -174,6 +175,8 @@ def train_and_evaluate(args, lambda_rate, lambda_connectivity, seed, active_task
     (lambda or budget, seed).
     ``budget_opts`` (``rate_budget``, ``conn_budget``, ``budget_lr``, ...) are
     passed to ``train`` for budget-constrained training; pass zero lambdas then.
+    ``step_callback(step, history, model, config)`` is called after every
+    training step (e.g. to save intermediate networks).
     """
     config = default_config(n_eachring=args.n_eachring, seed=seed, easy_task=True)
     model = make_fresh_model(args, config, device, seed=seed)
@@ -190,6 +193,8 @@ def train_and_evaluate(args, lambda_rate, lambda_connectivity, seed, active_task
         log_every=args.log_every,
         show_progress=False,
         loss_per_trial=args.loss_per_trial,
+        step_callback=(None if step_callback is None else
+                       lambda step, hist: step_callback(step, hist, model, config)),
         **(budget_opts or {}),
         **reg_opts,
     )

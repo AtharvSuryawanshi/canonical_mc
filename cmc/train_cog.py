@@ -890,6 +890,7 @@ def train(
     budget_lambda_init=BUDGET_DEFAULTS["budget_lambda_init"],
     budget_ema=BUDGET_DEFAULTS["budget_ema"],
     conn_budget_mode=BUDGET_DEFAULTS["conn_budget_mode"],
+    step_callback=None,
     **reg_overrides,
 ):
     """Multitask training. By default each batch mixes all active tasks.
@@ -908,6 +909,10 @@ def train(
 
     With both budgets ``None`` (the default) training is exactly the
     weighted-sum training it always was.
+
+    ``step_callback(step, history)``, if given, is called at the end of every
+    step (after the optimizer step, the projection and the multiplier update),
+    e.g. to save intermediate networks. It must not touch the training RNGs.
     """
     reg = _reg_opts(**reg_overrides)
     if rate_budget is not None and lambda_rate:
@@ -1055,6 +1060,9 @@ def train(
             history["frac_saturated"].append(frac_saturated)
             parts.append(f"sat:{frac_saturated:.2f}; silent:{frac_silent:.2f}")
             # print(" | ".join(parts))
+
+        if step_callback is not None:
+            step_callback(step, history)
 
     if plot_results:
         plot_training(history, active_tasks)
