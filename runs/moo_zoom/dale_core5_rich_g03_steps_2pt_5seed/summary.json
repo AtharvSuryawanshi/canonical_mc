@@ -1,0 +1,83 @@
+{
+  "model": "dale",
+  "task_battery": "core5",
+  "active_tasks": [
+    "fdgo",
+    "fdanti",
+    "dm1",
+    "contextdm1",
+    "dmsgo"
+  ],
+  "steps": 32000,
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "save_at": [
+    2000,
+    4000,
+    8000,
+    16000
+  ],
+  "points": {
+    "control": {
+      "rate_budget": null,
+      "conn_budget": null,
+      "n_trained": 5,
+      "n_feasible": 5
+    },
+    "wiring_limited": {
+      "rate_budget": 0.0322022890202443,
+      "conn_budget": 0.0027038098412398,
+      "n_trained": 5,
+      "n_feasible": 5
+    }
+  },
+  "feasible_min_task_acc": 0.6,
+  "args": {
+    "model": "dale",
+    "task_battery": "core5",
+    "tasks": null,
+    "steps": 32000,
+    "batch_size": 32,
+    "n_rnn": 256,
+    "n_neurons": 256,
+    "n_eachring": 16,
+    "frac_e": 0.8,
+    "g": 0.3,
+    "sigma_rec": 0.05,
+    "noise_level": null,
+    "lr": 0.001,
+    "log_every": 20,
+    "seed": 0,
+    "device": "cuda",
+    "eval_batch_size": 64,
+    "feasible_min_task_acc": 0.6,
+    "eval_seeds": null,
+    "n_seeds": 5,
+    "rate_kind": "l2",
+    "rate_inh_scale": 1.0,
+    "conn_kind": "l1",
+    "conn_target": "w_rec",
+    "conn_inh_scale": 1.0,
+    "prune_eps": 0.0,
+    "loss_per_trial": true,
+    "eval_noise_level": 0.0,
+    "eval_input_noise": false,
+    "output_dir": "runs/moo_zoom/dale_core5_rich_g03_steps_2pt_5seed",
+    "budget_lr": 0.01,
+    "budget_kp": 0.0,
+    "budget_ramp": 0.0,
+    "conn_budget_mode": "projection",
+    "budget_rho": 1.0,
+    "budget_lambda_init": 0.01,
+    "budget_ema": 0.9,
+    "points": "control=none; wiring_limited=0.0322022890202443,0.0027038098412398",
+    "overwrite": false,
+    "workers": 4,
+    "save_at": "2000,4000,8000,16000"
+  }
+}
