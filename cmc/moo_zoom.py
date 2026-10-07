@@ -29,6 +29,13 @@ With ``--save-at`` the network is also saved at those steps, under
 ``<point>/step_XXXXXX/seed_XX.pt``, with one row per saved step in
 ``runs_by_step.csv``. A run stopped mid-training restarts that network from
 step 0 when resumed (only finished networks are skipped).
+
+``--batched`` trains up to ``--batch-pop`` networks together in one process
+(``cmc.batched``), much faster on a GPU; same output layout. The networks of a
+batch share one trial stream, so they are not bit-identical to the default
+runs (and seed 0 no longer reproduces the ``cmc.moo`` network).
+
+    python -m cmc.moo_zoom --batched --batch-pop 50 --steps 40000 --task-battery all
 """
 
 import argparse
@@ -42,6 +49,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from cmc.batched import add_batched_args
 from cmc.moo import add_budget_args, budget_opts_from_args
 from cmc.paths import MOO_ZOOM_RUNS_DIR
 from cmc.runner import (
@@ -96,7 +104,9 @@ def build_parser():
         "so a job that hit its time limit can simply be resubmitted).",
     )
     parser.add_argument("--workers", type=int, default=1,
-                        help="Networks trained in parallel (one process each).")
+                        help="Networks trained in parallel (one process each). With "
+                        "--batched: batches trained in parallel (one process each).")
+    add_batched_args(parser)
     parser.add_argument(
         "--save-at",
         type=str,
@@ -205,7 +215,8 @@ def train_point(args, name, rate_budget, conn_budget, seed, out_dir):
     (``--save-at`` steps plus the final one, with a ``step`` column).
     Top-level so it can run in a worker process.
     """
-    active_tasks, _, device, noise_level, eval_seeds, reg_opts = resolve_run_settings(args)
+    settings = resolve_run_settings(args)
+    active_tasks, _, device, noise_level, eval_seeds, reg_opts = settings
     out_dir = Path(out_dir)
     ckpt_path = out_dir / name / f"seed_{seed:02d}.pt"
     budget_opts = None
@@ -214,35 +225,79 @@ def train_point(args, name, rate_budget, conn_budget, seed, out_dir):
     save_at = set(parse_save_at(args.save_at, args.steps))
     step_rows = []
     t0 = time.perf_counter()
-
-    def evaluate_and_save(model, config, history, step, path, metrics=None):
-        """Noise-free eval on the fixed eval seeds (own RNGs, so training is unaffected)."""
-        if metrics is None:
-            metrics = evaluate_pareto_metrics(
-                model, config, active_tasks, device, eval_seeds=eval_seeds,
-                batch_size=args.eval_batch_size, noise_level=args.eval_noise_level,
-                input_noise=args.eval_input_noise, easy_task=True, **reg_opts,
-            )
-        task_var, mean_rate = activity_summary(
-            model, config, active_tasks, device, eval_seeds, args.eval_batch_size
-        )
-        row = _summarize(args, name, rate_budget, conn_budget, seed, history, metrics, budget_opts,
-                         path.relative_to(out_dir).as_posix(), t0)
-        _save(args, path, model, config, active_tasks, seed, step, history, name, rate_budget,
-              conn_budget, budget_opts, metrics, row, reg_opts, noise_level, eval_seeds, task_var, mean_rate)
-        step_rows.append({"step": step, **row})
-        return row
+    job = (name, rate_budget, conn_budget, seed, budget_opts)
 
     def on_step(step, history, model, config):
         if step in save_at:
-            evaluate_and_save(model, config, history, step, step_checkpoint_path(out_dir, name, seed, step))
+            step_rows.append(_evaluate_and_save(args, settings, out_dir, job, model, config, history, step,
+                                                step_checkpoint_path(out_dir, name, seed, step), t0))
 
     model, config, history, metrics = train_and_evaluate(
         args, 0.0, 0.0, seed, active_tasks, device, noise_level, eval_seeds, reg_opts, budget_opts,
         step_callback=on_step if save_at else None,
     )
-    row = evaluate_and_save(model, config, history, args.steps, ckpt_path, metrics)
-    return row, step_rows
+    step_rows.append(_evaluate_and_save(args, settings, out_dir, job, model, config, history, args.steps,
+                                        ckpt_path, t0, metrics))
+    return {k: v for k, v in step_rows[-1].items() if k != "step"}, step_rows
+
+
+def train_points_batched(args, jobs, out_dir, device=None):
+    """``train_point`` for several (name, rate_budget, conn_budget, seed) jobs trained
+    together (``--batched``). Returns one (row, step_rows) per job; ``train_time_s``
+    counts from the start of the batch. Top-level so it can run in a worker process.
+    """
+    from cmc.batched import args_on_device, train_and_evaluate_batched
+
+    if device is not None:
+        args = args_on_device(args, device)
+    settings = resolve_run_settings(args)
+    active_tasks, _, device, noise_level, eval_seeds, reg_opts = settings
+    out_dir = Path(out_dir)
+    save_at = parse_save_at(args.save_at, args.steps)
+    full_jobs, specs = [], []
+    for name, rb, cb, seed in jobs:
+        budget_opts = None if rb is None else budget_opts_from_args(args, rb, cb)
+        full_jobs.append((name, rb, cb, seed, budget_opts))
+        specs.append({"seed": seed, "rate_budget": rb, "conn_budget": cb})
+    step_rows = [[] for _ in jobs]
+    t0 = time.perf_counter()
+
+    def on_step(step, models, configs, histories):
+        for p, job in enumerate(full_jobs):
+            path = step_checkpoint_path(out_dir, job[0], job[3], step)
+            step_rows[p].append(_evaluate_and_save(args, settings, out_dir, job, models[p], configs[p],
+                                                   histories[p], step, path, t0))
+
+    results = train_and_evaluate_batched(args, specs, active_tasks, device, noise_level, eval_seeds, reg_opts,
+                                         callback_steps=save_at, step_callback=on_step if save_at else None)
+    out = []
+    for p, (job, (model, config, history, metrics)) in enumerate(zip(full_jobs, results)):
+        path = out_dir / job[0] / f"seed_{job[3]:02d}.pt"
+        step_rows[p].append(_evaluate_and_save(args, settings, out_dir, job, model, config, history,
+                                               args.steps, path, t0, metrics))
+        out.append(({k: v for k, v in step_rows[p][-1].items() if k != "step"}, step_rows[p]))
+    return out
+
+
+def _evaluate_and_save(args, settings, out_dir, job, model, config, history, step, path, t0, metrics=None):
+    """Noise-free eval on the fixed eval seeds (own RNGs, so training is unaffected),
+    task variance, then save. Returns the runs_by_step row (runs.csv row + ``step``)."""
+    active_tasks, _, device, noise_level, eval_seeds, reg_opts = settings
+    name, rate_budget, conn_budget, seed, budget_opts = job
+    if metrics is None:
+        metrics = evaluate_pareto_metrics(
+            model, config, active_tasks, device, eval_seeds=eval_seeds,
+            batch_size=args.eval_batch_size, noise_level=args.eval_noise_level,
+            input_noise=args.eval_input_noise, easy_task=True, **reg_opts,
+        )
+    task_var, mean_rate = activity_summary(
+        model, config, active_tasks, device, eval_seeds, args.eval_batch_size
+    )
+    row = _summarize(args, name, rate_budget, conn_budget, seed, history, metrics, budget_opts,
+                     path.relative_to(out_dir).as_posix(), t0)
+    _save(args, path, model, config, active_tasks, seed, step, history, name, rate_budget,
+          conn_budget, budget_opts, metrics, row, reg_opts, noise_level, eval_seeds, task_var, mean_rate)
+    return {"step": step, **row}
 
 
 def parse_save_at(text, steps):
@@ -308,7 +363,24 @@ def main(argv=None):
             flush=True,
         )
 
-    if args.workers > 1 and todo:
+    if args.batched and todo:
+        from cmc.batched import chunked, parse_devices
+
+        chunks = chunked(todo, args.batch_pop)
+        devices = parse_devices(args.devices) or [args.device]
+        if args.workers > 1:
+            ctx = multiprocessing.get_context("spawn")
+            with ProcessPoolExecutor(max_workers=args.workers, mp_context=ctx) as pool:
+                futures = [pool.submit(train_points_batched, args, chunk, str(out_dir), devices[k % len(devices)])
+                           for k, chunk in enumerate(chunks)]
+                for fut in as_completed(futures):
+                    for result in fut.result():
+                        record(result)
+        else:
+            for chunk in chunks:
+                for result in train_points_batched(args, chunk, str(out_dir)):
+                    record(result)
+    elif args.workers > 1 and todo:
         # spawn, not fork: CUDA cannot be re-initialised in a forked child.
         ctx = multiprocessing.get_context("spawn")
         with ProcessPoolExecutor(max_workers=args.workers, mp_context=ctx) as pool:

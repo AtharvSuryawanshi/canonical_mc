@@ -44,6 +44,12 @@ from runs.csv instead of retraining them.
 ``--workers N`` trains up to N networks of a generation at once (one process
 each, sharing the GPU); results are identical to --workers 1.
 
+``--batched`` trains up to ``--batch-pop`` genomes of a generation together in
+one process (``cmc.batched``), much faster on a GPU; ``--workers`` then runs that
+many batches at once, spread over ``--devices``. The networks of a batch share
+one trial stream, so they are not bit-identical to the default runs: keep one
+mode per search (a resumed run must use the mode it started with).
+
     python -m cmc.moo --steps 200 --pop-size 6 --n-gen 2 --device cpu    # smoke test
     python -m cmc.moo --points "0.0087,0.0045; 0.0144,0.0056"            # fixed budgets only
     python -m cmc.moo --reference-run runs/lambda_pareto/<6x6 run> --workers 4  # NSGA-III search
@@ -60,6 +66,7 @@ from pathlib import Path
 
 import numpy as np
 
+from cmc.batched import add_batched_args
 from cmc.front import compute_front, pareto_mask
 from cmc.paths import MOO_RUNS_DIR
 from cmc.runner import add_common_args, append_csv_row, resolve_run_settings, train_and_evaluate
@@ -155,7 +162,9 @@ def build_parser():
     )
     parser.add_argument("--moo-seed", type=int, default=1, help="Seed of NSGA-III itself.")
     parser.add_argument("--workers", type=int, default=1,
-                        help="Networks trained in parallel (one process each).")
+                        help="Networks trained in parallel (one process each). With "
+                        "--batched: batches trained in parallel (one process each).")
+    add_batched_args(parser)
     parser.add_argument(
         "--points",
         type=str,
@@ -240,21 +249,21 @@ def load_cache(runs_csv):
     return out
 
 
+def _decode_genome(args, x):
+    """(lambda_rate, lambda_connectivity, budget_opts, genome_cols) for genome ``x``."""
+    a, b = (float(v) for v in 10.0 ** np.asarray(x))
+    if args.genome == "lambda":
+        return a, b, None, {"lambda_rate": a, "lambda_connectivity": b}
+    return 0.0, 0.0, budget_opts_from_args(args, a, b), {"rate_budget": a, "conn_budget": b}
+
+
 def evaluate_genome(args, x, generation, index):
     """Train + evaluate one network for genome ``x``; returns its runs.csv row.
 
     Top-level so it can run in a worker process.
     """
     active_tasks, _, device, noise_level, eval_seeds, reg_opts = resolve_run_settings(args)
-    key = genome_key(x)
-    a, b = (float(v) for v in 10.0 ** np.asarray(x))
-    if args.genome == "lambda":
-        lr, lc, budget_opts = a, b, None
-        genome_cols = {"lambda_rate": lr, "lambda_connectivity": lc}
-    else:
-        lr = lc = 0.0
-        budget_opts = budget_opts_from_args(args, a, b)
-        genome_cols = {"rate_budget": a, "conn_budget": b}
+    lr, lc, budget_opts, genome_cols = _decode_genome(args, x)
 
     # Training draws from numpy's global RNG in places; keep it from shifting
     # NSGA-III's own draws when run in-process, or a resumed run would diverge.
@@ -265,7 +274,44 @@ def evaluate_genome(args, x, generation, index):
         reg_opts, budget_opts,
     )
     np.random.set_state(rng_state)
+    return _genome_row(args, x, generation, index, genome_cols, budget_opts, history, metrics,
+                       time.perf_counter() - t0)
 
+
+def evaluate_genomes_batched(args, jobs, device=None):
+    """``evaluate_genome`` for several genomes trained together (``--batched``).
+
+    ``jobs``: list of (x, generation, index). Returns their rows; ``train_time_s``
+    is the time of the whole batch. Top-level so it can run in a worker process.
+    """
+    from cmc.batched import args_on_device, train_and_evaluate_batched
+
+    if device is not None:
+        args = args_on_device(args, device)
+    active_tasks, _, device, noise_level, eval_seeds, reg_opts = resolve_run_settings(args)
+    decoded = [_decode_genome(args, x) for x, _, _ in jobs]
+    specs = []
+    for lr, lc, budget_opts, _ in decoded:
+        spec = {"seed": args.seed}
+        if budget_opts is None:
+            spec.update(lambda_rate=lr, lambda_connectivity=lc)
+        else:
+            spec.update(rate_budget=budget_opts["rate_budget"], conn_budget=budget_opts["conn_budget"])
+        specs.append(spec)
+    rng_state = np.random.get_state()
+    t0 = time.perf_counter()
+    results = train_and_evaluate_batched(args, specs, active_tasks, device, noise_level, eval_seeds, reg_opts)
+    np.random.set_state(rng_state)
+    dt = time.perf_counter() - t0
+    return [
+        _genome_row(args, x, generation, index, genome_cols, budget_opts, history, metrics, dt)
+        for (x, generation, index), (_, _, budget_opts, genome_cols), (_, _, history, metrics)
+        in zip(jobs, decoded, results)
+    ]
+
+
+def _genome_row(args, x, generation, index, genome_cols, budget_opts, history, metrics, train_time_s):
+    key = genome_key(x)
     f, g = objectives_from_metrics(metrics, args.feasible_min_task_acc)
     row = {"generation": generation, "index": index, "x0": key[0], "x1": key[1],
            "seed": args.seed, **genome_cols}
@@ -286,7 +332,7 @@ def evaluate_genome(args, x, generation, index):
         **dict(zip(OBJECTIVE_NAMES, f)),
         "constraint_g": g[0],
         "is_feasible": bool(g[0] <= 0),
-        "train_time_s": time.perf_counter() - t0,
+        "train_time_s": train_time_s,
     })
     return row
 
@@ -315,7 +361,22 @@ def evaluate_all(args, X, generation, cache, runs_csv, pool):
         cache[genome_key((row["x0"], row["x1"]))] = row
         print(describe(row, args.genome), flush=True)
 
-    if pool is None:
+    if args.batched:
+        from cmc.batched import chunked, parse_devices
+
+        chunks = chunked([(x, generation, i) for i, x in todo], args.batch_pop)
+        devices = parse_devices(args.devices) or [args.device]
+        if pool is None:
+            for chunk in chunks:
+                for row in evaluate_genomes_batched(args, chunk):
+                    record(row)
+        else:
+            futures = [pool.submit(evaluate_genomes_batched, args, chunk, devices[k % len(devices)])
+                       for k, chunk in enumerate(chunks)]
+            for fut in as_completed(futures):
+                for row in fut.result():
+                    record(row)
+    elif pool is None:
         for i, x in todo:
             record(evaluate_genome(args, x, generation, i))
     else:

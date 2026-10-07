@@ -23,6 +23,7 @@ cmc/                    installable package -- all the code that runs
   lambda_zoom.py        many seeds at a few chosen lambdas, every network saved
   moo.py                NSGA-III (pymoo) search over cost budgets
   moo_zoom.py           many seeds at a few chosen budget points, every network saved
+  batched.py            many networks trained together in one process (--batched)
   paths.py              repo-anchored runs/ locations
   pareto.py, zoom_lambda.py   deprecated aliases of lambda_pareto / lambda_zoom
 notebooks/              lambda_pareto_analysis, moo_pareto_analysis, network analysis
@@ -160,6 +161,23 @@ Seed 0 at a point is the network `cmc.moo` trained there: bit-identical on CPU, 
 the GPU equal up to CUDA nondeterminism (well within seed noise). Each
 `runs/moo_zoom/<run>/<point>/seed_XX.pt` holds the weights, budgets, the learned
 rate multiplier per step, metrics and per-neuron task variance.
+
+**Batched training (`--batched`, opt-in).** A single small RNN leaves the GPU mostly
+idle, so `cmc.moo` and `cmc.moo_zoom` can train up to `--batch-pop` networks (default
+24) together in one process, with their weights stacked into the same tensors
+(`cmc/batched.py`). P networks then cost roughly what one costs. Each network keeps
+its own init, budgets, Adam state and gradient clipping, but all networks in a batch
+see the same training trials. They are therefore not bit-identical to the default
+one-at-a-time networks (they are equally valid samples), so use one mode per
+comparison. With `--workers N` and `--batched`, N batches run at once, spread over
+`--devices`. Without `--batched` nothing changes.
+
+```bash
+python -m cmc.batched --bench --task-battery all --pop 1,4,24 --steps 20        # time per step vs P
+python -m cmc.moo --batched --batch-pop 24 --task-battery all --steps 40000     # whole generation per batch
+python -m cmc.moo_zoom --batched --batch-pop 50 --workers 2 --devices cuda:0,cuda:1
+python tests/test_batched.py      # batched == single-network training, to float precision
+```
 
 Analysis lives in `notebooks/`: `lambda_pareto_analysis.ipynb` for the fronts,
 `analysis_of_network.ipynb` for task variance and clustering,

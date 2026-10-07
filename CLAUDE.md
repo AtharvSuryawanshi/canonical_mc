@@ -13,7 +13,7 @@ metabolic cost vs. wiring cost).
 cmc/            installable package: task.py, network.py, train_cog.py,
                 front.py (dominance, feasibility), runner.py (train+eval one
                 network, common flags), lambda_pareto.py, lambda_zoom.py, moo.py,
-                moo_zoom.py, paths.py. pareto.py / zoom_lambda.py are deprecated shims.
+                moo_zoom.py, batched.py, paths.py. pareto.py / zoom_lambda.py are deprecated shims.
 notebooks/      lambda_pareto_analysis, moo_pareto_analysis, ...; import cmc.*
 slurm/          LRZ batch scripts
 runs/           ALL output, committed incl. weights (git is the cluster transfer):
@@ -113,6 +113,15 @@ the knee. Seed 0 reproduces the cmc.moo network bit-for-bit on CPU; on GPU
 (CUDA nondeterminism, different MIG slices) only to within ~0.3 seed std
 (checked in notebooks/moo_zoom_analysis.ipynb). Same caveat for every
 "network is determined by (lambda, seed)" statement here: exact on CPU only.
+
+**Batched training (`cmc.batched`, `--batched` on moo / moo_zoom, opt-in):** P
+DaleRNNs stacked into `[P, ...]` tensors and trained in one process; per-network
+init, budgets (BudgetConstraint math, L1 projection), Adam and grad clipping are
+exactly the single-network ones (`tests/test_batched.py`: equal to ~1e-15 in
+float64 on shared trials). But the P networks share ONE trial stream and do no
+per-task logging eval, so a batched network is not the single-run network with
+that seed. Don't mix batched and single networks in one comparison, and don't
+resume a run in the other mode. Default (no flag) code path is unchanged.
 
 **Important:** the fixes above changed what the loss functions numerically
 mean (wiring quantity, loss normalization, task difficulty). Old

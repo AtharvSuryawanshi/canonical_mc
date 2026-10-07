@@ -106,8 +106,8 @@ only the reference baseline.
 
 **About g.** With g = 1 (near critical) the network can solve the tasks by changing a random matrix
 only slightly: in the unconstrained control, corr(W, W₀) ≈ 0.98 even after 8k steps, so the final weights
-mostly show the init. With **g = 0.3** the initial recurrence is weak and learning has to build the
-recurrent structure. The latest runs use g = 0.3. ρ(W_rec) is only set at init and can drift.
+mostly show the init. All runs use **g = 1**. Low g (e.g. the exploratory g = 0.3 runs) makes the final W dominated by the
+learned low-rank change, which is the low-rank-RNN regime and out of scope. ρ(W_rec) is only set at init and can drift.
 
 W_in ~ N(0, 1/n_in), W_out ~ 0.01·N(0, 1), biases 0. Torch and numpy are seeded in the constructor, so a
 network is determined by (settings, seed). This is exact on CPU only.

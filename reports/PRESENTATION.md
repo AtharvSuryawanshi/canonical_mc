@@ -167,9 +167,8 @@ embedded RNNs).
 - **Dale's law**: `W_rec = softplus(w_raw) · sign_pre`. The network learns magnitudes; each presynaptic
   neuron's sign is fixed.
 - Zero diagonal. Readout `y = σ(h_E W_out)` from E cells only.
-- Init: |orthogonal| magnitudes, I rows × n_E/n_I (balanced E and I drive), spectral radius g
-  (g = 1 originally; **g = 0.3** in the latest runs, so learning has to build W_rec instead of nudging a
-  random matrix).
+- Init: |orthogonal| magnitudes, I rows × n_E/n_I (balanced E and I drive), spectral radius g = 1
+  (exploratory g = 0.3 runs exist but are out of scope: low-rank-RNN regime).
 
 ---
 
@@ -253,7 +252,7 @@ rate_limited / middle / wiring_limited lie on the same **iso-accuracy curve** (~
 
 > **[UPDATE]** The front (slides 19–20) was trained at **4000 steps**. Later runs show 4k is too short:
 > accuracy still climbs to ~16k steps, and the wiring budget's cost was mostly a *learning-speed* cost.
-> Re-run NSGA-III with longer training (and g = 0.3) and replace these two slides.
+> Re-run NSGA-III with longer training (g = 1) and replace these two slides.
 
 ---
 
