@@ -19,8 +19,8 @@ slurm/          LRZ batch scripts
 runs/           ALL output, committed incl. weights (git is the cluster transfer):
                 checkpoints/, lambda_pareto/, lambda_zoom/, moo/, moo_zoom/
 archives/       legacy code, not imported by anything
-theory.md       the neuroscience the objectives are meant to encode
-FIXED_ISSUES.md audit of past mismatches between that theory and the code
+reports/        theory.md (neuroscience the objectives encode), FIXED_ISSUES.md (audit
+                of theory/code mismatches), IMPLEMENTATION.md, PRESENTATION.md, ABSTRACT.md
 ```
 
 Env: `conda create -n cmc_env python=3.12 && pip install -r requirements.txt
@@ -40,7 +40,7 @@ Naming: `lambda_*` = anything driven by hand-set lambdas (weighted sum),
 - Loss = task loss (masked MSE via `c_mask`) + `lambda_rate * rate_reg` +
   `lambda_connectivity * connectivity_reg`.
 
-## Neuroscience-faithfulness fixes already applied (see FIXED_ISSUES.md)
+## Neuroscience-faithfulness fixes already applied (see reports/FIXED_ISSUES.md)
 
 These are the load-bearing facts — later work should not accidentally
 regress them:
@@ -108,7 +108,7 @@ rate x wiring ~ const. **dmsgo is the bottleneck in every network**, with the
 other 4 tasks at ceiling, so on core5 min_task_acc == dmsgo accuracy.
 `cmc.moo_zoom` saves 10 seeds at 5 budget points: control, then
 rate_limited / middle / wiring_limited along the ~0.65 iso-accuracy curve
-(equal competence, different binding cost: the key contrast for motifs), and
+(equal competence, different binding cost: the key contrast), and
 the knee. Seed 0 reproduces the cmc.moo network bit-for-bit on CPU; on GPU
 (CUDA nondeterminism, different MIG slices) only to within ~0.3 seed std
 (checked in notebooks/moo_zoom_analysis.ipynb). Same caveat for every

@@ -51,7 +51,7 @@ from cmc.train_cog import _model_kwargs_from_args, save_checkpoint
 # runs/lambda_pareto/dale_core5_6x6_2026_09_23_05_45_12_5802320 (task axis min_task_acc,
 # networks with min_task_acc < 0.6 excluded), at the exact grid lambdas. They are
 # not bit-for-bit the sweep's networks: that sweep predates seeding torch, so its
-# readout init and training noise were unseeded (see FIXED_ISSUES.md). Each
+# readout init and training noise were unseeded (see reports/FIXED_ISSUES.md). Each
 # constrained point is the most constrained network along its direction that
 # still did every task (worst-task accuracy, conn_frac, 3-seed mean):
 #

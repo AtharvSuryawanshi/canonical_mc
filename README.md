@@ -34,8 +34,11 @@ runs/                   all experiment output, committed (git is the cluster tra
   moo/<run>/            one directory per NSGA-III search
   moo_zoom/<run>/       saved networks at chosen budget points, weights included
 archives/               legacy code, kept for reference, not imported
-theory.md               the neuroscience the objectives are meant to encode
-FIXED_ISSUES.md         audited mismatches between that theory and the code
+reports/                docs and write-ups:
+  theory.md             the neuroscience the objectives are meant to encode
+  FIXED_ISSUES.md       audited mismatches between that theory and the code
+  IMPLEMENTATION.md     implementation summary with exact values
+  PRESENTATION.md       talk outline; ABSTRACT.md: COSYNE 2027 plan
 ```
 
 ## Install

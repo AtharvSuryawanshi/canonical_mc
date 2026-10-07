@@ -15,7 +15,7 @@ in every core5 run (lambda grid, moo, zoom).
 | 4. Costs + lambda grid | Sep 10-22 | core5 / sanity3 batteries, rate and wiring penalties, 6x6 lambda Pareto sweep. |
 | 5. Neuroscience audit | Sep 17 | 14 code/theory mismatches fixed (`FIXED_ISSUES.md`): wiring penalty on W_rec not W_in, circular decoding, fixation release, response window, easy-task coherence, seeding, ... Old runs not comparable. |
 | 6. Multi-objective | Sep 24-30 | NSGA-III (pymoo) over cost **budgets** instead of lambdas. |
-| 7. Zoom + motifs | Sep 30 - Oct 1 | 5 budget points x 10 seeds, saved networks, wiring / E-I analysis. |
+| 7. Zoom | Sep 30 - Oct 1 | 5 budget points x 10 seeds, saved networks, wiring / E-I analysis. |
 
 ## 1. Network (`DaleRNN`)
 
