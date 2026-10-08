@@ -1,0 +1,295 @@
+cmc.moo: genome=budget tasks=('fdgo', 'reactgo', 'delaygo', 'fdanti', 'reactanti', 'delayanti', 'dm1', 'dm2', 'contextdm1', 'contextdm2', 'multidm', 'delaydm1', 'delaydm2', 'contextdelaydm1', 'contextdelaydm2', 'multidelaydm', 'dmsgo', 'dmsnogo', 'dmcgo', 'dmcnogo') steps=50000 device=cuda
+  output=/home/go23tan/canonical_mc/runs/moo/dale_all_nsga3_budget_p48g3_50k  cached=0
+  NSGA-III pop=48 gens=3 ref_dirs=45 dedup_eps=0.02 workers=2
+cmc.moo: genome=budget tasks=('fdgo', 'reactgo', 'delaygo', 'fdanti', 'reactanti', 'delayanti', 'dm1', 'dm2', 'contextdm1', 'contextdm2', 'multidm', 'delaydm1', 'delaydm2', 'contextdelaydm1', 'contextdelaydm2', 'multidelaydm', 'dmsgo', 'dmsnogo', 'dmcgo', 'dmcnogo') steps=50000 device=cuda
+  output=/home/go23tan/canonical_mc/runs/moo/dale_all_nsga3_budget_p48g3_50k  cached=0
+  NSGA-III pop=48 gens=3 ref_dirs=45 dedup_eps=0.02 workers=2
+gen 0 #0  budget rate=0.01823 conn=0.02623 -> lambda 1e-06,nan  min_task_acc=0.870  metabolic=0.02835  wiring=0.02623  ok  (12802s)
+gen 0 #1  budget rate=0.003727 conn=0.02611 -> lambda 0.125,nan  min_task_acc=0.697  metabolic=0.006108  wiring=0.0261  ok  (12802s)
+gen 0 #2  budget rate=0.007687 conn=0.006294 -> lambda 0.0216,nan  min_task_acc=0.761  metabolic=0.01235  wiring=0.006294  ok  (12802s)
+gen 0 #3  budget rate=0.07129 conn=0.006057 -> lambda 1e-06,nan  min_task_acc=0.700  metabolic=0.09373  wiring=0.006057  ok  (12802s)
+gen 0 #4  budget rate=0.02146 conn=0.002155 -> lambda 1e-06,nan  min_task_acc=0.758  metabolic=0.02847  wiring=0.002155  ok  (12802s)
+gen 0 #5  budget rate=0.05175 conn=0.008589 -> lambda 1e-06,nan  min_task_acc=0.534  metabolic=0.06929  wiring=0.008588  FAILS A TASK  (12802s)
+gen 0 #6  budget rate=0.008304 conn=0.01692 -> lambda 0.00336,nan  min_task_acc=0.502  metabolic=0.01321  wiring=0.01691  FAILS A TASK  (12802s)
+gen 0 #7  budget rate=0.007405 conn=0.006829 -> lambda 0.0272,nan  min_task_acc=0.652  metabolic=0.01218  wiring=0.006829  ok  (12802s)
+gen 0 #8  budget rate=0.003568 conn=0.005958 -> lambda 0.138,nan  min_task_acc=0.498  metabolic=0.005767  wiring=0.005958  FAILS A TASK  (12802s)
+gen 0 #9  budget rate=0.004814 conn=0.004069 -> lambda 0.0766,nan  min_task_acc=0.494  metabolic=0.007535  wiring=0.004069  FAILS A TASK  (12802s)
+gen 0 #10  budget rate=0.05105 conn=0.004274 -> lambda 1e-06,nan  min_task_acc=0.786  metabolic=0.06553  wiring=0.004274  ok  (12802s)
+gen 0 #11  budget rate=0.01625 conn=0.02848 -> lambda 1e-06,nan  min_task_acc=0.864  metabolic=0.02684  wiring=0.02705  ok  (12802s)
+gen 0 #12  budget rate=0.1271 conn=0.01424 -> lambda 1e-06,nan  min_task_acc=0.784  metabolic=0.1677  wiring=0.01424  ok  (12802s)
+gen 0 #13  budget rate=0.02069 conn=0.004233 -> lambda 1e-06,nan  min_task_acc=0.756  metabolic=0.02963  wiring=0.004233  ok  (12802s)
+gen 0 #14  budget rate=0.004002 conn=0.02765 -> lambda 0.0902,nan  min_task_acc=0.558  metabolic=0.007173  wiring=0.02765  FAILS A TASK  (12802s)
+gen 0 #15  budget rate=0.01856 conn=0.002737 -> lambda 1e-06,nan  min_task_acc=0.747  metabolic=0.02614  wiring=0.002737  ok  (12802s)
+gen 0 #16  budget rate=0.02952 conn=0.01639 -> lambda 1e-06,nan  min_task_acc=0.816  metabolic=0.04509  wiring=0.01639  ok  (12802s)
+gen 0 #17  budget rate=0.02821 conn=0.02398 -> lambda 1e-06,nan  min_task_acc=0.791  metabolic=0.04361  wiring=0.02398  ok  (12802s)
+gen 0 #18  budget rate=0.002373 conn=0.008369 -> lambda 0.222,nan  min_task_acc=0.491  metabolic=0.00389  wiring=0.008369  FAILS A TASK  (12802s)
+gen 0 #19  budget rate=0.01453 conn=0.002368 -> lambda 1.48e-06,nan  min_task_acc=0.478  metabolic=0.02031  wiring=0.002368  FAILS A TASK  (12802s)
+gen 0 #20  budget rate=0.03188 conn=0.02013 -> lambda 1e-06,nan  min_task_acc=0.836  metabolic=0.04689  wiring=0.02012  ok  (12802s)
+gen 0 #21  budget rate=0.02587 conn=0.004045 -> lambda 1e-06,nan  min_task_acc=0.744  metabolic=0.03586  wiring=0.004045  ok  (12802s)
+gen 0 #22  budget rate=0.07514 conn=0.007948 -> lambda 1e-06,nan  min_task_acc=0.759  metabolic=0.1  wiring=0.007945  ok  (12802s)
+gen 0 #23  budget rate=0.01815 conn=0.01537 -> lambda 1e-06,nan  min_task_acc=0.722  metabolic=0.02842  wiring=0.01537  ok  (12802s)
+gen 0 #24  budget rate=0.003788 conn=0.01841 -> lambda 0.0672,nan  min_task_acc=0.473  metabolic=0.006505  wiring=0.01841  FAILS A TASK  (13216s)
+gen 0 #25  budget rate=0.03822 conn=0.01685 -> lambda 1e-06,nan  min_task_acc=0.870  metabolic=0.05681  wiring=0.01685  ok  (13216s)
+gen 0 #26  budget rate=0.004574 conn=0.01757 -> lambda 0.078,nan  min_task_acc=0.514  metabolic=0.007998  wiring=0.01757  FAILS A TASK  (13216s)
+gen 0 #27  budget rate=0.004569 conn=0.002494 -> lambda 0.0791,nan  min_task_acc=0.755  metabolic=0.007262  wiring=0.002494  ok  (13216s)
+gen 0 #28  budget rate=0.08028 conn=0.02061 -> lambda 1e-06,nan  min_task_acc=0.859  metabolic=0.1069  wiring=0.0206  ok  (13216s)
+gen 0 #29  budget rate=0.08802 conn=0.007179 -> lambda 1e-06,nan  min_task_acc=0.764  metabolic=0.1165  wiring=0.007178  ok  (13216s)
+gen 0 #30  budget rate=0.00653 conn=0.002039 -> lambda 0.0396,nan  min_task_acc=0.495  metabolic=0.009731  wiring=0.002039  FAILS A TASK  (13216s)
+gen 0 #31  budget rate=0.03249 conn=0.01405 -> lambda 1e-06,nan  min_task_acc=0.786  metabolic=0.0479  wiring=0.01405  ok  (13216s)
+gen 0 #32  budget rate=0.07375 conn=0.004291 -> lambda 1e-06,nan  min_task_acc=0.783  metabolic=0.09158  wiring=0.004291  ok  (13216s)
+gen 0 #33  budget rate=0.005065 conn=0.0113 -> lambda 0.0499,nan  min_task_acc=0.722  metabolic=0.00852  wiring=0.0113  ok  (13216s)
+gen 0 #34  budget rate=0.06465 conn=0.02719 -> lambda 1e-06,nan  min_task_acc=0.886  metabolic=0.09359  wiring=0.02601  ok  (13216s)
+gen 0 #35  budget rate=0.003831 conn=0.007382 -> lambda 0.123,nan  min_task_acc=0.722  metabolic=0.006312  wiring=0.007382  ok  (13216s)
+gen 0 #36  budget rate=0.09521 conn=0.006283 -> lambda 1e-06,nan  min_task_acc=0.683  metabolic=0.1201  wiring=0.006283  ok  (13216s)
+gen 0 #37  budget rate=0.02549 conn=0.002137 -> lambda 1e-06,nan  min_task_acc=0.678  metabolic=0.03304  wiring=0.002137  ok  (13216s)
+gen 0 #38  budget rate=0.03663 conn=0.0241 -> lambda 1e-06,nan  min_task_acc=0.917  metabolic=0.05308  wiring=0.02409  ok  (13216s)
+gen 0 #39  budget rate=0.07102 conn=0.022 -> lambda 1e-06,nan  min_task_acc=0.916  metabolic=0.09713  wiring=0.02199  ok  (13216s)
+gen 0 #40  budget rate=0.03461 conn=0.003889 -> lambda 1e-06,nan  min_task_acc=0.744  metabolic=0.04538  wiring=0.003889  ok  (13216s)
+gen 0 #41  budget rate=0.05521 conn=0.003548 -> lambda 1e-06,nan  min_task_acc=0.686  metabolic=0.06952  wiring=0.003548  ok  (13216s)
+gen 0 #42  budget rate=0.0724 conn=0.00237 -> lambda 1e-06,nan  min_task_acc=0.755  metabolic=0.08665  wiring=0.00237  ok  (13216s)
+gen 0 #43  budget rate=0.07061 conn=0.003123 -> lambda 1e-06,nan  min_task_acc=0.709  metabolic=0.0879  wiring=0.003123  ok  (13216s)
+gen 0 #44  budget rate=0.0101 conn=0.004716 -> lambda 0.00817,nan  min_task_acc=0.486  metabolic=0.01635  wiring=0.004716  FAILS A TASK  (13216s)
+gen 0 #45  budget rate=0.03957 conn=0.003244 -> lambda 1e-06,nan  min_task_acc=0.578  metabolic=0.05007  wiring=0.003244  FAILS A TASK  (13216s)
+gen 0 #46  budget rate=0.01107 conn=0.002032 -> lambda 0.00454,nan  min_task_acc=0.475  metabolic=0.0161  wiring=0.002032  FAILS A TASK  (13216s)
+gen 0 #47  budget rate=0.006212 conn=0.006257 -> lambda 0.0556,nan  min_task_acc=0.497  metabolic=0.01073  wiring=0.006257  FAILS A TASK  (13216s)
+gen 1 #24  budget rate=0.03002 conn=0.01537 -> lambda 1e-06,nan  min_task_acc=0.744  metabolic=0.04539  wiring=0.01537  ok  (12711s)
+gen 1 #25  budget rate=0.003642 conn=0.007925 -> lambda 0.116,nan  min_task_acc=0.739  metabolic=0.005898  wiring=0.007925  ok  (12711s)
+gen 1 #26  budget rate=0.0823 conn=0.004236 -> lambda 1e-06,nan  min_task_acc=0.728  metabolic=0.101  wiring=0.004235  ok  (12711s)
+gen 1 #27  budget rate=0.07102 conn=0.002713 -> lambda 1e-06,nan  min_task_acc=0.723  metabolic=0.08511  wiring=0.002713  ok  (12711s)
+gen 1 #28  budget rate=0.04284 conn=0.006909 -> lambda 1e-06,nan  min_task_acc=0.738  metabolic=0.05728  wiring=0.006908  ok  (12711s)
+gen 1 #29  budget rate=0.08683 conn=0.002689 -> lambda 1e-06,nan  min_task_acc=0.742  metabolic=0.1012  wiring=0.002689  ok  (12711s)
+gen 1 #30  budget rate=0.05521 conn=0.003996 -> lambda 1e-06,nan  min_task_acc=0.684  metabolic=0.07079  wiring=0.003996  ok  (12711s)
+gen 1 #31  budget rate=0.02218 conn=0.004034 -> lambda 1e-06,nan  min_task_acc=0.761  metabolic=0.03188  wiring=0.004034  ok  (12711s)
+gen 1 #32  budget rate=0.00872 conn=0.005986 -> lambda 0.0152,nan  min_task_acc=0.666  metabolic=0.01421  wiring=0.005986  ok  (12711s)
+gen 1 #33  budget rate=0.03651 conn=0.02731 -> lambda 1e-06,nan  min_task_acc=0.936  metabolic=0.05309  wiring=0.02646  ok  (12711s)
+gen 1 #34  budget rate=0.005164 conn=0.01643 -> lambda 0.0568,nan  min_task_acc=0.666  metabolic=0.008934  wiring=0.01643  ok  (12711s)
+gen 1 #35  budget rate=0.003265 conn=0.002422 -> lambda 0.165,nan  min_task_acc=0.506  metabolic=0.004872  wiring=0.002422  FAILS A TASK  (12711s)
+gen 1 #36  budget rate=0.01883 conn=0.002008 -> lambda 1e-06,nan  min_task_acc=0.767  metabolic=0.02522  wiring=0.002008  ok  (12711s)
+gen 1 #37  budget rate=0.09061 conn=0.004371 -> lambda 1e-06,nan  min_task_acc=0.825  metabolic=0.1137  wiring=0.004371  ok  (12711s)
+gen 1 #38  budget rate=0.08611 conn=0.0198 -> lambda 1e-06,nan  min_task_acc=0.884  metabolic=0.1152  wiring=0.0198  ok  (12711s)
+gen 1 #39  budget rate=0.01319 conn=0.0263 -> lambda 1e-06,nan  min_task_acc=0.858  metabolic=0.02188  wiring=0.0263  ok  (12711s)
+gen 1 #40  budget rate=0.004676 conn=0.007382 -> lambda 0.0892,nan  min_task_acc=0.470  metabolic=0.007436  wiring=0.007382  FAILS A TASK  (12711s)
+gen 1 #41  budget rate=0.05238 conn=0.01214 -> lambda 1e-06,nan  min_task_acc=0.703  metabolic=0.0734  wiring=0.01214  ok  (12711s)
+gen 1 #42  budget rate=0.01961 conn=0.0155 -> lambda 1e-06,nan  min_task_acc=0.831  metabolic=0.03091  wiring=0.0155  ok  (12711s)
+gen 1 #43  budget rate=0.03634 conn=0.01538 -> lambda 1e-06,nan  min_task_acc=0.820  metabolic=0.05469  wiring=0.01537  ok  (12711s)
+gen 1 #44  budget rate=0.05894 conn=0.006395 -> lambda 1e-06,nan  min_task_acc=0.727  metabolic=0.07799  wiring=0.006395  ok  (12711s)
+gen 1 #45  budget rate=0.03408 conn=0.004475 -> lambda 1e-06,nan  min_task_acc=0.761  metabolic=0.04642  wiring=0.004475  ok  (12711s)
+gen 1 #46  budget rate=0.008304 conn=0.01809 -> lambda 0.0065,nan  min_task_acc=0.614  metabolic=0.01376  wiring=0.01809  ok  (12711s)
+gen 1 #47  budget rate=0.03796 conn=0.02303 -> lambda 1e-06,nan  min_task_acc=0.930  metabolic=0.05362  wiring=0.02302  ok  (12711s)
+gen 1 #0  budget rate=0.007687 conn=0.0292 -> lambda 0.00539,nan  min_task_acc=0.741  metabolic=0.01366  wiring=0.02762  ok  (12910s)
+gen 1 #1  budget rate=0.006033 conn=0.003605 -> lambda 0.0568,nan  min_task_acc=0.534  metabolic=0.009412  wiring=0.003605  FAILS A TASK  (12910s)
+gen 1 #2  budget rate=0.02146 conn=0.009341 -> lambda 1e-06,nan  min_task_acc=0.478  metabolic=0.0335  wiring=0.009341  FAILS A TASK  (12910s)
+gen 1 #3  budget rate=0.07552 conn=0.003177 -> lambda 1e-06,nan  min_task_acc=0.730  metabolic=0.09168  wiring=0.003177  ok  (12910s)
+gen 1 #4  budget rate=0.02952 conn=0.01935 -> lambda 1e-06,nan  min_task_acc=0.817  metabolic=0.04376  wiring=0.01935  ok  (12910s)
+gen 1 #5  budget rate=0.02821 conn=0.02133 -> lambda 1e-06,nan  min_task_acc=0.842  metabolic=0.04226  wiring=0.02132  ok  (12910s)
+gen 1 #6  budget rate=0.08831 conn=0.005171 -> lambda 1e-06,nan  min_task_acc=0.738  metabolic=0.1115  wiring=0.00517  ok  (12910s)
+gen 1 #7  budget rate=0.01768 conn=0.01889 -> lambda 1e-06,nan  min_task_acc=0.917  metabolic=0.02672  wiring=0.01888  ok  (12910s)
+gen 1 #8  budget rate=0.008146 conn=0.003273 -> lambda 0.019,nan  min_task_acc=0.494  metabolic=0.01241  wiring=0.003273  FAILS A TASK  (12910s)
+gen 1 #9  budget rate=0.004394 conn=0.007948 -> lambda 0.0867,nan  min_task_acc=0.742  metabolic=0.007134  wiring=0.007948  ok  (12910s)
+gen 1 #10  budget rate=0.03882 conn=0.003889 -> lambda 1e-06,nan  min_task_acc=0.734  metabolic=0.05008  wiring=0.003889  ok  (12910s)
+gen 1 #11  budget rate=0.07524 conn=0.006074 -> lambda 1e-06,nan  min_task_acc=0.738  metabolic=0.09693  wiring=0.006073  ok  (12910s)
+gen 1 #12  budget rate=0.09478 conn=0.004275 -> lambda 1e-06,nan  min_task_acc=0.781  metabolic=0.119  wiring=0.004276  ok  (12910s)
+gen 1 #13  budget rate=0.01173 conn=0.0206 -> lambda 1e-06,nan  min_task_acc=0.781  metabolic=0.0191  wiring=0.02059  ok  (12910s)
+gen 1 #14  budget rate=0.06485 conn=0.02163 -> lambda 1e-06,nan  min_task_acc=0.881  metabolic=0.08588  wiring=0.02162  ok  (12910s)
+gen 1 #15  budget rate=0.02952 conn=0.02268 -> lambda 1e-06,nan  min_task_acc=0.873  metabolic=0.04406  wiring=0.02267  ok  (12910s)
+gen 1 #16  budget rate=0.0472 conn=0.01405 -> lambda 1e-06,nan  min_task_acc=0.812  metabolic=0.06514  wiring=0.01404  ok  (12910s)
+gen 1 #17  budget rate=0.06186 conn=0.02245 -> lambda 1e-06,nan  min_task_acc=0.864  metabolic=0.08652  wiring=0.02244  ok  (12910s)
+gen 1 #18  budget rate=0.07065 conn=0.002941 -> lambda 1e-06,nan  min_task_acc=0.739  metabolic=0.08486  wiring=0.002941  ok  (12910s)
+gen 1 #19  budget rate=0.01625 conn=0.005833 -> lambda 1e-06,nan  min_task_acc=0.739  metabolic=0.02441  wiring=0.005833  ok  (12910s)
+gen 1 #20  budget rate=0.05616 conn=0.007792 -> lambda 1e-06,nan  min_task_acc=0.745  metabolic=0.07521  wiring=0.007792  ok  (12910s)
+gen 1 #21  budget rate=0.08005 conn=0.0111 -> lambda 1e-06,nan  min_task_acc=0.716  metabolic=0.1071  wiring=0.01109  ok  (12910s)
+gen 1 #22  budget rate=0.04131 conn=0.002396 -> lambda 1e-06,nan  min_task_acc=0.725  metabolic=0.05153  wiring=0.002396  ok  (12910s)
+gen 1 #23  budget rate=0.07375 conn=0.004 -> lambda 1e-06,nan  min_task_acc=0.680  metabolic=0.09254  wiring=0.004  ok  (12910s)
+gen 2 #0  budget rate=0.0167 conn=0.004034 -> lambda 1e-06,nan  min_task_acc=0.744  metabolic=0.02466  wiring=0.004034  ok  (13283s)
+gen 2 #1  budget rate=0.01105 conn=0.002132 -> lambda 0.00782,nan  min_task_acc=0.602  metabolic=0.01623  wiring=0.002132  ok  (13283s)
+gen 2 #2  budget rate=0.01005 conn=0.02091 -> lambda 1.42e-05,nan  min_task_acc=0.631  metabolic=0.01613  wiring=0.0209  ok  (13283s)
+gen 2 #3  budget rate=0.01789 conn=0.0216 -> lambda 1e-06,nan  min_task_acc=0.836  metabolic=0.02802  wiring=0.0216  ok  (13283s)
+gen 2 #4  budget rate=0.06485 conn=0.01871 -> lambda 1e-06,nan  min_task_acc=0.927  metabolic=0.09164  wiring=0.0187  ok  (13283s)
+gen 2 #5  budget rate=0.06128 conn=0.02238 -> lambda 1e-06,nan  min_task_acc=0.834  metabolic=0.08434  wiring=0.02237  ok  (13283s)
+gen 2 #6  budget rate=0.07993 conn=0.002003 -> lambda 1e-06,nan  min_task_acc=0.730  metabolic=0.09676  wiring=0.002003  ok  (13283s)
+gen 2 #7  budget rate=0.007627 conn=0.002056 -> lambda 0.0749,nan  min_task_acc=0.473  metabolic=0.01099  wiring=0.002056  FAILS A TASK  (13283s)
+gen 2 #8  budget rate=0.01961 conn=0.00799 -> lambda 1e-06,nan  min_task_acc=0.728  metabolic=0.03012  wiring=0.00799  ok  (13283s)
+gen 2 #9  budget rate=0.1014 conn=0.02061 -> lambda 1e-06,nan  min_task_acc=0.866  metabolic=0.1335  wiring=0.0206  ok  (13283s)
+gen 2 #10  budget rate=0.02884 conn=0.0261 -> lambda 1e-06,nan  min_task_acc=0.831  metabolic=0.04268  wiring=0.0261  ok  (13283s)
+gen 2 #11  budget rate=0.02065 conn=0.002502 -> lambda 1e-06,nan  min_task_acc=0.595  metabolic=0.02802  wiring=0.002502  FAILS A TASK  (13283s)
+gen 2 #12  budget rate=0.09449 conn=0.0198 -> lambda 1e-06,nan  min_task_acc=0.906  metabolic=0.1243  wiring=0.0198  ok  (13283s)
+gen 2 #13  budget rate=0.03395 conn=0.01527 -> lambda 1e-06,nan  min_task_acc=0.748  metabolic=0.04874  wiring=0.01527  ok  (13283s)
+gen 2 #14  budget rate=0.04201 conn=0.02619 -> lambda 1e-06,nan  min_task_acc=0.912  metabolic=0.06267  wiring=0.02619  ok  (13283s)
+gen 2 #15  budget rate=0.09061 conn=0.005941 -> lambda 1e-06,nan  min_task_acc=0.731  metabolic=0.1174  wiring=0.005941  ok  (13283s)
+gen 2 #16  budget rate=0.003727 conn=0.02366 -> lambda 0.096,nan  min_task_acc=0.766  metabolic=0.006606  wiring=0.02366  ok  (13283s)
+gen 2 #17  budget rate=0.01674 conn=0.006116 -> lambda 1e-06,nan  min_task_acc=0.738  metabolic=0.02577  wiring=0.006116  ok  (13283s)
+gen 2 #18  budget rate=0.01883 conn=0.002193 -> lambda 1e-06,nan  min_task_acc=0.759  metabolic=0.02647  wiring=0.002193  ok  (13283s)
+gen 2 #19  budget rate=0.01392 conn=0.01537 -> lambda 1e-06,nan  min_task_acc=0.783  metabolic=0.023  wiring=0.01537  ok  (13283s)
+gen 2 #20  budget rate=0.03579 conn=0.002155 -> lambda 1e-06,nan  min_task_acc=0.756  metabolic=0.04688  wiring=0.002155  ok  (13283s)
+gen 2 #21  budget rate=0.01941 conn=0.02326 -> lambda 1e-06,nan  min_task_acc=0.919  metabolic=0.02949  wiring=0.02325  ok  (13283s)
+gen 2 #22  budget rate=0.08028 conn=0.004113 -> lambda 1e-06,nan  min_task_acc=0.787  metabolic=0.1006  wiring=0.004113  ok  (13283s)
+gen 2 #23  budget rate=0.08605 conn=0.02414 -> lambda 1e-06,nan  min_task_acc=0.883  metabolic=0.1189  wiring=0.02414  ok  (13283s)
+gen 2 #24  budget rate=0.01829 conn=0.02918 -> lambda 1e-06,nan  min_task_acc=0.923  metabolic=0.02735  wiring=0.02689  ok  (13303s)
+gen 2 #25  budget rate=0.004607 conn=0.01542 -> lambda 0.0915,nan  min_task_acc=0.767  metabolic=0.008018  wiring=0.01542  ok  (13303s)
+gen 2 #26  budget rate=0.01526 conn=0.003677 -> lambda 1e-06,nan  min_task_acc=0.750  metabolic=0.02336  wiring=0.003677  ok  (13303s)
+gen 2 #27  budget rate=0.09662 conn=0.007225 -> lambda 1e-06,nan  min_task_acc=0.747  metabolic=0.1251  wiring=0.007223  ok  (13303s)
+gen 2 #28  budget rate=0.004605 conn=0.02609 -> lambda 0.0499,nan  min_task_acc=0.752  metabolic=0.007968  wiring=0.02609  ok  (13303s)
+gen 2 #29  budget rate=0.004454 conn=0.01883 -> lambda 0.0619,nan  min_task_acc=0.559  metabolic=0.007247  wiring=0.01882  FAILS A TASK  (13303s)
+gen 2 #30  budget rate=0.02707 conn=0.002185 -> lambda 1e-06,nan  min_task_acc=0.708  metabolic=0.03661  wiring=0.002185  ok  (13303s)
+gen 2 #31  budget rate=0.01347 conn=0.02789 -> lambda 1e-06,nan  min_task_acc=0.741  metabolic=0.02086  wiring=0.0272  ok  (13303s)
+gen 2 #32  budget rate=0.07065 conn=0.002703 -> lambda 1e-06,nan  min_task_acc=0.741  metabolic=0.08483  wiring=0.002703  ok  (13303s)
+gen 2 #33  budget rate=0.02312 conn=0.002002 -> lambda 1e-06,nan  min_task_acc=0.759  metabolic=0.03102  wiring=0.002002  ok  (13303s)
+gen 2 #34  budget rate=0.003623 conn=0.02217 -> lambda 0.073,nan  min_task_acc=0.480  metabolic=0.005751  wiring=0.02217  FAILS A TASK  (13303s)
+gen 2 #35  budget rate=0.01159 conn=0.01432 -> lambda 5.62e-06,nan  min_task_acc=0.731  metabolic=0.01927  wiring=0.01432  ok  (13303s)
+gen 2 #36  budget rate=0.01482 conn=0.002317 -> lambda 1e-06,nan  min_task_acc=0.500  metabolic=0.02082  wiring=0.002317  FAILS A TASK  (13303s)
+gen 2 #37  budget rate=0.07595 conn=0.003226 -> lambda 1e-06,nan  min_task_acc=0.716  metabolic=0.09262  wiring=0.003226  ok  (13303s)
+gen 2 #38  budget rate=0.06485 conn=0.02443 -> lambda 1e-06,nan  min_task_acc=0.883  metabolic=0.08397  wiring=0.02441  ok  (13303s)
+gen 2 #39  budget rate=0.07817 conn=0.008082 -> lambda 1e-06,nan  min_task_acc=0.730  metabolic=0.1041  wiring=0.008079  ok  (13303s)
+gen 2 #40  budget rate=0.08183 conn=0.01859 -> lambda 1e-06,nan  min_task_acc=0.863  metabolic=0.1087  wiring=0.01858  ok  (13303s)
+gen 2 #41  budget rate=0.005065 conn=0.007639 -> lambda 0.0768,nan  min_task_acc=0.567  metabolic=0.008358  wiring=0.007639  FAILS A TASK  (13303s)
+gen 2 #42  budget rate=0.1122 conn=0.00789 -> lambda 1e-06,nan  min_task_acc=0.742  metabolic=0.1438  wiring=0.007883  ok  (13303s)
+gen 2 #43  budget rate=0.02425 conn=0.002144 -> lambda 1e-06,nan  min_task_acc=0.758  metabolic=0.03267  wiring=0.002144  ok  (13303s)
+gen 2 #44  budget rate=0.007643 conn=0.0155 -> lambda 0.00808,nan  min_task_acc=0.531  metabolic=0.01298  wiring=0.0155  FAILS A TASK  (13303s)
+gen 2 #45  budget rate=0.009977 conn=0.005986 -> lambda 0.00487,nan  min_task_acc=0.650  metabolic=0.01619  wiring=0.005986  ok  (13303s)
+gen 2 #46  budget rate=0.02097 conn=0.005327 -> lambda 1e-06,nan  min_task_acc=0.697  metabolic=0.03101  wiring=0.005327  ok  (13303s)
+gen 2 #47  budget rate=0.03249 conn=0.002543 -> lambda 1e-06,nan  min_task_acc=0.748  metabolic=0.04325  wiring=0.002544  ok  (13303s)
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+DaleRNN: N=256  frac_e=0.8  rho(W)=1.000  activation=relu
+118/144 feasible, 27 on the front. Saved -> /home/go23tan/canonical_mc/runs/moo/dale_all_nsga3_budget_p48g3_50k
