@@ -441,6 +441,7 @@ def main():
                 log_every=args.log_every,
                 show_progress=False,
                 loss_per_trial=args.loss_per_trial,
+                freeze=args.freeze,
                 **reg_opts,
             )
 

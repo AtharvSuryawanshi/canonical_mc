@@ -141,6 +141,13 @@ def add_common_args(parser, n_seeds=True):
         action="store_true",
         help="Also apply input noise during Pareto eval.",
     )
+    parser.add_argument(
+        "--freeze",
+        type=str,
+        default="",
+        help='Comma-separated parameters kept at their init, e.g. "w_in" or "w_in,w_out". '
+        "Default: train everything. Not supported with --batched.",
+    )
     parser.add_argument("--output-dir", type=str, default=None)
     return parser
 
@@ -193,6 +200,7 @@ def train_and_evaluate(args, lambda_rate, lambda_connectivity, seed, active_task
         log_every=args.log_every,
         show_progress=False,
         loss_per_trial=args.loss_per_trial,
+        freeze=getattr(args, "freeze", ""),
         step_callback=(None if step_callback is None else
                        lambda step, hist: step_callback(step, hist, model, config)),
         **(budget_opts or {}),

@@ -864,6 +864,15 @@ class BudgetConstraint:
         self.step += 1
 
 
+def parse_freeze(freeze):
+    """'w_in,w_out' / ['w_in'] / None -> ('w_in', 'w_out') / ('w_in',) / ()."""
+    if not freeze:
+        return ()
+    if isinstance(freeze, str):
+        freeze = freeze.split(",")
+    return tuple(dict.fromkeys(f.strip() for f in freeze if f.strip()))
+
+
 def train(
     model,
     config,
@@ -891,6 +900,7 @@ def train(
     budget_ema=BUDGET_DEFAULTS["budget_ema"],
     conn_budget_mode=BUDGET_DEFAULTS["conn_budget_mode"],
     step_callback=None,
+    freeze=(),
     **reg_overrides,
 ):
     """Multitask training. By default each batch mixes all active tasks.
@@ -913,6 +923,10 @@ def train(
     ``step_callback(step, history)``, if given, is called at the end of every
     step (after the optimizer step, the projection and the multiplier update),
     e.g. to save intermediate networks. It must not touch the training RNGs.
+
+    ``freeze`` names parameters kept at their init (e.g. ``("w_in", "w_out")``):
+    they get no gradient, are left out of Adam and of gradient clipping. Empty
+    (default) trains everything, exactly as before.
     """
     reg = _reg_opts(**reg_overrides)
     if rate_budget is not None and lambda_rate:
@@ -933,7 +947,13 @@ def train(
         # Only its ramp / budget bookkeeping is used; there is no multiplier.
         conn_proj = BudgetConstraint(conn_budget, n_steps, **budget_kw)
     device = next(model.parameters()).device
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    freeze = parse_freeze(freeze)
+    for name in freeze:
+        param = getattr(model, name, None)
+        if not isinstance(param, torch.nn.Parameter):
+            raise ValueError(f"train: cannot freeze {name!r}: not a parameter of {type(model).__name__}")
+        param.requires_grad_(False)
+    optimizer = torch.optim.Adam([p for p in model.parameters() if p.requires_grad], lr=lr)
     history = {
         "loss": [],
         "step": [],
@@ -954,6 +974,8 @@ def train(
         "reg": dict(reg),
         "loss_per_trial": bool(loss_per_trial),
     }
+    if freeze:
+        history["freeze"] = list(freeze)
     if rate_con is not None or conn_budget is not None:
         history["budget"] = {
             "rate_budget": rate_budget,
@@ -1291,6 +1313,13 @@ def parse_args():
     parser.add_argument("--log-every", type=int, default=20)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--device", type=str, default=None)
+    parser.add_argument(
+        "--freeze",
+        type=str,
+        default="",
+        help='Comma-separated parameters kept at their init, e.g. "w_in" or "w_in,w_out" '
+        "(DaleRNN). Default: train everything.",
+    )
     parser.add_argument("--plot-results", type=bool, default=False)
     parser.add_argument(
         "--save-path",
@@ -1399,6 +1428,7 @@ def main():
         log_every=args.log_every,
         plot_results=args.plot_results,
         loss_per_trial=args.loss_per_trial,
+        freeze=args.freeze,
         **reg_opts,
     )
 

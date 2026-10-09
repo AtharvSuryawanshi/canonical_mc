@@ -470,7 +470,9 @@ def train_and_evaluate_batched(args, specs, active_tasks, device, noise_level, e
     """
     from cmc.runner import make_fresh_model
 
-    configs = [default_config(n_eachring=args.n_eachring, seed=int(s["seed"]), easy_task=True) for s in specs]
+    if getattr(args, "freeze", ""):
+        raise ValueError("--freeze is not implemented for --batched; run without --batched")
+    configs =[default_config(n_eachring=args.n_eachring, seed=int(s["seed"]), easy_task=True) for s in specs]
     models = [make_fresh_model(args, cfg, device, seed=int(s["seed"])) for s, cfg in zip(specs, configs)]
     bmodel = BatchedDaleRNN(models).to(device)
     data_seed = int(specs[0]["seed"] if data_seed is None else data_seed)

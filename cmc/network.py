@@ -318,7 +318,7 @@ class DaleRNN(nn.Module):
         self.w_in = nn.Parameter(torch.from_numpy(w_in0.astype(np.float32)))
         self.w_raw = nn.Parameter(torch.from_numpy(w_raw0))  # Dale: learn magnitudes, not signed W
         self.bias = nn.Parameter(torch.zeros(n_rnn))  # Dale: zero bias init
-        self.w_out = nn.Parameter(torch.randn(self.n_e, n_output) * 0.01)  # Dale: E-only readout
+        self.w_out = nn.Parameter(torch.randn(self.n_e, n_output) / math.sqrt(self.n_e))  # Dale: E-only readout
         self.b_out = nn.Parameter(torch.zeros(n_output))
 
         self.register_buffer("sign_vector", torch.from_numpy(sign0))  # Dale: fixed presynaptic sign
