@@ -289,6 +289,7 @@ class DaleRNN(nn.Module):
         target_rho=1.0,
         prune_eps=0.0,
         seed=0,
+        w_out_init="small",
     ):
         super().__init__()
         if activation == "tanh":
@@ -318,7 +319,15 @@ class DaleRNN(nn.Module):
         self.w_in = nn.Parameter(torch.from_numpy(w_in0.astype(np.float32)))
         self.w_raw = nn.Parameter(torch.from_numpy(w_raw0))  # Dale: learn magnitudes, not signed W
         self.bias = nn.Parameter(torch.zeros(n_rnn))  # Dale: zero bias init
-        self.w_out = nn.Parameter(torch.randn(self.n_e, n_output) * 0.01)  # Dale: E-only readout
+        # Readout init: "small" (0.01 * randn, every run so far: outputs start near neutral) or
+        # "fanin" (randn / sqrt(n_e): O(1) output, for a frozen readout that has to carry signal).
+        if w_out_init == "small":
+            w_out_scale = 0.01
+        elif w_out_init == "fanin":
+            w_out_scale = 1.0 / math.sqrt(self.n_e)
+        else:
+            raise ValueError(f"w_out_init must be 'small' or 'fanin', got {w_out_init!r}")
+        self.w_out = nn.Parameter(torch.randn(self.n_e, n_output) * w_out_scale)  # Dale: E-only readout
         self.b_out = nn.Parameter(torch.zeros(n_output))
 
         self.register_buffer("sign_vector", torch.from_numpy(sign0))  # Dale: fixed presynaptic sign

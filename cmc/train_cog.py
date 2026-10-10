@@ -556,6 +556,7 @@ def make_dale_model(
     prune_eps=0.0,
     seed=0,
     device="cpu",
+    w_out_init="small",
 ):
     # `seed` alone must determine the network. numpy's RandomState(seed) covers
     # w_in/w_rec, but w_out and the per-step training noise come from torch's
@@ -574,6 +575,7 @@ def make_dale_model(
         target_rho=g,
         prune_eps=prune_eps,
         seed=seed,
+        w_out_init=w_out_init,
     )
     rho = model.recurrent_spectral_radius()
     print(f"DaleRNN: N={n_neurons}  frac_e={frac_e}  rho(W)={rho:.3f}  activation={activation}")
@@ -1320,6 +1322,13 @@ def parse_args():
         help='Comma-separated parameters kept at their init, e.g. "w_in" or "w_in,w_out" '
         "(DaleRNN). Default: train everything.",
     )
+    parser.add_argument(
+        "--w-out-init",
+        choices=["small", "fanin"],
+        default="small",
+        help="DaleRNN readout init: small = 0.01*randn (default, all earlier runs), "
+        "fanin = randn/sqrt(n_E) (use with --freeze w_out).",
+    )
     parser.add_argument("--plot-results", type=bool, default=False)
     parser.add_argument(
         "--save-path",
@@ -1348,6 +1357,7 @@ def _model_kwargs_from_args(args):
         "g": args.g,
         "sigma_rec": args.sigma_rec,
         "prune_eps": getattr(args, "prune_eps", 0.0),
+        "w_out_init": getattr(args, "w_out_init", "small"),
         "seed": args.seed,
     }
 

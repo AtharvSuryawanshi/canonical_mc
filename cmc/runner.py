@@ -148,6 +148,13 @@ def add_common_args(parser, n_seeds=True):
         help='Comma-separated parameters kept at their init, e.g. "w_in" or "w_in,w_out". '
         "Default: train everything. Not supported with --batched.",
     )
+    parser.add_argument(
+        "--w-out-init",
+        choices=["small", "fanin"],
+        default="small",
+        help="DaleRNN readout init: small = 0.01*randn (default, all earlier runs), "
+        "fanin = randn/sqrt(n_E) (use with --freeze w_out).",
+    )
     parser.add_argument("--output-dir", type=str, default=None)
     return parser
 
