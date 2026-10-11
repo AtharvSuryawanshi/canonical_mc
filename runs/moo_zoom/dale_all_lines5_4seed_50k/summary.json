@@ -1,0 +1,265 @@
+{
+  "model": "dale",
+  "task_battery": "all",
+  "active_tasks": [
+    "fdgo",
+    "reactgo",
+    "delaygo",
+    "fdanti",
+    "reactanti",
+    "delayanti",
+    "dm1",
+    "dm2",
+    "contextdm1",
+    "contextdm2",
+    "multidm",
+    "delaydm1",
+    "delaydm2",
+    "contextdelaydm1",
+    "contextdelaydm2",
+    "multidelaydm",
+    "dmsgo",
+    "dmsnogo",
+    "dmcgo",
+    "dmcnogo"
+  ],
+  "steps": 50000,
+  "seeds": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "save_at": [],
+  "points": {
+    "L0p0": {
+      "rate_budget": 0.002543,
+      "conn_budget": 0.007847,
+      "n_trained": 4,
+      "n_feasible": 1
+    },
+    "L0p1": {
+      "rate_budget": 0.003296,
+      "conn_budget": 0.006054,
+      "n_trained": 4,
+      "n_feasible": 1
+    },
+    "L0p2": {
+      "rate_budget": 0.004272,
+      "conn_budget": 0.004671,
+      "n_trained": 4,
+      "n_feasible": 2
+    },
+    "L0p3": {
+      "rate_budget": 0.005537,
+      "conn_budget": 0.003604,
+      "n_trained": 4,
+      "n_feasible": 3
+    },
+    "L0p4": {
+      "rate_budget": 0.007177,
+      "conn_budget": 0.00278,
+      "n_trained": 4,
+      "n_feasible": 0
+    },
+    "L0p5": {
+      "rate_budget": 0.009302,
+      "conn_budget": 0.002145,
+      "n_trained": 4,
+      "n_feasible": 1
+    },
+    "L1p0": {
+      "rate_budget": 0.002543,
+      "conn_budget": 0.01244,
+      "n_trained": 4,
+      "n_feasible": 1
+    },
+    "L1p1": {
+      "rate_budget": 0.003614,
+      "conn_budget": 0.008751,
+      "n_trained": 4,
+      "n_feasible": 2
+    },
+    "L1p2": {
+      "rate_budget": 0.005136,
+      "conn_budget": 0.006157,
+      "n_trained": 4,
+      "n_feasible": 3
+    },
+    "L1p3": {
+      "rate_budget": 0.007299,
+      "conn_budget": 0.004332,
+      "n_trained": 4,
+      "n_feasible": 2
+    },
+    "L1p4": {
+      "rate_budget": 0.01037,
+      "conn_budget": 0.003048,
+      "n_trained": 4,
+      "n_feasible": 4
+    },
+    "L1p5": {
+      "rate_budget": 0.01474,
+      "conn_budget": 0.002145,
+      "n_trained": 4,
+      "n_feasible": 3
+    },
+    "L2p0": {
+      "rate_budget": 0.002543,
+      "conn_budget": 0.01971,
+      "n_trained": 4,
+      "n_feasible": 2
+    },
+    "L2p1": {
+      "rate_budget": 0.003962,
+      "conn_budget": 0.01265,
+      "n_trained": 4,
+      "n_feasible": 1
+    },
+    "L2p2": {
+      "rate_budget": 0.006174,
+      "conn_budget": 0.008117,
+      "n_trained": 4,
+      "n_feasible": 4
+    },
+    "L2p3": {
+      "rate_budget": 0.009622,
+      "conn_budget": 0.005209,
+      "n_trained": 4,
+      "n_feasible": 4
+    },
+    "L2p4": {
+      "rate_budget": 0.01499,
+      "conn_budget": 0.003342,
+      "n_trained": 4,
+      "n_feasible": 4
+    },
+    "L2p5": {
+      "rate_budget": 0.02337,
+      "conn_budget": 0.002145,
+      "n_trained": 4,
+      "n_feasible": 4
+    },
+    "L3p0": {
+      "rate_budget": 0.002915,
+      "conn_budget": 0.02725,
+      "n_trained": 4,
+      "n_feasible": 2
+    },
+    "L3p1": {
+      "rate_budget": 0.004846,
+      "conn_budget": 0.01639,
+      "n_trained": 4,
+      "n_feasible": 3
+    },
+    "L3p2": {
+      "rate_budget": 0.008057,
+      "conn_budget": 0.009858,
+      "n_trained": 4,
+      "n_feasible": 3
+    },
+    "L3p3": {
+      "rate_budget": 0.0134,
+      "conn_budget": 0.005929,
+      "n_trained": 4,
+      "n_feasible": 4
+    },
+    "L3p4": {
+      "rate_budget": 0.02227,
+      "conn_budget": 0.003566,
+      "n_trained": 4,
+      "n_feasible": 4
+    },
+    "L3p5": {
+      "rate_budget": 0.03703,
+      "conn_budget": 0.002145,
+      "n_trained": 4,
+      "n_feasible": 3
+    },
+    "L4p0": {
+      "rate_budget": 0.004619,
+      "conn_budget": 0.02725,
+      "n_trained": 4,
+      "n_feasible": 4
+    },
+    "L4p1": {
+      "rate_budget": 0.007681,
+      "conn_budget": 0.01639,
+      "n_trained": 4,
+      "n_feasible": 3
+    },
+    "L4p2": {
+      "rate_budget": 0.01277,
+      "conn_budget": 0.009858,
+      "n_trained": 4,
+      "n_feasible": 2
+    },
+    "L4p3": {
+      "rate_budget": 0.02123,
+      "conn_budget": 0.005929,
+      "n_trained": 4,
+      "n_feasible": 4
+    },
+    "L4p4": {
+      "rate_budget": 0.0353,
+      "conn_budget": 0.003566,
+      "n_trained": 4,
+      "n_feasible": 4
+    },
+    "L4p5": {
+      "rate_budget": 0.05869,
+      "conn_budget": 0.002145,
+      "n_trained": 4,
+      "n_feasible": 4
+    }
+  },
+  "feasible_min_task_acc": 0.6,
+  "args": {
+    "model": "dale",
+    "task_battery": "all",
+    "tasks": null,
+    "steps": 50000,
+    "batch_size": 32,
+    "n_rnn": 256,
+    "n_neurons": 256,
+    "n_eachring": 16,
+    "frac_e": 0.8,
+    "g": 1.0,
+    "sigma_rec": 0.05,
+    "noise_level": null,
+    "lr": 0.001,
+    "log_every": 20,
+    "seed": 0,
+    "device": null,
+    "eval_batch_size": 64,
+    "feasible_min_task_acc": 0.6,
+    "eval_seeds": null,
+    "n_seeds": 4,
+    "rate_kind": "l2",
+    "rate_inh_scale": 1.0,
+    "conn_kind": "l1",
+    "conn_target": "w_rec",
+    "conn_inh_scale": 1.0,
+    "prune_eps": 0.0,
+    "loss_per_trial": true,
+    "eval_noise_level": 0.0,
+    "eval_input_noise": false,
+    "freeze": "",
+    "w_out_init": "small",
+    "output_dir": "runs/moo_zoom/dale_all_lines5_4seed_50k",
+    "budget_lr": 0.01,
+    "budget_kp": 0.0,
+    "budget_ramp": 0.0,
+    "conn_budget_mode": "projection",
+    "budget_rho": 1.0,
+    "budget_lambda_init": 0.01,
+    "budget_ema": 0.9,
+    "points": "L0p0=0.002543,0.007847; L0p1=0.003296,0.006054; L0p2=0.004272,0.004671; L0p3=0.005537,0.003604; L0p4=0.007177,0.00278; L0p5=0.009302,0.002145; L1p0=0.002543,0.01244; L1p1=0.003614,0.008751; L1p2=0.005136,0.006157; L1p3=0.007299,0.004332; L1p4=0.01037,0.003048; L1p5=0.01474,0.002145; L2p0=0.002543,0.01971; L2p1=0.003962,0.01265; L2p2=0.006174,0.008117; L2p3=0.009622,0.005209; L2p4=0.01499,0.003342; L2p5=0.02337,0.002145; L3p0=0.002915,0.02725; L3p1=0.004846,0.01639; L3p2=0.008057,0.009858; L3p3=0.0134,0.005929; L3p4=0.02227,0.003566; L3p5=0.03703,0.002145; L4p0=0.004619,0.02725; L4p1=0.007681,0.01639; L4p2=0.01277,0.009858; L4p3=0.02123,0.005929; L4p4=0.0353,0.003566; L4p5=0.05869,0.002145",
+    "overwrite": false,
+    "workers": 2,
+    "batched": true,
+    "batch_pop": 30,
+    "devices": "cuda:0,cuda:1",
+    "save_at": null
+  }
+}
