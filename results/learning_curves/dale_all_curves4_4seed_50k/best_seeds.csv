@@ -1,0 +1,5 @@
+point,seed,rate_budget,conn_budget,min_task_acc,mean_acc
+both,2,0.009622,0.005209,0.7578125,0.958203125
+control,1,,,0.9375,0.986328125
+rate_limited,3,0.006921,0.02855,0.7625,0.980625
+wiring_limited,2,0.05869,0.002145,0.7921875,0.958359375

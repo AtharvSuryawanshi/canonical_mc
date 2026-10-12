@@ -9,6 +9,16 @@ import numpy as np
 # per-step SNR, which made dm/contextdm solvable from a single timestep.
 EASY_STIM_COH_RANGE = np.array([0.10, 0.15, 0.20], dtype=np.float32)
 
+# Display names for plots, as in Yang 2019 (rule_name in gyyang/multitask task.py).
+rule_name = {
+    "fdgo": "Go", "reactgo": "RT Go", "delaygo": "Dly Go",
+    "fdanti": "Anti", "reactanti": "RT Anti", "delayanti": "Dly Anti",
+    "dm1": "DM 1", "dm2": "DM 2", "contextdm1": "Ctx DM 1", "contextdm2": "Ctx DM 2",
+    "multidm": "MultSen DM", "delaydm1": "Dly DM 1", "delaydm2": "Dly DM 2",
+    "contextdelaydm1": "Ctx Dly DM 1", "contextdelaydm2": "Ctx Dly DM 2", "multidelaydm": "MultSen Dly DM",
+    "dmsgo": "DMS", "dmsnogo": "DNMS", "dmcgo": "DMC", "dmcnogo": "DNMC",
+}
+
 rules_dict = {
     "all": [
         "fdgo",
