@@ -1,0 +1,199 @@
+{
+  "model": "dale",
+  "task_battery": "all",
+  "active_tasks": [
+    "fdgo",
+    "reactgo",
+    "delaygo",
+    "fdanti",
+    "reactanti",
+    "delayanti",
+    "dm1",
+    "dm2",
+    "contextdm1",
+    "contextdm2",
+    "multidm",
+    "delaydm1",
+    "delaydm2",
+    "contextdelaydm1",
+    "contextdelaydm2",
+    "multidelaydm",
+    "dmsgo",
+    "dmsnogo",
+    "dmcgo",
+    "dmcnogo"
+  ],
+  "steps": 150000,
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "save_at": [
+    2000,
+    5000,
+    10000,
+    20000,
+    30000,
+    40000,
+    50000,
+    60000,
+    70000,
+    80000,
+    90000,
+    100000,
+    110000,
+    120000,
+    130000,
+    140000
+  ],
+  "points": {
+    "control": {
+      "rate_budget": null,
+      "conn_budget": null,
+      "n_trained": 5,
+      "n_feasible": 5
+    },
+    "A0": {
+      "rate_budget": 0.0173,
+      "conn_budget": 1.0,
+      "n_trained": 5,
+      "n_feasible": 5
+    },
+    "A1": {
+      "rate_budget": 0.006921,
+      "conn_budget": 1.0,
+      "n_trained": 5,
+      "n_feasible": 5
+    },
+    "A2": {
+      "rate_budget": 0.002768,
+      "conn_budget": 1.0,
+      "n_trained": 5,
+      "n_feasible": 5
+    },
+    "A3": {
+      "rate_budget": 0.001107,
+      "conn_budget": 1.0,
+      "n_trained": 5,
+      "n_feasible": 5
+    },
+    "A4": {
+      "rate_budget": 0.0004429,
+      "conn_budget": 1.0,
+      "n_trained": 5,
+      "n_feasible": 3
+    },
+    "B0": {
+      "rate_budget": 10.0,
+      "conn_budget": 0.005363,
+      "n_trained": 5,
+      "n_feasible": 5
+    },
+    "B1": {
+      "rate_budget": 10.0,
+      "conn_budget": 0.002145,
+      "n_trained": 5,
+      "n_feasible": 4
+    },
+    "B2": {
+      "rate_budget": 10.0,
+      "conn_budget": 0.000858,
+      "n_trained": 5,
+      "n_feasible": 0
+    },
+    "B3": {
+      "rate_budget": 10.0,
+      "conn_budget": 0.0003432,
+      "n_trained": 5,
+      "n_feasible": 0
+    },
+    "B4": {
+      "rate_budget": 10.0,
+      "conn_budget": 0.0001373,
+      "n_trained": 5,
+      "n_feasible": 0
+    },
+    "C0": {
+      "rate_budget": 0.01148,
+      "conn_budget": 0.004387,
+      "n_trained": 5,
+      "n_feasible": 5
+    },
+    "C1": {
+      "rate_budget": 0.004569,
+      "conn_budget": 0.002494,
+      "n_trained": 5,
+      "n_feasible": 1
+    },
+    "C2": {
+      "rate_budget": 0.001819,
+      "conn_budget": 0.001418,
+      "n_trained": 5,
+      "n_feasible": 0
+    },
+    "C3": {
+      "rate_budget": 0.0007241,
+      "conn_budget": 0.0008064,
+      "n_trained": 5,
+      "n_feasible": 0
+    },
+    "C4": {
+      "rate_budget": 0.0002883,
+      "conn_budget": 0.0004585,
+      "n_trained": 5,
+      "n_feasible": 0
+    }
+  },
+  "feasible_min_task_acc": 0.6,
+  "args": {
+    "model": "dale",
+    "task_battery": "all",
+    "tasks": null,
+    "steps": 150000,
+    "batch_size": 32,
+    "n_rnn": 256,
+    "n_neurons": 256,
+    "n_eachring": 16,
+    "frac_e": 0.8,
+    "g": 1.0,
+    "sigma_rec": 0.05,
+    "noise_level": null,
+    "lr": 0.001,
+    "log_every": 20,
+    "seed": 0,
+    "device": null,
+    "eval_batch_size": 64,
+    "feasible_min_task_acc": 0.6,
+    "eval_seeds": null,
+    "n_seeds": 5,
+    "rate_kind": "l2",
+    "rate_inh_scale": 1.0,
+    "conn_kind": "l1",
+    "conn_target": "w_rec",
+    "conn_inh_scale": 1.0,
+    "prune_eps": 0.0,
+    "loss_per_trial": true,
+    "eval_noise_level": 0.0,
+    "eval_input_noise": false,
+    "freeze": "",
+    "w_out_init": "small",
+    "output_dir": "runs/moo_zoom/dale_all_rays3_5seed_150k",
+    "budget_lr": 0.01,
+    "budget_kp": 0.0,
+    "budget_ramp": 0.0,
+    "conn_budget_mode": "projection",
+    "budget_rho": 1.0,
+    "budget_lambda_init": 0.01,
+    "budget_ema": 0.9,
+    "points": "control=none; A0=0.0173,1; A1=0.006921,1; A2=0.002768,1; A3=0.001107,1; A4=0.0004429,1; B0=10,0.005363; B1=10,0.002145; B2=10,0.000858; B3=10,0.0003432; B4=10,0.0001373; C0=0.01148,0.004387; C1=0.004569,0.002494; C2=0.001819,0.001418; C3=0.0007241,0.0008064; C4=0.0002883,0.0004585",
+    "overwrite": false,
+    "workers": 2,
+    "batched": true,
+    "batch_pop": 40,
+    "devices": "cuda:0,cuda:1",
+    "save_at": "2000,5000,10000,20000,30000,40000,50000,60000,70000,80000,90000,100000,110000,120000,130000,140000"
+  }
+}
