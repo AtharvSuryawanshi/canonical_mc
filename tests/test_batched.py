@@ -30,13 +30,13 @@ SPECS = [
 ]
 
 
-def _model(seed):
+def _model(seed, w_out_init="small"):
     cfg = default_config(n_eachring=8, seed=seed, easy_task=True)
-    m = tc.make_dale_model(cfg, n_neurons=32, seed=seed).double()
+    m = tc.make_dale_model(cfg, n_neurons=32, seed=seed, w_out_init=w_out_init).double()
     return m
 
 
-def _single_runs():
+def _single_runs(freeze=(), w_out_init="small"):
     """train_cog.train per spec, all on the trial stream of config seed DATA_SEED."""
     recorded, out = [], []
     orig = tc.generate_mixed_trials
@@ -48,9 +48,11 @@ def _single_runs():
 
     for i, spec in enumerate(SPECS):
         tc.generate_mixed_trials = recording if i == 0 else orig
-        model = _model(spec["seed"])
+        model = _model(spec["seed"], w_out_init)
         cfg = default_config(n_eachring=8, seed=DATA_SEED, easy_task=True)
         kw = {k: v for k, v in spec.items() if k != "seed"}
+        if freeze:
+            kw["freeze"] = freeze
         if "rate_budget" in kw or "conn_budget" in kw:
             kw.update(BUDGET_KW)
         try:
@@ -63,14 +65,14 @@ def _single_runs():
     return out, trials
 
 
-def _batched(trials, poison=None):
-    models = [_model(s["seed"]) for s in SPECS]
+def _batched(trials, poison=None, freeze=(), w_out_init="small"):
+    models = [_model(s["seed"], w_out_init) for s in SPECS]
     bmodel = BatchedDaleRNN(models)
     if poison is not None:
         with torch.no_grad():
             bmodel.w_out[poison] = float("nan")
     hists = train_batched(bmodel, None, TASKS, SPECS, n_steps=STEPS, noise_level=0.0, grad_clip=GRAD_CLIP, log_every=5,
-                          trial_source=lambda step: trials[step - 1], **BUDGET_KW)
+                          trial_source=lambda step: trials[step - 1], freeze=freeze, **BUDGET_KW)
     return models, hists
 
 
@@ -95,6 +97,30 @@ def test_batched_matches_single():
             _close(getattr(m_b, name).detach(), getattr(m_single, name).detach(), f"{name} net {p}")
 
 
+def test_batched_matches_single_frozen_w_out():
+    """--freeze w_out: the frozen readout must stay at init, and everything else
+    must still match the single-network path step for step. Uses the fanin readout
+    init, i.e. the configuration the frozen runs actually use."""
+    freeze, w_out_init = ("w_out",), "fanin"
+    singles, trials = _single_runs(freeze=freeze, w_out_init=w_out_init)
+    models, hists = _batched(trials, freeze=freeze, w_out_init=w_out_init)
+    for p, ((m_single, h_single), m_b, h_b) in enumerate(zip(singles, models, hists)):
+        assert h_b.get("freeze") == list(freeze) == h_single.get("freeze"), p
+        _close(h_b["loss"], h_single["loss"], f"loss net {p}")
+        if "budget" in h_single:
+            for key in ("rate", "conn"):
+                for field in ("lambda", "cost", "budget_t"):
+                    _close(h_b["budget"][key][field], h_single["budget"][key][field], f"{key} {field} net {p}")
+        for name in PARAM_NAMES:
+            _close(getattr(m_b, name).detach(), getattr(m_single, name).detach(), f"{name} net {p}")
+        # w_out never moved, in either path
+        init = _model(SPECS[p]["seed"], w_out_init).w_out.detach()
+        _close(getattr(m_b, "w_out").detach(), init, f"w_out frozen at init net {p}")
+    # and the other parameters DID move, so the test is not vacuous
+    assert not np.allclose(models[0].w_raw.detach().numpy(),
+                           _model(SPECS[0]["seed"], w_out_init).w_raw.detach().numpy())
+
+
 def test_nan_network_is_isolated():
     _, trials = _single_runs()
     clean, _ = _batched(trials)
@@ -108,5 +134,6 @@ def test_nan_network_is_isolated():
 
 if __name__ == "__main__":
     test_batched_matches_single()
+    test_batched_matches_single_frozen_w_out()
     test_nan_network_is_isolated()
     print("ok")

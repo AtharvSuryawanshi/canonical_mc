@@ -116,9 +116,9 @@ the knee. Seed 0 reproduces the cmc.moo network bit-for-bit on CPU; on GPU
 
 **Batched training (`cmc.batched`, `--batched` on moo / moo_zoom, opt-in):** P
 DaleRNNs stacked into `[P, ...]` tensors and trained in one process; per-network
-init, budgets (BudgetConstraint math, L1 projection), Adam and grad clipping are
-exactly the single-network ones (`tests/test_batched.py`: equal to ~1e-15 in
-float64 on shared trials). But the P networks share ONE trial stream and do no
+init, budgets (BudgetConstraint math, L1 projection), Adam, grad clipping and
+`--freeze` are exactly the single-network ones (`tests/test_batched.py`: equal to
+~1e-15 in float64 on shared trials, including a frozen `w_out` + `fanin` case). But the P networks share ONE trial stream and do no
 per-task logging eval, so a batched network is not the single-run network with
 that seed. Don't mix batched and single networks in one comparison, and don't
 resume a run in the other mode. Default (no flag) code path is unchanged.

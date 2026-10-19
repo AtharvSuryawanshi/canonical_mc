@@ -146,7 +146,8 @@ def add_common_args(parser, n_seeds=True):
         type=str,
         default="",
         help='Comma-separated parameters kept at their init, e.g. "w_in" or "w_in,w_out". '
-        "Default: train everything. Not supported with --batched.",
+        "Default: train everything. Works with --batched (left out of Adam and of the "
+        "per-network gradient norm, as in the single-network path).",
     )
     parser.add_argument(
         "--w-out-init",

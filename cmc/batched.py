@@ -43,6 +43,7 @@ from cmc.train_cog import (
     BudgetConstraint,
     _reg_opts,
     evaluate_pareto_metrics,
+    parse_freeze,
     trial_to_tensors,
 )
 
@@ -263,9 +264,14 @@ def _spec_value(spec, key):
     return float("nan") if v is None else float(v)
 
 
-def _clip_and_mask_grads(bmodel, grad_clip, alive):
-    """Per-network clip_grad_norm_ (same formula), and zero the grads of dead networks."""
-    params = [getattr(bmodel, n) for n in PARAM_NAMES]
+def _clip_and_mask_grads(bmodel, grad_clip, alive, names=PARAM_NAMES):
+    """Per-network clip_grad_norm_ (same formula), and zero the grads of dead networks.
+
+    ``names`` are the trainable parameters. A frozen parameter has no gradient and
+    ``torch.nn.utils.clip_grad_norm_`` skips those, so leaving it out of the norm is
+    exactly what the single-network path does.
+    """
+    params = [getattr(bmodel, n) for n in names]
     sq = sum(p.grad.flatten(1).square().sum(dim=1) for p in params)
     norm = sq.sqrt()
     alive = alive & torch.isfinite(norm)
@@ -298,6 +304,7 @@ def train_batched(
     budget_lambda_init=BUDGET_DEFAULTS["budget_lambda_init"],
     budget_ema=BUDGET_DEFAULTS["budget_ema"],
     conn_budget_mode=BUDGET_DEFAULTS["conn_budget_mode"],
+    freeze=(),
     callback_steps=(),
     step_callback=None,
     show_progress=False,
@@ -312,6 +319,8 @@ def train_batched(
     in ``callback_steps``, after the weights are written back into
     ``bmodel.models`` (e.g. to save intermediate networks). ``trial_source(step)``
     replaces trial generation (tests). The budget flags are shared by all networks.
+    ``freeze`` names parameters kept at their init for every network, exactly as in
+    ``train_cog.train``: they are left out of Adam and of the gradient norm.
     """
     reg = _reg_opts(**reg_overrides)
     P = bmodel.P
@@ -340,7 +349,16 @@ def train_batched(
     conn_proj = BatchedBudget(conn_b, n_steps, device, **budget_kw) if any(has_conn) else None
     use_lam_rate, use_lam_conn = bool(lam_rate.any()), bool(lam_conn.any())
 
-    params = [getattr(bmodel, n) for n in PARAM_NAMES]
+    freeze = parse_freeze(freeze)
+    unknown = [n for n in freeze if n not in PARAM_NAMES]
+    if unknown:
+        raise ValueError(f"train_batched: cannot freeze {unknown}: not in {list(PARAM_NAMES)}")
+    train_names = tuple(n for n in PARAM_NAMES if n not in freeze)
+    if not train_names:
+        raise ValueError("train_batched: every parameter is frozen; nothing to train")
+    for name in freeze:
+        getattr(bmodel, name).requires_grad_(False)
+    params = [getattr(bmodel, n) for n in train_names]
     optimizer = torch.optim.Adam(params, lr=lr)
     alive = torch.ones(P, dtype=torch.bool, device=device)
     diverged_step = torch.zeros(P, dtype=torch.long, device=device)
@@ -386,7 +404,7 @@ def train_batched(
         loss_alive = torch.where(alive, loss, torch.zeros_like(loss))
         loss_alive.sum().backward()
         prev = [p.detach().clone() for p in params]
-        new_alive = _clip_and_mask_grads(bmodel, grad_clip, alive & torch.isfinite(loss))
+        new_alive = _clip_and_mask_grads(bmodel, grad_clip, alive & torch.isfinite(loss), train_names)
         optimizer.step()
         with torch.no_grad():
             if conn_proj is not None:
@@ -419,14 +437,15 @@ def train_batched(
         if step_callback is not None and step in callback_steps:
             bmodel.unstack()
             step_callback(step, _histories(host, specs, has_rate, has_conn, diverged_step, conn_budget_mode,
-                                           budget_kw, reg, loss_per_trial))
+                                           budget_kw, reg, loss_per_trial, freeze))
     flush()
     bmodel.unstack()
     return _histories(host, specs, has_rate, has_conn, diverged_step, conn_budget_mode, budget_kw, reg,
-                      loss_per_trial)
+                      loss_per_trial, freeze)
 
 
-def _histories(host, specs, has_rate, has_conn, diverged_step, conn_budget_mode, budget_kw, reg, loss_per_trial):
+def _histories(host, specs, has_rate, has_conn, diverged_step, conn_budget_mode, budget_kw, reg, loss_per_trial,
+               freeze=()):
     """Per-network history dicts with the keys train_cog.train produces."""
     cat = {k: (np.concatenate(v) if v else None) for k, v in host.items()}
     n = 0 if cat["loss"] is None else len(cat["loss"])
@@ -437,6 +456,8 @@ def _histories(host, specs, has_rate, has_conn, diverged_step, conn_budget_mode,
              "eval_step": [], "frac_silent": [], "frac_saturated": [], "per_task": {},
              "reg": dict(reg), "loss_per_trial": bool(loss_per_trial), "batched": True,
              "diverged_step": int(div[p]) or None}
+        if freeze:
+            h["freeze"] = list(freeze)
         if has_rate[p] or has_conn[p]:
             b = {"rate_budget": spec.get("rate_budget"), "conn_budget": spec.get("conn_budget"),
                  "conn_budget_mode": conn_budget_mode, **budget_kw,
@@ -470,8 +491,6 @@ def train_and_evaluate_batched(args, specs, active_tasks, device, noise_level, e
     """
     from cmc.runner import make_fresh_model
 
-    if getattr(args, "freeze", ""):
-        raise ValueError("--freeze is not implemented for --batched; run without --batched")
     configs =[default_config(n_eachring=args.n_eachring, seed=int(s["seed"]), easy_task=True) for s in specs]
     models = [make_fresh_model(args, cfg, device, seed=int(s["seed"])) for s, cfg in zip(specs, configs)]
     bmodel = BatchedDaleRNN(models).to(device)
@@ -489,6 +508,7 @@ def train_and_evaluate_batched(args, specs, active_tasks, device, noise_level, e
         bmodel, train_config, active_tasks, specs,
         n_steps=args.steps, batch_size=args.batch_size, lr=args.lr, noise_level=noise_level,
         log_every=args.log_every, loss_per_trial=args.loss_per_trial,
+        freeze=getattr(args, "freeze", ""),
         callback_steps=callback_steps, step_callback=cb, **budget_kw, **reg_opts,
     )
     results = []
