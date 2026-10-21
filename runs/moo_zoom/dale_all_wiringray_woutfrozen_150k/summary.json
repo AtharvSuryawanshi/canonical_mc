@@ -1,0 +1,133 @@
+{
+  "model": "dale",
+  "task_battery": "all",
+  "active_tasks": [
+    "fdgo",
+    "reactgo",
+    "delaygo",
+    "fdanti",
+    "reactanti",
+    "delayanti",
+    "dm1",
+    "dm2",
+    "contextdm1",
+    "contextdm2",
+    "multidm",
+    "delaydm1",
+    "delaydm2",
+    "contextdelaydm1",
+    "contextdelaydm2",
+    "multidelaydm",
+    "dmsgo",
+    "dmsnogo",
+    "dmcgo",
+    "dmcnogo"
+  ],
+  "steps": 150000,
+  "seeds": [
+    0,
+    1
+  ],
+  "save_at": [
+    5000,
+    10000,
+    20000,
+    50000,
+    75000,
+    100000,
+    125000
+  ],
+  "points": {
+    "control": {
+      "rate_budget": null,
+      "conn_budget": null,
+      "n_trained": 2,
+      "n_feasible": 2
+    },
+    "W0": {
+      "rate_budget": 100.0,
+      "conn_budget": 0.033519,
+      "n_trained": 2,
+      "n_feasible": 2
+    },
+    "W1": {
+      "rate_budget": 100.0,
+      "conn_budget": 0.013408,
+      "n_trained": 2,
+      "n_feasible": 2
+    },
+    "B0": {
+      "rate_budget": 100.0,
+      "conn_budget": 0.005363,
+      "n_trained": 2,
+      "n_feasible": 2
+    },
+    "B1": {
+      "rate_budget": 100.0,
+      "conn_budget": 0.002145,
+      "n_trained": 2,
+      "n_feasible": 0
+    },
+    "B2": {
+      "rate_budget": 100.0,
+      "conn_budget": 0.000858,
+      "n_trained": 2,
+      "n_feasible": 0
+    },
+    "B3": {
+      "rate_budget": 100.0,
+      "conn_budget": 0.000343,
+      "n_trained": 2,
+      "n_feasible": 0
+    }
+  },
+  "feasible_min_task_acc": 0.6,
+  "args": {
+    "model": "dale",
+    "task_battery": "all",
+    "tasks": null,
+    "steps": 150000,
+    "batch_size": 32,
+    "n_rnn": 256,
+    "n_neurons": 256,
+    "n_eachring": 16,
+    "frac_e": 0.8,
+    "g": 1.0,
+    "sigma_rec": 0.05,
+    "noise_level": null,
+    "lr": 0.001,
+    "log_every": 2000,
+    "seed": 0,
+    "device": "cuda:1",
+    "eval_batch_size": 64,
+    "feasible_min_task_acc": 0.6,
+    "eval_seeds": null,
+    "n_seeds": 2,
+    "rate_kind": "l2",
+    "rate_inh_scale": 1.0,
+    "conn_kind": "l1",
+    "conn_target": "w_rec",
+    "conn_inh_scale": 1.0,
+    "prune_eps": 0.0,
+    "loss_per_trial": true,
+    "eval_noise_level": 0.0,
+    "eval_input_noise": false,
+    "freeze": "w_out",
+    "w_out_init": "fanin",
+    "output_dir": "runs/moo_zoom/dale_all_wiringray_woutfrozen_150k",
+    "budget_lr": 0.01,
+    "budget_kp": 0.0,
+    "budget_ramp": 0.0,
+    "conn_budget_mode": "projection",
+    "budget_rho": 1.0,
+    "budget_lambda_init": 0.01,
+    "budget_ema": 0.9,
+    "points": "control=none; W0=100,0.033519; W1=100,0.013408; B0=100,0.005363; B1=100,0.002145; B2=100,0.000858; B3=100,0.000343",
+    "overwrite": false,
+    "workers": 14,
+    "batched": false,
+    "batch_pop": 24,
+    "devices": null,
+    "save_at": "5000,10000,20000,50000,75000,100000,125000"
+  }
+}
