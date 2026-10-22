@@ -1,0 +1,330 @@
+{
+  "model": "dale",
+  "task_battery": "all",
+  "active_tasks": [
+    "fdgo",
+    "reactgo",
+    "delaygo",
+    "fdanti",
+    "reactanti",
+    "delayanti",
+    "dm1",
+    "dm2",
+    "contextdm1",
+    "contextdm2",
+    "multidm",
+    "delaydm1",
+    "delaydm2",
+    "contextdelaydm1",
+    "contextdelaydm2",
+    "multidelaydm",
+    "dmsgo",
+    "dmsnogo",
+    "dmcgo",
+    "dmcnogo"
+  ],
+  "steps": 150000,
+  "seeds": [
+    0
+  ],
+  "save_at": [
+    5000,
+    10000,
+    20000,
+    50000,
+    75000,
+    100000,
+    125000
+  ],
+  "points": {
+    "r0w0": {
+      "rate_budget": 10.6,
+      "conn_budget": 0.033519,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "r0w1": {
+      "rate_budget": 10.6,
+      "conn_budget": 0.013408,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "r0w2": {
+      "rate_budget": 10.6,
+      "conn_budget": 0.005363,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "r0w3": {
+      "rate_budget": 10.6,
+      "conn_budget": 0.002145,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r1w0": {
+      "rate_budget": 4.23,
+      "conn_budget": 0.033519,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "r1w1": {
+      "rate_budget": 4.23,
+      "conn_budget": 0.013408,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "r1w2": {
+      "rate_budget": 4.23,
+      "conn_budget": 0.005363,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "r1w3": {
+      "rate_budget": 4.23,
+      "conn_budget": 0.002145,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r2w0": {
+      "rate_budget": 1.69,
+      "conn_budget": 0.033519,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "r2w1": {
+      "rate_budget": 1.69,
+      "conn_budget": 0.013408,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "r2w2": {
+      "rate_budget": 1.69,
+      "conn_budget": 0.005363,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "r2w3": {
+      "rate_budget": 1.69,
+      "conn_budget": 0.002145,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r3w0": {
+      "rate_budget": 0.676,
+      "conn_budget": 0.033519,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "r3w1": {
+      "rate_budget": 0.676,
+      "conn_budget": 0.013408,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "r3w2": {
+      "rate_budget": 0.676,
+      "conn_budget": 0.005363,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r3w3": {
+      "rate_budget": 0.676,
+      "conn_budget": 0.002145,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r4w0": {
+      "rate_budget": 0.27,
+      "conn_budget": 0.033519,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "r4w1": {
+      "rate_budget": 0.27,
+      "conn_budget": 0.013408,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "r4w2": {
+      "rate_budget": 0.27,
+      "conn_budget": 0.005363,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r4w3": {
+      "rate_budget": 0.27,
+      "conn_budget": 0.002145,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r5w0": {
+      "rate_budget": 0.108,
+      "conn_budget": 0.033519,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "r5w1": {
+      "rate_budget": 0.108,
+      "conn_budget": 0.013408,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "r5w2": {
+      "rate_budget": 0.108,
+      "conn_budget": 0.005363,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r5w3": {
+      "rate_budget": 0.108,
+      "conn_budget": 0.002145,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r6w0": {
+      "rate_budget": 0.0433,
+      "conn_budget": 0.033519,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "r6w1": {
+      "rate_budget": 0.0433,
+      "conn_budget": 0.013408,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r6w2": {
+      "rate_budget": 0.0433,
+      "conn_budget": 0.005363,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r6w3": {
+      "rate_budget": 0.0433,
+      "conn_budget": 0.002145,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r7w0": {
+      "rate_budget": 0.0173,
+      "conn_budget": 0.033519,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "r7w1": {
+      "rate_budget": 0.0173,
+      "conn_budget": 0.013408,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r7w2": {
+      "rate_budget": 0.0173,
+      "conn_budget": 0.005363,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r7w3": {
+      "rate_budget": 0.0173,
+      "conn_budget": 0.002145,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r8w0": {
+      "rate_budget": 0.00692,
+      "conn_budget": 0.033519,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r8w1": {
+      "rate_budget": 0.00692,
+      "conn_budget": 0.013408,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r8w2": {
+      "rate_budget": 0.00692,
+      "conn_budget": 0.005363,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r8w3": {
+      "rate_budget": 0.00692,
+      "conn_budget": 0.002145,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r9w0": {
+      "rate_budget": 0.00277,
+      "conn_budget": 0.033519,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r9w1": {
+      "rate_budget": 0.00277,
+      "conn_budget": 0.013408,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r9w2": {
+      "rate_budget": 0.00277,
+      "conn_budget": 0.005363,
+      "n_trained": 1,
+      "n_feasible": 0
+    },
+    "r9w3": {
+      "rate_budget": 0.00277,
+      "conn_budget": 0.002145,
+      "n_trained": 1,
+      "n_feasible": 0
+    }
+  },
+  "feasible_min_task_acc": 0.6,
+  "args": {
+    "model": "dale",
+    "task_battery": "all",
+    "tasks": null,
+    "steps": 150000,
+    "batch_size": 32,
+    "n_rnn": 256,
+    "n_neurons": 256,
+    "n_eachring": 16,
+    "frac_e": 0.8,
+    "g": 1.0,
+    "sigma_rec": 0.05,
+    "noise_level": null,
+    "lr": 0.001,
+    "log_every": 2000,
+    "seed": 0,
+    "device": "cuda:1",
+    "eval_batch_size": 64,
+    "feasible_min_task_acc": 0.6,
+    "eval_seeds": null,
+    "n_seeds": 1,
+    "rate_kind": "l2",
+    "rate_inh_scale": 1.0,
+    "conn_kind": "l1",
+    "conn_target": "w_rec",
+    "conn_inh_scale": 1.0,
+    "prune_eps": 0.0,
+    "loss_per_trial": true,
+    "eval_noise_level": 0.0,
+    "eval_input_noise": false,
+    "freeze": "w_out",
+    "w_out_init": "fanin",
+    "output_dir": "runs/moo_zoom/dale_all_grid10x4_woutfrozen_150k",
+    "budget_lr": 0.01,
+    "budget_kp": 0.0,
+    "budget_ramp": 0.0,
+    "conn_budget_mode": "projection",
+    "budget_rho": 1.0,
+    "budget_lambda_init": 0.01,
+    "budget_ema": 0.9,
+    "points": "r0w0=10.6,0.033519; r0w1=10.6,0.013408; r0w2=10.6,0.005363; r0w3=10.6,0.002145; r1w0=4.23,0.033519; r1w1=4.23,0.013408; r1w2=4.23,0.005363; r1w3=4.23,0.002145; r2w0=1.69,0.033519; r2w1=1.69,0.013408; r2w2=1.69,0.005363; r2w3=1.69,0.002145; r3w0=0.676,0.033519; r3w1=0.676,0.013408; r3w2=0.676,0.005363; r3w3=0.676,0.002145; r4w0=0.27,0.033519; r4w1=0.27,0.013408; r4w2=0.27,0.005363; r4w3=0.27,0.002145; r5w0=0.108,0.033519; r5w1=0.108,0.013408; r5w2=0.108,0.005363; r5w3=0.108,0.002145; r6w0=0.0433,0.033519; r6w1=0.0433,0.013408; r6w2=0.0433,0.005363; r6w3=0.0433,0.002145; r7w0=0.0173,0.033519; r7w1=0.0173,0.013408; r7w2=0.0173,0.005363; r7w3=0.0173,0.002145; r8w0=0.00692,0.033519; r8w1=0.00692,0.013408; r8w2=0.00692,0.005363; r8w3=0.00692,0.002145; r9w0=0.00277,0.033519; r9w1=0.00277,0.013408; r9w2=0.00277,0.005363; r9w3=0.00277,0.002145",
+    "overwrite": false,
+    "workers": 1,
+    "batched": true,
+    "batch_pop": 40,
+    "devices": null,
+    "save_at": "5000,10000,20000,50000,75000,100000,125000"
+  }
+}
