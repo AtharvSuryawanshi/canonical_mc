@@ -25,7 +25,7 @@
   ],
   "steps": 150000,
   "seeds": [
-    0
+    1
   ],
   "save_at": [
     5000,
@@ -191,7 +191,7 @@
       "rate_budget": 0.0433,
       "conn_budget": 0.013408,
       "n_trained": 1,
-      "n_feasible": 0
+      "n_feasible": 1
     },
     "r6w2": {
       "rate_budget": 0.0433,
@@ -294,7 +294,7 @@
     "noise_level": null,
     "lr": 0.001,
     "log_every": 2000,
-    "seed": 0,
+    "seed": 1,
     "device": "cuda:1",
     "eval_batch_size": 64,
     "feasible_min_task_acc": 0.6,
