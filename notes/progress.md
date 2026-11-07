@@ -38,9 +38,19 @@ notes/idea.md (the spec; self-contained, written for the report).
   5. feasible: rate_limited 3.388 (n=3) < control 4.920 (n=12) — weak by the pre-run rule; all-12:
      3.359 vs 4.920 (confounded, reported only).
   6. B0 is not below control: B0 max 5.485, and every B0 seed (min 4.764) is >= control min 4.515.
+- `figure` rule -> `results/selectivity/breadth.png` (E breadth per seed: 150k at thr 0.3/0.5/0.7, 50k
+  at 0.5; breadth vs min_task_acc for both sets; palette checked with the dataviz validator).
+  Evidence: re-plotted from networks.csv and read back the dots, all 6 panels: one dot per network
+  (20/20/20/48/20/48), max |diff| 0; hollow dots 19 = infeasible networks 19.
+- Rerun from scratch — evidence: full build, sha256 of all 212 outputs, `rm -r results/selectivity`,
+  `pixi run pipeline` (213 steps, 3 min 24 s), sha256 again: all 212 identical (211 CSVs + the PNG).
+- `pixi run dag` -> `reports/dag.svg` — evidence: 213 job nodes; rule graph is unit_table -> summary
+  -> {verdicts, figure} -> all. The job-level SVG is wide (320 kB, 204 unit_table jobs).
 
 ## Next — one at a time
-- [ ] `figure` rule -> `breadth.png`; then rerun-from-scratch sha256 check; then `pixi run dag`.
+- [ ] Note the 50k wiring_limited result (Open questions) next to rule 6 in the write-up, so the
+      claim is stated for the 150k budgets.
+- [ ] Update PRESENTATION.md slide 22 with the verdict (see Internal cross-checks).
 
 ## Internal cross-checks (project context, not for the report)
 - An earlier notebook computed the same metric: `notebooks/ei_modularity_150k.ipynb` ->
@@ -51,5 +61,10 @@ notes/idea.md (the spec; self-contained, written for the report).
   this result; update it once the verdict is in.
 
 ## Open questions
+- **50k set, wiring_limited is as narrow as rate_limited** (thr 0.5, feasible: wiring_limited 3.339,
+  n=10, max 3.733; rate_limited 3.388, n=3; control 4.920, min 4.309). Rule 6 is decided on the 150k
+  set only (B0 at or above the lowest control seed), so the verdict stands, but in the 50k set a wiring
+  budget also narrows E units. Its budgets differ (wiring 0.0020 vs B0's 0.0054, rate 0.023 vs B0's
+  loose 10) and training is shorter, so this does not separate rate from wiring.
 - `pixi` is not on PATH in this shell; it is at `~/.pixi/bin/pixi`.
 - Rate cost is L2: why would it produce specialization? (mechanism, out of scope for this slice)

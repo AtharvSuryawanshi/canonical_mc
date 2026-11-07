@@ -31,6 +31,7 @@ rule all:
     input:
         expand(f"{OUT}/{{set}}/thr{{thr}}/networks.csv", set=SETS, thr=THRESHOLDS),
         f"{OUT}/wrong_if.csv",
+        f"{OUT}/breadth.png",
 
 
 rule unit_table:
@@ -65,3 +66,16 @@ rule verdicts:
         from cmc.selectivity import wrong_if
         nets = {(f.split("/")[-3], f.split("/")[-2].removeprefix("thr")): pd.read_csv(f) for f in input}
         wrong_if(nets).to_csv(output[0], index=False)
+
+
+rule figure:
+    input:
+        expand(f"{OUT}/150k/thr{{thr}}/networks.csv", thr=THRESHOLDS),
+        f"{OUT}/50k/thr0.5/networks.csv",
+    output:
+        f"{OUT}/breadth.png",
+    run:
+        import pandas as pd
+        from cmc.selectivity import plot_breadth
+        nets = {(f.split("/")[-3], f.split("/")[-2].removeprefix("thr")): pd.read_csv(f) for f in input}
+        plot_breadth(nets, {s: SETS[s]["points"] for s in SETS}, output[0])

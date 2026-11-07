@@ -142,3 +142,80 @@ def wrong_if(nets):
         f"B0 max {b0.max():.3f} vs control min {ctl.min():.3f}")
 
     return pd.DataFrame(rows)
+
+
+# ---- Figure ---------------------------------------------------------------------------------------
+# One colour per budget role, same in both sets; control is a dark neutral (it is the baseline).
+# Palette validated with the dataviz validator (all-pairs, light surface).
+ROLE_COLOR = {"control": "#3a3936", "rate": "#eb6834", "wiring": "#2a78d6", "both": "#1baf7a"}
+ROLE = {"control": "control", "A3": "rate", "B0": "wiring", "C0": "both",
+        "rate_limited": "rate", "wiring_limited": "wiring", "knee": "both"}
+LABEL = {"control": "control", "A3": "A3\nrate", "B0": "B0\nwiring", "C0": "C0\nboth",
+         "rate_limited": "rate-\nlimited", "wiring_limited": "wiring-\nlimited", "knee": "knee\nboth"}
+
+
+def plot_breadth(nets, points, out=None, feasible_min=0.6):
+    """nets: {(set, thr): networks.csv frame}; points: {set: [point order]}. Writes a PNG to out,
+    or returns the figure if out is None (used to check the plotted values)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    ink, muted, grid = "#0b0b0b", "#52514e", "#e4e3df"
+    plt.rcParams.update({"font.size": 8, "axes.edgecolor": muted, "axes.labelcolor": ink,
+                         "xtick.color": muted, "ytick.color": muted, "axes.spines.top": False,
+                         "axes.spines.right": False})
+    strips = [("150k", "0.3"), ("150k", "0.5"), ("150k", "0.7"), ("50k", "0.5")]
+    fig = plt.figure(figsize=(11, 6.6), facecolor="#fcfcfb")
+    gs = fig.add_gridspec(2, 4, height_ratios=[1, 1], hspace=0.55, wspace=0.32)
+    def dot(ax, x, y, color, filled):
+        ax.scatter(x, y, s=26, zorder=3, linewidths=1.2, edgecolors=color,
+                   facecolors=color if filled else "#fcfcfb")
+
+    for i, (s, thr) in enumerate(strips):
+        ax = fig.add_subplot(gs[0, i], facecolor="#fcfcfb")
+        df = nets[s, thr]
+        ctl_min = df[df["point"] == "control"]["E_breadth"].min()
+        ax.axhline(ctl_min, color=muted, lw=0.8, ls=(0, (3, 3)), zorder=1)
+        for j, p in enumerate(points[s]):
+            d = df[df["point"] == p].sort_values("seed")
+            c = ROLE_COLOR[ROLE[p]]
+            xs = j + np.linspace(-0.18, 0.18, len(d))
+            for x, r in zip(xs, d.itertuples()):
+                dot(ax, x, r.E_breadth, c, r.is_feasible)
+            ax.hlines(d["E_breadth"].mean(), j - 0.28, j + 0.28, color=c, lw=2, zorder=2)
+        ax.set_xticks(range(len(points[s])), [LABEL[p] for p in points[s]])
+        ax.set_xlim(-0.6, len(points[s]) - 0.4)
+        ax.grid(axis="y", color=grid, lw=0.6); ax.set_axisbelow(True)
+        ax.set_title(f"{s} set, threshold {thr}", fontsize=9, color=ink, loc="left")
+        if i == 0:
+            ax.set_ylabel("E breadth (tasks per active E unit)")
+        ax.text(len(points[s]) - 0.45, ctl_min, "lowest control seed", fontsize=6.5, color=muted,
+                ha="right", va="bottom")
+
+    for k, s in enumerate(("150k", "50k")):
+        ax = fig.add_subplot(gs[1, 2 * k:2 * k + 2], facecolor="#fcfcfb")
+        df = nets[s, "0.5"]
+        for p in points[s]:
+            d = df[df["point"] == p]
+            c = ROLE_COLOR[ROLE[p]]
+            for r in d.itertuples():
+                dot(ax, r.min_task_acc, r.E_breadth, c, r.is_feasible)
+            ax.scatter([], [], s=26, color=c, label=LABEL[p].replace("-\n", "-").replace("\n", " "))
+        if s == "50k":
+            ax.axvline(feasible_min, color=muted, lw=0.8, ls=(0, (3, 3)))
+            ax.text(feasible_min, ax.get_ylim()[1], " feasibility 0.6", fontsize=6.5, color=muted, va="top")
+        ax.grid(color=grid, lw=0.6); ax.set_axisbelow(True)
+        ax.set_xlabel("min task accuracy (worst of 20 tasks)")
+        if k == 0:
+            ax.set_ylabel("E breadth, threshold 0.5")
+        ax.set_title(f"{s} set: breadth vs accuracy, one dot per network", fontsize=9, color=ink, loc="left")
+        ax.legend(frameon=False, fontsize=7, loc="best")
+
+    fig.suptitle("Task breadth of excitatory units by cost budget. Dot = one network (150k: 5 seeds per "
+                 "condition, 50k: 12); bar = condition mean; hollow = infeasible (min task acc < 0.6)",
+                 fontsize=9, color=ink, x=0.06, ha="left")
+    if out is None:
+        return fig
+    fig.savefig(out, dpi=200, bbox_inches="tight", metadata={"Software": None})
+    plt.close(fig)
