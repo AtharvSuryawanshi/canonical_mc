@@ -7,6 +7,14 @@ RNNs on the Yang et al. (2019) cognitive task battery, penalize rate and
 wiring cost, and look at the resulting Pareto front (task accuracy vs.
 metabolic cost vs. wiring cost).
 
+## Each session (branch `agent-course`: selectivity analysis)
+- Start: read notes/progress.md and `git log --oneline -10`. The spec is notes/idea.md; never edit
+  its "Wrong if" section.
+- Analysis env is pixi (`pixi run test | dry | pipeline | report`); training stays on conda.
+- One step from "Next" at a time; run its check; show the output as evidence.
+- End: update notes/progress.md (Done with evidence, Next, Open questions), show the diff, wait
+  for OK, commit.
+
 ## Layout
 
 ```
