@@ -104,4 +104,56 @@ carry fewer tasks*. If any fails, the report says which one, and the claim is na
 - Chklovskii, Schikorski & Stevens (2002). Wiring optimization in cortical circuits. *Neuron.*
 
 ## Plan
-<!-- filled after the spec is agreed (plan mode), before building -->
+Agreed 2026-11-07, before any pipeline run.
+
+### Pre-run clarifications (2026-11-07, before any results; "Wrong if" above is unchanged)
+- **Rule 5** is decided on feasible networks only (min_task_acc >= 0.6). The all-12 result is
+  reported too, labelled "confounded by infeasibility". Only 3/12 rate_limited networks are
+  feasible (control 12/12, wiring_limited 10/12), so the replication is called **weak** whichever
+  way it comes out.
+- **Rule 2** uses rule 1's seed separation, not means: it fails if, at threshold 0.3 *or* at 0.7,
+  any A3 seed >= the lowest control seed.
+
+### Files
+- `cmc/selectivity.py` (pure numpy on the stored `task_variance`, no model construction):
+  `active_units` (total TV > 1% of the network max, over all units), `normalized` (each unit / its
+  own max over tasks), `breadth` (number of tasks with normalized TV strictly > thr),
+  `unit_table(ckpt, thr)` (per unit: pop E/I from `sign_vector`, active, total TV, breadth),
+  `network_summary` (mean breadth and active count, E and I).
+- `tests/test_selectivity.py`: ground truth.
+- `Snakefile` (repo root), outputs in `results/selectivity/`.
+
+### Pipeline
+- Config: sets `150k` (`dale_all_woutfree_fanin_4pt_5seed_150k`: control, A3, B0, C0) and `50k`
+  (`dale_all_4pt_12seed_50k`: control, rate_limited, wiring_limited, knee); final checkpoints only
+  (`{point}/seed_*.pt`; the `step_025000/` ones are excluded); thresholds 0.3 / 0.5 / 0.7.
+- `unit_table`: checkpoint -> `{set}/thr{thr}/units/{point}/seed_{seed}.csv` (threshold is a wildcard).
+- `summary`: -> `{set}/thr{thr}/networks.csv`, one row per network (point, seed, E/I breadth, E/I
+  active count, min_task_acc, is_feasible).
+- `verdicts`: all summaries -> `wrong_if.csv`, one row per rule with the numbers used and pass/fail.
+- `figure`: -> `breadth.png`, E breadth per seed by condition, panel per threshold and set, plus
+  breadth vs min_task_acc.
+
+### Steps, each with one check
+1. `selectivity.py` + tests. Check: `pixi run test` passes; synthetic units of breadth 1/5/20 are
+   recovered, scaling a unit leaves its breadth unchanged, a unit < 1% of max is inactive, a value
+   exactly at thr is not counted, E/I follows `sign_vector`.
+2. `unit_table`, smallest first run: one checkpoint (150k control seed 0, thr 0.5), seconds.
+   Check: `pixi run dry` lists 20 jobs for the 150k set; its E breadth = 4.691
+   (`notebooks/ei_modularity_150k_summary.csv`).
+3. `summary`. Check: all 20 E and I breadths match the notebook CSV to 3 decimals; a mismatch is
+   resolved before going on.
+4. `verdicts`. Check, per rule:
+   1. thr 0.5: fail if any A3 seed >= lowest control seed.
+   2. thr 0.3 and 0.7: same separation as rule 1; fail if it breaks at either.
+   3. A3 seeds with min_task_acc >= lowest control min_task_acc: fail if any has breadth inside the
+      control range; Spearman(breadth, min_task_acc) over all 20 reported.
+   4. fail if mean active E count of A3 < 0.5 x control's.
+   5. 50k, thr 0.5, feasible only: fail if mean rate_limited is not below mean control (all-12
+      reported, labelled confounded; verdict labelled weak).
+   6. thr 0.5: fail if every B0 seed < lowest control seed.
+5. `figure`. Check: open the PNG; dots equal the values in `networks.csv`.
+6. Reproducibility. Check: `rm -r results/selectivity`, `pixi run pipeline`, sha256 of every CSV
+   identical to the first run.
+7. `pixi run dag` -> `reports/dag.svg`. Check: the SVG exists and shows
+   unit_table -> summary -> verdicts / figure.

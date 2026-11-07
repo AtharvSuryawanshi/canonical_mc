@@ -8,14 +8,24 @@ notes/idea.md (the spec; self-contained, written for the report).
 - Locked analysis env: pixi.toml + pixi.lock (CPU torch, snakemake, quarto, graphviz) — evidence:
   `pixi run test` 3 passed; a 150k checkpoint loads with `task_variance` (20, 256).
 - Spec: notes/idea.md, with "Wrong if" fixed before any pipeline run.
+- Plan: "## Plan" in notes/idea.md (2026-11-07), with two pre-run clarifications (rule 5 on feasible
+  networks only; rule 2 by seed separation at 0.3 or 0.7).
+- Found while planning: in the 50k replication set only 3/12 rate_limited networks are feasible
+  (min_task_acc >= 0.6; control 12/12, wiring_limited 10/12, knee 4/12, from summary.json). So rule 5
+  rests on 3 networks: weak either way. Also: that set has 96 .pt files, 48 of them `step_025000/`
+  snapshots; the pipeline uses the 48 final ones only.
+- `cmc/selectivity.py` + `tests/test_selectivity.py` — evidence: `pixi run test` 8 passed (5 new:
+  known breadth 1/5/20/3/12 recovered, scale-invariant, strict threshold, inactive excluded, E/I by
+  sign).
+- Snakefile, first rule `unit_table` (threshold as wildcard) — evidence: `pixi run dry` lists 20 jobs
+  per threshold for 150k, 48 for 50k (204 total); one checkpoint (150k control seed 0, thr 0.5) in
+  4 s gives E breadth 4.691, I 4.635 = notebook CSV.
 
 ## Next — one at a time
-- [ ] Plan (plan mode) -> fill "## Plan" in notes/idea.md — done when: the plan names rules, files
-      and one check per step.
-- [ ] `cmc/selectivity.py` + ground-truth test — done when: `pixi run test` passes, including a
-      synthetic case with known breadth.
-- [ ] First rule: one checkpoint -> per-unit table — done when: `pixi run dry` lists 20 jobs for the
-      150k set.
+- [ ] `summary` rule -> `{set}/thr{thr}/networks.csv` — done when: all 20 150k E and I breadths match
+      `notebooks/ei_modularity_150k_summary.csv` to 3 decimals.
+- [ ] `verdicts` rule -> `wrong_if.csv` (rules 1-6 as in "## Plan").
+- [ ] `figure` rule -> `breadth.png`; then rerun-from-scratch sha256 check; then `pixi run dag`.
 
 ## Internal cross-checks (project context, not for the report)
 - An earlier notebook computed the same metric: `notebooks/ei_modularity_150k.ipynb` ->
@@ -26,4 +36,5 @@ notes/idea.md (the spec; self-contained, written for the report).
   this result; update it once the verdict is in.
 
 ## Open questions
+- `pixi` is not on PATH in this shell; it is at `~/.pixi/bin/pixi`.
 - Rate cost is L2: why would it produce specialization? (mechanism, out of scope for this slice)
