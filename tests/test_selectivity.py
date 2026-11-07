@@ -6,7 +6,7 @@
 import numpy as np
 import pandas as pd
 
-from cmc.selectivity import active_units, breadth, network_summary, unit_frame
+from cmc.selectivity import active_units, breadth, network_summary, unit_frame, wrong_if
 
 N_TASKS = 20
 
@@ -64,3 +64,27 @@ def test_e_i_split_follows_sign():
     row = network_summary(pd.DataFrame(units))
     assert row["E_breadth"] == 6.0 and row["I_breadth"] == 5.0
     assert row["E_active"] == 2 and row["I_active"] == 2
+
+
+def _nets(e150, e50, acc=0.9, active=200, feasible=True):
+    """Fake networks.csv frames: e150 / e50 = {point: [E breadth per seed]}, same at every thr."""
+    def frame(d):
+        return pd.DataFrame([dict(point=p, seed=i, E_breadth=b, min_task_acc=acc, E_active=active,
+                                  is_feasible=feasible) for p, bs in d.items() for i, b in enumerate(bs)])
+    return {**{("150k", t): frame(e150) for t in ("0.3", "0.5", "0.7")}, ("50k", "0.5"): frame(e50)}
+
+
+def test_wrong_if_boundaries():
+    # A3 max == control min: a tie counts against the claim (">="), rule 1 and 2 fail.
+    # B0 max just below control min: rule 6 fails. A3 at control accuracy and breadth 4.0 = control
+    # min: inside the (closed) control range, rule 3 fails.
+    v = wrong_if(_nets({"control": [4.0, 5.0], "A3": [3.0, 4.0], "B0": [3.9, 3.8]},
+                       {"control": [4.0], "rate_limited": [4.0]})).set_index("rule")["verdict"]
+    assert v[1] == "fail" and v[2] == "fail" and v[3] == "fail" and v[6] == "fail"
+    assert v[4] == "pass" and v[5] == "fail"                     # equal means: not below
+
+
+def test_wrong_if_all_pass():
+    v = wrong_if(_nets({"control": [4.5, 5.0], "A3": [2.5, 3.0], "B0": [4.6, 5.1]},
+                       {"control": [4.5], "rate_limited": [3.0]})).set_index("rule")["verdict"]
+    assert (v[[1, 2, 3, 4, 5, 6]] == "pass").all()

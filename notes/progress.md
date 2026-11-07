@@ -26,9 +26,20 @@ notes/idea.md (the spec; self-contained, written for the report).
 - `summary` rule -> `{set}/thr{thr}/networks.csv` — evidence: 150k thr 0.5 built in 33 s (20 unit
   tables, -c4); all 20 networks match `notebooks/ei_modularity_150k_summary.csv`: max |diff| 0.000
   for E breadth, I breadth and min_task_acc (rounded to 3 decimals, merged 1:1 on point/seed).
+- `verdicts` rule -> `results/selectivity/wrong_if.csv` (`cmc.selectivity.wrong_if`; operators checked
+  against "## Plan" step 4; 2 boundary tests: ties count against the claim, control range closed).
+  Evidence: tests/test_selectivity.py 7 passed; full build 2 min (-c4). All rules
+  PASS:
+  1. A3 max 3.288 < control min 4.515.
+  2. thr 0.3: A3 max 5.116 < control min 8.260; thr 0.7: 2.091 < 2.632 (narrowest margin).
+  3. one A3 seed (3, acc 0.963) is above control's lowest acc 0.939; breadth 2.918, outside control
+     [4.515, 4.798]. Rests on that one seed. Spearman(breadth, acc) over 20: rho 0.37, p 0.11.
+  4. A3 mean active E 195.0 vs half of control 101.9.
+  5. feasible: rate_limited 3.388 (n=3) < control 4.920 (n=12) — weak by the pre-run rule; all-12:
+     3.359 vs 4.920 (confounded, reported only).
+  6. B0 is not below control: B0 max 5.485, and every B0 seed (min 4.764) is >= control min 4.515.
 
 ## Next — one at a time
-- [ ] `verdicts` rule -> `wrong_if.csv` (rules 1-6 as in "## Plan").
 - [ ] `figure` rule -> `breadth.png`; then rerun-from-scratch sha256 check; then `pixi run dag`.
 
 ## Internal cross-checks (project context, not for the report)

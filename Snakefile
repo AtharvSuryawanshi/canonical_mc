@@ -30,6 +30,7 @@ wildcard_constraints:
 rule all:
     input:
         expand(f"{OUT}/{{set}}/thr{{thr}}/networks.csv", set=SETS, thr=THRESHOLDS),
+        f"{OUT}/wrong_if.csv",
 
 
 rule unit_table:
@@ -51,3 +52,16 @@ rule summary:
         import pandas as pd
         from cmc.selectivity import network_summary
         pd.DataFrame([network_summary(pd.read_csv(f)) for f in input]).to_csv(output[0], index=False)
+
+
+rule verdicts:
+    input:
+        expand(f"{OUT}/{{set}}/thr{{thr}}/networks.csv", set=["150k"], thr=THRESHOLDS),
+        f"{OUT}/50k/thr0.5/networks.csv",
+    output:
+        f"{OUT}/wrong_if.csv",
+    run:
+        import pandas as pd
+        from cmc.selectivity import wrong_if
+        nets = {(f.split("/")[-3], f.split("/")[-2].removeprefix("thr")): pd.read_csv(f) for f in input}
+        wrong_if(nets).to_csv(output[0], index=False)

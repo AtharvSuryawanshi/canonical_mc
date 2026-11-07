@@ -73,3 +73,72 @@ def network_summary(units):
         row[f"{pop}_breadth"] = act["breadth"].mean()
         row[f"{pop}_active"] = len(act)
     return row
+
+
+# ---- "Wrong if" verdicts (notes/idea.md, "## Plan" step 4) --------------------------------------
+# verdict "fail" = the Wrong-if condition holds (the claim is wrong on that rule), "pass" = it does not.
+
+def _b(nets, point, col="E_breadth"):
+    return nets[nets["point"] == point][col]
+
+
+def wrong_if(nets):
+    """nets: {(set, thr): networks.csv frame}, thr as a string ("0.5"). One row per rule."""
+    from scipy.stats import spearmanr
+
+    n5 = nets["150k", "0.5"]
+    rows = []
+
+    def add(rule, name, set_, thr, fail, numbers, note=""):
+        verdict = "untestable" if fail is None else ("fail" if fail else "pass")
+        rows.append(dict(rule=rule, name=name, set=set_, thr=thr, verdict=verdict,
+                         numbers=numbers, note=note))
+
+    # 1. No rate effect: fail if any A3 seed >= the lowest control seed (thr 0.5).
+    a3, ctl = _b(n5, "A3"), _b(n5, "control")
+    add(1, "no rate effect", "150k", "0.5", bool(a3.max() >= ctl.min()),
+        f"A3 max {a3.max():.3f} vs control min {ctl.min():.3f}")
+
+    # 2. Threshold artefact: rule 1's separation breaks at 0.3 OR at 0.7.
+    parts, fail2 = [], False
+    for thr in ("0.3", "0.7"):
+        a3t, ctlt = _b(nets["150k", thr], "A3"), _b(nets["150k", thr], "control")
+        fail2 |= bool(a3t.max() >= ctlt.min())
+        parts.append(f"thr {thr}: A3 max {a3t.max():.3f} vs control min {ctlt.min():.3f}")
+    add(2, "threshold artefact", "150k", "0.3,0.7", fail2, "; ".join(parts))
+
+    # 3. Accuracy, not budget: A3 seeds as accurate as the least accurate control seed must sit
+    #    outside (below) the control breadth range.
+    acc_floor = _b(n5, "control", "min_task_acc").min()
+    top = n5[(n5["point"] == "A3") & (n5["min_task_acc"] >= acc_floor)]
+    inside = (top["E_breadth"] >= ctl.min()) & (top["E_breadth"] <= ctl.max())
+    rho, p = spearmanr(n5["E_breadth"], n5["min_task_acc"])
+    add(3, "accuracy, not budget", "150k", "0.5", None if top.empty else bool(inside.any()),
+        f"control acc min {acc_floor:.3f}; A3 seeds at/above it: "
+        + (", ".join(f"seed {int(r.seed)} acc {r.min_task_acc:.3f} breadth {r.E_breadth:.3f}"
+                     for r in top.itertuples()) or "none")
+        + f"; control range [{ctl.min():.3f}, {ctl.max():.3f}]",
+        f"Spearman(E breadth, min_task_acc), all 20: rho {rho:.3f}, p {p:.3g}")
+
+    # 4. Population artefact: A3 mean active E count below half of control's.
+    a3n, ctln = _b(n5, "A3", "E_active").mean(), _b(n5, "control", "E_active").mean()
+    add(4, "population artefact", "150k", "0.5", bool(a3n < 0.5 * ctln),
+        f"A3 mean active E {a3n:.1f} vs 0.5 x control {0.5 * ctln:.1f}")
+
+    # 5. Does not replicate: 50k, rate_limited mean not below control mean. Decided on feasible
+    #    networks; all-12 reported as confounded. Weak either way (3/12 rate_limited feasible).
+    n50 = nets["50k", "0.5"]
+    for label, df in (("feasible only", n50[n50["is_feasible"]]), ("all 12, confounded by infeasibility", n50)):
+        rl, c = _b(df, "rate_limited"), _b(df, "control")
+        fail = None if rl.empty or c.empty else bool(rl.mean() >= c.mean())
+        add(5 if label == "feasible only" else "5 (all)", "does not replicate", "50k", "0.5", fail,
+            f"{label}: rate_limited mean {rl.mean():.3f} (n={len(rl)}) vs control mean {c.mean():.3f} (n={len(c)})",
+            f"decides rule 5; weak ({len(rl)}/{len(_b(n50, 'rate_limited'))} rate_limited feasible)"
+            if label == "feasible only" else "reported only, not decisive")
+
+    # 6. Wiring does specialize: every B0 seed below the lowest control seed.
+    b0 = _b(n5, "B0")
+    add(6, "wiring does specialize", "150k", "0.5", bool(b0.max() < ctl.min()),
+        f"B0 max {b0.max():.3f} vs control min {ctl.min():.3f}")
+
+    return pd.DataFrame(rows)

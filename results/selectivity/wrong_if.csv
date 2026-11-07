@@ -1,0 +1,8 @@
+rule,name,set,thr,verdict,numbers,note
+1,no rate effect,150k,0.5,pass,A3 max 3.288 vs control min 4.515,
+2,threshold artefact,150k,"0.3,0.7",pass,thr 0.3: A3 max 5.116 vs control min 8.260; thr 0.7: A3 max 2.091 vs control min 2.632,
+3,"accuracy, not budget",150k,0.5,pass,"control acc min 0.939; A3 seeds at/above it: seed 3 acc 0.963 breadth 2.918; control range [4.515, 4.798]","Spearman(E breadth, min_task_acc), all 20: rho 0.369, p 0.109"
+4,population artefact,150k,0.5,pass,A3 mean active E 195.0 vs 0.5 x control 101.9,
+5,does not replicate,50k,0.5,pass,feasible only: rate_limited mean 3.388 (n=3) vs control mean 4.920 (n=12),decides rule 5; weak (3/12 rate_limited feasible)
+5 (all),does not replicate,50k,0.5,pass,"all 12, confounded by infeasibility: rate_limited mean 3.359 (n=12) vs control mean 4.920 (n=12)","reported only, not decisive"
+6,wiring does specialize,150k,0.5,pass,B0 max 5.485 vs control min 4.515,
