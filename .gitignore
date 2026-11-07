@@ -229,3 +229,6 @@ __marimo__/
 
 # snakemake bookkeeping
 .snakemake/
+
+# selectivity per-unit tables are regenerated; networks.csv, wrong_if.csv and the figure are committed
+results/selectivity/*/thr*/units/

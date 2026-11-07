@@ -20,10 +20,14 @@ notes/idea.md (the spec; self-contained, written for the report).
 - Snakefile, first rule `unit_table` (threshold as wildcard) — evidence: `pixi run dry` lists 20 jobs
   per threshold for 150k, 48 for 50k (204 total); one checkpoint (150k control seed 0, thr 0.5) in
   4 s gives E breadth 4.691, I 4.635 = notebook CSV.
+- Per-unit tables are no longer tracked (`results/selectivity/*/thr*/units/` in .gitignore); the
+  committed outputs will be networks.csv, wrong_if.csv and the figure. "## Plan" steps 2-3 now refer
+  to "an independent earlier implementation" (the notebook below) instead of naming it.
+- `summary` rule -> `{set}/thr{thr}/networks.csv` — evidence: 150k thr 0.5 built in 33 s (20 unit
+  tables, -c4); all 20 networks match `notebooks/ei_modularity_150k_summary.csv`: max |diff| 0.000
+  for E breadth, I breadth and min_task_acc (rounded to 3 decimals, merged 1:1 on point/seed).
 
 ## Next — one at a time
-- [ ] `summary` rule -> `{set}/thr{thr}/networks.csv` — done when: all 20 150k E and I breadths match
-      `notebooks/ei_modularity_150k_summary.csv` to 3 decimals.
 - [ ] `verdicts` rule -> `wrong_if.csv` (rules 1-6 as in "## Plan").
 - [ ] `figure` rule -> `breadth.png`; then rerun-from-scratch sha256 check; then `pixi run dag`.
 

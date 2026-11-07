@@ -139,10 +139,10 @@ Agreed 2026-11-07, before any pipeline run.
    recovered, scaling a unit leaves its breadth unchanged, a unit < 1% of max is inactive, a value
    exactly at thr is not counted, E/I follows `sign_vector`.
 2. `unit_table`, smallest first run: one checkpoint (150k control seed 0, thr 0.5), seconds.
-   Check: `pixi run dry` lists 20 jobs for the 150k set; its E breadth = 4.691
-   (`notebooks/ei_modularity_150k_summary.csv`).
-3. `summary`. Check: all 20 E and I breadths match the notebook CSV to 3 decimals; a mismatch is
-   resolved before going on.
+   Check: `pixi run dry` lists 20 jobs for the 150k set; its E breadth matches an independent
+   earlier implementation (see notes/progress.md).
+3. `summary`. Check: all 20 E and I breadths match an independent earlier implementation (see
+   notes/progress.md) to 3 decimals; a mismatch is resolved before going on.
 4. `verdicts`. Check, per rule:
    1. thr 0.5: fail if any A3 seed >= lowest control seed.
    2. thr 0.3 and 0.7: same separation as rule 1; fail if it breaks at either.

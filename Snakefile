@@ -29,7 +29,7 @@ wildcard_constraints:
 
 rule all:
     input:
-        [t for s in SETS for thr in THRESHOLDS for t in unit_tables(s, thr)],
+        expand(f"{OUT}/{{set}}/thr{{thr}}/networks.csv", set=SETS, thr=THRESHOLDS),
 
 
 rule unit_table:
@@ -40,3 +40,14 @@ rule unit_table:
     run:
         from cmc.selectivity import unit_table
         unit_table(input[0], float(wildcards.thr)).to_csv(output[0], index=False)
+
+
+rule summary:
+    input:
+        lambda w: unit_tables(w.set, w.thr),
+    output:
+        f"{OUT}/{{set}}/thr{{thr}}/networks.csv",
+    run:
+        import pandas as pd
+        from cmc.selectivity import network_summary
+        pd.DataFrame([network_summary(pd.read_csv(f)) for f in input]).to_csv(output[0], index=False)
