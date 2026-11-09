@@ -9,6 +9,9 @@ format:
     number-sections: true
 ---
 
+**Code, data and pipeline:** [github.com/AtharvSuryawanshi/canonical_mc](https://github.com/AtharvSuryawanshi/canonical_mc/tree/selectivity-report-v1),
+at the tag `selectivity-report-v1`, the exact version this report was built from (see [Reproduce](#reproduce)).
+
 ## Introduction
 
 Every action potential costs energy and every synaptic connection costs space and wiring material,
@@ -315,13 +318,13 @@ tables. Each step has its own check.
 Everything needed is in the repository: the trained networks are committed as saved model
 files (checkpoints), one per network. They take 167 MB for the main set and 241 MB for the second
 set, and only the final checkpoints are used, not the ones saved halfway through training. All saved
-runs together take about 1.7 GB, so the clone is large. The analysis lives on its own branch,
-checked out below.
+runs together take about 1.7 GB, so the clone is large. The analysis lives on the `agent-course`
+branch; the tag `selectivity-report-v1` below is the exact version this report was built from.
 
 ```bash
 git clone https://github.com/AtharvSuryawanshi/canonical_mc.git
 cd canonical_mc
-git checkout agent-course
+git checkout selectivity-report-v1
 pixi install        # locked environment from pixi.lock
 pixi run test       # ground-truth tests
 pixi run pipeline   # networks -> tables -> verdicts -> figure -> report tables

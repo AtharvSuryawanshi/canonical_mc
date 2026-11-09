@@ -2267,6 +2267,7 @@ vertical-align: -.125em;
 </header>
 
 
+<p><strong>Code, data and pipeline:</strong> <a href="https://github.com/AtharvSuryawanshi/canonical_mc/tree/selectivity-report-v1">github.com/AtharvSuryawanshi/canonical_mc</a>, at the tag <code>selectivity-report-v1</code>, the exact version this report was built from (see <a href="#reproduce">Reproduce</a>).</p>
 <section id="introduction" class="level2" data-number="1">
 <h2 data-number="1" class="anchored" data-anchor-id="introduction"><span class="header-section-number">1</span> Introduction</h2>
 <p>Every action potential costs energy and every synaptic connection costs space and wiring material, so cortical circuits are shaped by what they compute and by what that computation costs (Attwell &amp; Laughlin 2001; Chklovskii et al. 2002). If cost shapes circuits, it may also shape how a circuit shares out its work: whether each neuron takes part in many tasks or in only a few.</p>
@@ -2744,10 +2745,10 @@ Figure 2: Pipeline steps and their order.
 </div>
 <section id="reproduce" class="level3" data-number="4.1">
 <h3 data-number="4.1" class="anchored" data-anchor-id="reproduce"><span class="header-section-number">4.1</span> Reproduce</h3>
-<p>Everything needed is in the repository: the trained networks are committed as saved model files (checkpoints), one per network. They take 167 MB for the main set and 241 MB for the second set, and only the final checkpoints are used, not the ones saved halfway through training. All saved runs together take about 1.7 GB, so the clone is large. The analysis lives on its own branch, checked out below.</p>
+<p>Everything needed is in the repository: the trained networks are committed as saved model files (checkpoints), one per network. They take 167 MB for the main set and 241 MB for the second set, and only the final checkpoints are used, not the ones saved halfway through training. All saved runs together take about 1.7 GB, so the clone is large. The analysis lives on the <code>agent-course</code> branch; the tag <code>selectivity-report-v1</code> below is the exact version this report was built from.</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone https://github.com/AtharvSuryawanshi/canonical_mc.git</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> canonical_mc</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> checkout agent-course</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> checkout selectivity-report-v1</span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="ex">pixi</span> install        <span class="co"># locked environment from pixi.lock</span></span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">pixi</span> run test       <span class="co"># ground-truth tests</span></span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="ex">pixi</span> run pipeline   <span class="co"># networks -&gt; tables -&gt; verdicts -&gt; figure -&gt; report tables</span></span>
