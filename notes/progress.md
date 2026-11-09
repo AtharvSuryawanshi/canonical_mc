@@ -48,7 +48,7 @@ notes/idea.md (the spec; self-contained, written for the report).
   -> {verdicts, figure} -> all. The job-level SVG is wide (320 kB, 204 unit_table jobs).
 - Reviewer run (2026-11-09): one fresh-context subagent (read-only: Read/Grep/Glob/Bash) checked three
   summary claims against results/selectivity/, notes/idea.md and the runs' runs.csv (budget multipliers,
-  cost tails, metabolic_cost). 5 findings, all **accepted**; the key numbers of 1-3 re-checked by hand:
+  cost tails, metabolic_cost). 5 findings, all **accepted**; the key numbers of 1-3 re-checked by hand by the builder agent (this session), not by the reviewer:
   1. **Accepted** — 50k wiring_limited narrows with no active rate budget: final_lambda_rate at the
      1e-6 floor in 12/12 seeds, rate tail 0.0216-0.0225 < budget 0.0231; wiring binds (0.0020). E
      breadth fully separated from control at 0.3/0.5/0.7, but metabolic_cost 0.030-0.032 vs control
@@ -101,9 +101,61 @@ notes/idea.md (the spec; self-contained, written for the report).
   second set, "lowest control network", tick font 7). Evidence: only `figure` and `tables` rebuilt;
   sha256 of all 7 committed CSVs identical before/after; `pixi run report` exit 0, no warnings;
   tests 10 passed.
+- Report rewrite (2026-11-09, three fresh-context subagents, each checked afterwards):
+  - Intro / Approach (before Results): paper-style introduction, plain "order of events", networks
+    and every term defined once, compact none/loose/tight conditions table with exact values in a
+    collapsed callout, rules as plain if-sentences grouped by what they guard against. Evidence:
+    Results onward byte-identical before/after; render exit 0, no warnings.
+  - Figure: `plot_breadth` redesigned (2x2, panels a-d, 17 cm, 300 dpi, 9 pt, no suptitle; a main
+    0.5, b main 0.3/0.7, c breadth vs accuracy, d second set). Second-set accuracy panel dropped.
+    Evidence: sha256 of the 7 committed CSVs identical before/after; read-back 20/20/20/20/48 dots
+    match networks.csv, hollow 19 = infeasible 19; tests pass.
+  - Results onward: findings-first Results (rate effect -> robustness -> wiring null -> second set ->
+    exploratory), humanised Workflow / Limitations / Next steps, shorter agents section with the
+    literature / Skill / Quarto / coding uses and "the agent that did the work never graded it".
+    One [citation needed]: Song, Yang & Wang (2016). Evidence: text before Results unchanged.
+  - README: "Reproduce the selectivity report" section (clone, pixi install, test / pipeline /
+    report). Final evidence: `pixi run report` exit 0, no warnings; 5 tables, figure embedded, 6
+    figure cross-references resolved; `pixi run test` 10 passed.
+- Final edits (2026-11-09): y-axis "tasks per active E unit"; "min task accuracy" -> "worst-task
+  accuracy" in prose, captions, generated tables and figure (data column `min_task_acc` unchanged);
+  agents section in first person, names Claude Code, "analysis pipeline" (not training), infeasible
+  second set line restored; both-budgets rate budget "at ceiling", multiplier clearly above floor in
+  1 of 5; I-unit breadth "computed but not analysed"; Song, Yang & Wang (2016) added to references.
+  Evidence: only figure + tables rebuilt; sha256 of 6 networks.csv + wrong_if.csv identical; render
+  exit 0, no warnings; HTML contains "min task" 0 times, "citation needed" 0 times; tests 10 passed.
+- Prose polish (2026-11-09, fresh-context editor subagent, study.qmd only). Evidence: word count
+  3805 -> 3804; headings, YAML, code block, tables, includes, image lines, figure caption and @fig
+  cross-references unchanged; the multiset of numbers identical; "I" only in the agents section;
+  render exit 0, no warnings.
+- External-examiner review (2026-11-09, fresh-context read-only subagent): 10 findings, all acted on
+  as wording (no new analysis). Key correction: the earlier exploration had computed breadth on the
+  same main-set networks (and a frozen-readout set) and a similar all-active-units version on the
+  second set (notebooks/cog20_zoom_analysis.ipynb, 2026-10-12: control 4.98, rate_limited 3.58,
+  wiring_limited 3.51), so NEITHER set was unseen; the report now says the rules were fixed before
+  this pipeline ran, not before any result. Also: wiring-only quantified (conn_frac 0.047-0.060 vs
+  control 0.67-0.79, ~92 % removed); confound of firing and wiring tightness stated (scoped to the
+  tight-wiring conditions; rate-only narrows with loose wiring); rule 3's registered Spearman shown
+  (new note column in wrong_if.md); second-set differences (older W_out init, rate-limited wiring
+  binds ~30 %, batched shared trial stream) and approximate p-value; frozen-readout rate/wiring
+  sweeps named; bar = mean incl. infeasible; full expectation (A3 and C0 < control); agents table.
+  Evidence: render exit 0, no warnings; then `rm -r results/selectivity && pixi run pipeline`
+  (214 steps, 3 min 33 s) + `pixi run report`: all 214 outputs (204 unit CSVs, 6 networks.csv,
+  wrong_if.csv, 2 .md, PNG) byte-identical to the pre-rebuild state.
+- Examiner added to "How agents were used" (2026-11-09, wording only): a ~114-word paragraph after
+  the reviewer's (fresh-context read-only examiner checked claims against results, training logs and
+  git history; main finding: "before looking at any result" was an overclaim that crept in through
+  rewrites, disclosure corrected; also wiring budget wording and the exploratory claim; one of its
+  claims, the 0.0044 wiring-tightness statement, was checked against the data by the builder and
+  corrected) and a "final examination" table row. Existing paragraphs tightened; section 530 -> 583
+  words.
 
 ## Next — one at a time
-- [ ] Update PRESENTATION.md slide 22 with the verdict (see Internal cross-checks) — if still wanted.
+- [ ] Final read of reports/study.qmd / study.html by Atharv (open points listed in the session).
+- [ ] Commit.
+- [ ] Push.
+- [ ] Upload the report.
+- [ ] (optional) Update PRESENTATION.md slide 22 with the verdict (see Internal cross-checks).
 
 ## Internal cross-checks (project context, not for the report)
 - An earlier notebook computed the same metric: `notebooks/ei_modularity_150k.ipynb` ->
@@ -122,7 +174,8 @@ notes/idea.md (the spec; self-contained, written for the report).
   set only, so the verdict stands. Reviewer finding 1: its rate budget does not bind, so this is a
   wiring-driven narrowing at a tighter wiring level (0.0020 vs B0's 0.0054), with a ~13x lower firing
   rate. Is it the wiring level or the firing rate? Needs a wiring sweep with rate measured.
-- 50k rate_limited's wiring budget (0.0237) also binds (conn tail = budget); looser than the 150k
-  control's realised wiring cost, probably minor, unchecked against the 50k control.
+- 50k rate_limited's wiring budget (0.0237) also binds (conn tail = budget). Resolved: the 50k
+  control's wiring cost is 0.0238-0.0349, so the budget sits just below the lowest control network.
+  Not purely rate-limited; stated in the report's conditions table.
 - `pixi` is not on PATH in this shell; it is at `~/.pixi/bin/pixi`.
 - Rate cost is L2: why would it produce specialization? (mechanism, out of scope for this slice)

@@ -160,70 +160,101 @@ def label(point):
     return LABEL[point].replace("-\n", "-").replace("\n", " ")
 
 
+def _strip(ax, df, pts, feasible_min, ref=True, ticklabels=True, size=22):
+    """One condition per column: a dot per network (hollow = infeasible), a bar at the mean, and
+    optionally a dashed line at the lowest control network."""
+    if ref:
+        ax.axhline(df[df["point"] == "control"]["E_breadth"].min(), color=_MUTED, lw=0.8,
+                   ls=(0, (3, 3)), zorder=1)
+    for j, p in enumerate(pts):
+        d = df[df["point"] == p].sort_values("seed")
+        c = ROLE_COLOR[ROLE[p]]
+        xs = j + (np.linspace(-0.2, 0.2, len(d)) if len(d) > 1 else np.zeros(1))
+        feas = d["is_feasible"].astype(bool).to_numpy()
+        ax.scatter(xs, d["E_breadth"], s=size, zorder=3, linewidths=1.0, edgecolors=c,
+                   facecolors=[c if f else _BG for f in feas])
+        ax.hlines(d["E_breadth"].mean(), j - 0.32, j + 0.32, color=c, lw=2.2, zorder=2)
+    ax.set_xlim(-0.6, len(pts) - 0.4)
+    ax.set_xticks(range(len(pts)), [LABEL[p] for p in pts] if ticklabels else [])
+    ax.tick_params(axis="x", length=0)
+
+
+_BG, _INK, _MUTED = "white", "#0b0b0b", "#52514e"
+
+
+def _panel_label(fig, ax, letter, dx=-0.09):
+    bb = ax.get_position()
+    fig.text(bb.x0 + dx, bb.y1 + 0.012, letter, fontsize=12, fontweight="bold", color=_INK,
+             ha="left", va="bottom")
+
+
 def plot_breadth(nets, points, out=None, feasible_min=0.6):
     """nets: {(set, thr): networks.csv frame}; points: {set: [point order]}. Writes a PNG to out,
-    or returns the figure if out is None (used to check the plotted values)."""
+    or returns the figure if out is None (used to check the plotted values).
+    Panels: a main set, thr 0.5; b main set, thr 0.3 and 0.7; c main set, breadth vs worst-task
+    accuracy (thr 0.5); d second set, thr 0.5."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
 
-    ink, muted, grid = "#0b0b0b", "#52514e", "#e4e3df"
-    plt.rcParams.update({"font.size": 8, "axes.edgecolor": muted, "axes.labelcolor": ink,
-                         "xtick.color": muted, "ytick.color": muted, "axes.spines.top": False,
-                         "axes.spines.right": False})
-    strips = [("150k", "0.3"), ("150k", "0.5"), ("150k", "0.7"), ("50k", "0.5")]
-    fig = plt.figure(figsize=(11, 6.6), facecolor="#fcfcfb")
-    gs = fig.add_gridspec(2, 4, height_ratios=[1, 1], hspace=0.55, wspace=0.32)
-    def dot(ax, x, y, color, filled):
-        ax.scatter(x, y, s=26, zorder=3, linewidths=1.2, edgecolors=color,
-                   facecolors=color if filled else "#fcfcfb")
+    plt.rcParams.update({"font.size": 9, "axes.labelsize": 9, "xtick.labelsize": 9,
+                         "ytick.labelsize": 9, "legend.fontsize": 9, "axes.edgecolor": _MUTED,
+                         "axes.labelcolor": _INK, "xtick.color": _INK, "ytick.color": _INK,
+                         "axes.spines.top": False, "axes.spines.right": False,
+                         "axes.linewidth": 0.8, "font.family": "DejaVu Sans"})
+    fig = plt.figure(figsize=(6.7, 5.6), facecolor=_BG)   # 17 cm wide
+    outer = fig.add_gridspec(2, 2, left=0.1, right=0.985, top=0.95, bottom=0.09,
+                             hspace=0.42, wspace=0.36, height_ratios=[1, 1])
+    ylab = "E breadth (tasks per active E unit)"
+    main, sec = "150k", "50k"
 
-    for i, (s, thr) in enumerate(strips):
-        ax = fig.add_subplot(gs[0, i], facecolor="#fcfcfb")
-        df = nets[s, thr]
-        ctl_min = df[df["point"] == "control"]["E_breadth"].min()
-        ax.axhline(ctl_min, color=muted, lw=0.8, ls=(0, (3, 3)), zorder=1)
-        for j, p in enumerate(points[s]):
-            d = df[df["point"] == p].sort_values("seed")
-            c = ROLE_COLOR[ROLE[p]]
-            xs = j + np.linspace(-0.18, 0.18, len(d))
-            for x, r in zip(xs, d.itertuples()):
-                dot(ax, x, r.E_breadth, c, r.is_feasible)
-            ax.hlines(d["E_breadth"].mean(), j - 0.28, j + 0.28, color=c, lw=2, zorder=2)
-        ax.set_xticks(range(len(points[s])), [LABEL[p] for p in points[s]], fontsize=7)
-        ax.set_xlim(-0.6, len(points[s]) - 0.4)
-        ax.grid(axis="y", color=grid, lw=0.6); ax.set_axisbelow(True)
-        ax.set_title(f"{SET_NAME[s]}, threshold {thr}", fontsize=9, color=ink, loc="left")
-        if i == 0:
-            ax.set_ylabel("E breadth (tasks per active E unit)")
-        ax.text(len(points[s]) - 0.45, ctl_min, "lowest control network", fontsize=6.5, color=muted,
-                ha="right", va="bottom")
+    ax_a = fig.add_subplot(outer[0, 0])
+    _strip(ax_a, nets[main, "0.5"], points[main], feasible_min)
+    ax_a.set_ylabel(ylab)
+    ax_a.set_title(f"{SET_NAME[main]}, threshold 0.5", fontsize=9, color=_INK, loc="left")
 
-    for k, s in enumerate(("150k", "50k")):
-        ax = fig.add_subplot(gs[1, 2 * k:2 * k + 2], facecolor="#fcfcfb")
-        df = nets[s, "0.5"]
-        for p in points[s]:
-            d = df[df["point"] == p]
-            c = ROLE_COLOR[ROLE[p]]
-            for r in d.itertuples():
-                dot(ax, r.min_task_acc, r.E_breadth, c, r.is_feasible)
-            ax.scatter([], [], s=26, color=c, label=label(p))
-        if s == "50k":
-            ax.axvline(feasible_min, color=muted, lw=0.8, ls=(0, (3, 3)))
-            ax.text(feasible_min, ax.get_ylim()[1], " feasibility 0.6", fontsize=6.5, color=muted, va="top")
-        ax.grid(color=grid, lw=0.6); ax.set_axisbelow(True)
-        ax.set_xlabel("min task accuracy (worst of 20 tasks)")
-        if k == 0:
-            ax.set_ylabel("E breadth, threshold 0.5")
-        ax.set_title(f"{SET_NAME[s]}: breadth vs accuracy, one dot per network", fontsize=9, color=ink, loc="left")
-        ax.legend(frameon=False, fontsize=7, loc="best")
+    inner = outer[0, 1].subgridspec(2, 1, hspace=0.32)
+    ax_b = []
+    for k, thr in enumerate(("0.3", "0.7")):
+        ax = fig.add_subplot(inner[k])
+        _strip(ax, nets[main, thr], points[main], feasible_min, ticklabels=(k == 1), size=14)
+        ax.yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(3))
+        ax.set_title(f"{SET_NAME[main]}, threshold {thr}", fontsize=9, color=_INK, loc="left",
+                     pad=2)
+        ax_b.append(ax)
+    ax_b[0].set_ylabel(ylab, y=-0.16)
 
-    fig.suptitle("Task breadth of excitatory units by cost budget. Dot = one network (main set: 5 per "
-                 "condition, second set: 12); bar = condition mean; hollow = infeasible (min task acc < 0.6)",
-                 fontsize=9, color=ink, x=0.06, ha="left")
+    ax_c = fig.add_subplot(outer[1, 0])
+    df = nets[main, "0.5"]
+    for p in points[main]:
+        d = df[df["point"] == p].sort_values("seed")
+        c = ROLE_COLOR[ROLE[p]]
+        feas = d["is_feasible"].astype(bool).to_numpy()
+        ax_c.scatter(d["min_task_acc"], d["E_breadth"], s=22, zorder=3, linewidths=1.0,
+                     edgecolors=c, facecolors=[c if f else _BG for f in feas])
+    ax_c.set_xlabel("worst-task accuracy")
+    ax_c.set_ylabel(ylab)
+    ax_c.set_title(f"{SET_NAME[main]}, threshold 0.5", fontsize=9, color=_INK, loc="left")
+    ax_c.legend(handles=[Line2D([], [], ls="", marker="o", ms=5, color=ROLE_COLOR[ROLE[p]],
+                                label=label(p)) for p in points[main]],
+                frameon=False, loc="upper left", bbox_to_anchor=(0.17, 1.0), handletextpad=0.1,
+                borderaxespad=0.1,
+                labelspacing=0.3)
+
+    ax_d = fig.add_subplot(outer[1, 1])
+    _strip(ax_d, nets[sec, "0.5"], points[sec], feasible_min)
+    ax_d.set_ylabel(ylab)
+    ax_d.set_title(f"{SET_NAME[sec]}, threshold 0.5", fontsize=9, color=_INK, loc="left")
+
+    for ax in (ax_a, *ax_b, ax_c, ax_d):
+        ax.set_facecolor(_BG)
+    for ax, letter in ((ax_a, "a"), (ax_b[0], "b"), (ax_c, "c"), (ax_d, "d")):
+        _panel_label(fig, ax, letter)
+
     if out is None:
         return fig
-    fig.savefig(out, dpi=200, bbox_inches="tight", metadata={"Software": None})
+    fig.savefig(out, dpi=300, facecolor=_BG, metadata={"Software": None})
     plt.close(fig)
 
 
@@ -247,7 +278,7 @@ def condition_table(nets, runs, names):
                 "networks (feasible)": f"{len(g)} ({int(g['is_feasible'].sum())})",
                 "E breadth, mean (range)": f"{g['E_breadth'].mean():.2f} ({_rng(g['E_breadth'])})",
                 "active E (of 204)": f"{g['E_active'].mean():.0f}",
-                "min task acc": _rng(g["min_task_acc"]),
+                "worst-task accuracy": _rng(g["min_task_acc"]),
                 "metabolic cost": _rng(g["metabolic_cost"], "{:#.2g}"),
             })
     return pd.DataFrame(rows)
@@ -259,13 +290,17 @@ def verdict_table(verdicts, names):
     v["set"] = v["set"].map(names)
     v["rule"] = v["rule"].astype(str).replace({"5 (all)": "5, all 12 (supplementary)"})
     v["verdict"] = [f"{x} (weak)" if r == "5" else x for r, x in zip(v["rule"], v["verdict"])]
-    words = [("control acc min", "lowest control min task acc"), ("A3 seeds at/above it", "rate-only networks at or above it"),
+    words = [("control acc min", "lowest control worst-task accuracy"), ("A3 seeds at/above it", "rate-only networks at or above it"),
              ("thr ", "threshold ")]
     words += [(code, label(code)) for code in ("A3", "B0", "rate_limited")]
     for a, b in words:
         v["numbers"] = v["numbers"].str.replace(a, b, regex=False)
-    v["numbers"] = v["numbers"].str.replace(r"seed (\d+) acc ([\d.]+) breadth", r"seed \1: min task acc \2, E breadth",
+    v["numbers"] = v["numbers"].str.replace(r"seed (\d+) acc ([\d.]+) breadth", r"seed \1: worst-task accuracy \2, E breadth",
                                             regex=True)
+    # the registered Spearman for rule 3 lives in the note column; rule 5's notes are said in the text
+    v["note"] = v["note"].fillna("").where(v["rule"] == "3", "")
+    v["note"] = v["note"].str.replace(r"Spearman\(E breadth, min_task_acc\), all 20: rho ([-\d.]+), p ([\d.e-]+)",
+                                      r"Spearman, E breadth vs worst-task accuracy, all 20 networks: ρ \1, p \2", regex=True)
     v = v.rename(columns={"name": "registered name", "thr": "threshold",
                           "numbers": "E breadth (unless stated)"})
-    return v[["rule", "registered name", "set", "threshold", "verdict", "E breadth (unless stated)"]]
+    return v[["rule", "registered name", "set", "threshold", "verdict", "E breadth (unless stated)", "note"]]

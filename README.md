@@ -10,6 +10,25 @@ train sign-constrained (Dale's law) RNNs on the Yang et al. (2019) cognitive tas
 battery while charging them for higher firing rates and for recurrent connectivity, and
 look at the Pareto front that trades task performance against those two costs.
 
+## Reproduce the selectivity report
+
+The report `reports/study.qmd` (does a firing-rate or a wiring budget make excitatory units
+task-specialized?) is rebuilt from the committed networks by a Snakemake pipeline in a locked pixi
+environment (CPU only, no training). It lives on the `agent-course` branch. The clone is large
+(`runs/` is about 1.7 GB).
+
+```bash
+git clone https://github.com/AtharvSuryawanshi/canonical_mc.git
+cd canonical_mc
+git checkout agent-course
+pixi install        # locked environment from pixi.lock
+pixi run test       # ground-truth tests
+pixi run pipeline   # networks -> tables -> verdicts -> figure (results/selectivity/)
+pixi run report     # renders reports/study.html
+```
+
+Training itself uses the conda environment below, not pixi.
+
 ## Layout
 
 ```
