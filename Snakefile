@@ -32,6 +32,8 @@ rule all:
         expand(f"{OUT}/{{set}}/thr{{thr}}/networks.csv", set=SETS, thr=THRESHOLDS),
         f"{OUT}/wrong_if.csv",
         f"{OUT}/breadth.png",
+        f"{OUT}/wrong_if.md",
+        f"{OUT}/conditions.md",
 
 
 rule unit_table:
@@ -79,3 +81,23 @@ rule figure:
         from cmc.selectivity import plot_breadth
         nets = {(f.split("/")[-3], f.split("/")[-2].removeprefix("thr")): pd.read_csv(f) for f in input}
         plot_breadth(nets, {s: SETS[s]["points"] for s in SETS}, output[0])
+
+
+rule tables:
+    input:
+        verdicts=f"{OUT}/wrong_if.csv",
+        nets=expand(f"{OUT}/{{set}}/thr0.5/networks.csv", set=SETS),
+        runs=[SETS[s]["dir"] / "runs.csv" for s in SETS],
+    output:
+        verdicts=f"{OUT}/wrong_if.md",
+        conditions=f"{OUT}/conditions.md",
+    run:
+        import pandas as pd
+        from cmc.selectivity import condition_table, verdict_table
+        names = {"150k": "main", "50k": "second"}
+        nets = {s: pd.read_csv(f) for s, f in zip(SETS, input.nets)}
+        runs = {s: pd.read_csv(f) for s, f in zip(SETS, input.runs)}
+        for df, out in ((verdict_table(pd.read_csv(input.verdicts), names), output.verdicts),
+                        (condition_table(nets, runs, names), output.conditions)):
+            with open(out, "w") as f:
+                f.write(df.to_markdown(index=False) + "\n")

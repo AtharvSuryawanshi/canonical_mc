@@ -25,5 +25,5 @@ cmc = { path = ".", editable = true }
 test = "pytest -q tests"
 dry = "snakemake -n"
 pipeline = "snakemake -c4"
-dag = "snakemake --dag | dot -Tsvg > reports/dag.svg"
+dag = "snakemake --rulegraph | dot -Tsvg > reports/dag.svg"
 report = "quarto render reports/study.qmd"

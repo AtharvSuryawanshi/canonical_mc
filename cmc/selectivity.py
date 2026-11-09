@@ -219,3 +219,37 @@ def plot_breadth(nets, points, out=None, feasible_min=0.6):
         return fig
     fig.savefig(out, dpi=200, bbox_inches="tight", metadata={"Software": None})
     plt.close(fig)
+
+
+# ---- Report tables (markdown, included by reports/study.qmd) --------------------------------------
+
+def _rng(s, fmt="{:.2f}"):
+    lo, hi = s.min(), s.max()
+    return fmt.format(lo) if fmt.format(lo) == fmt.format(hi) else f"{fmt.format(lo)}–{fmt.format(hi)}"
+
+
+def condition_table(nets, runs, names):
+    """Per condition, threshold 0.5. nets / runs: {set: frame}; names: {set: display name}.
+    Metabolic cost (eval, noise-free) and the training-time rate cost come from the run's runs.csv."""
+    rows = []
+    for s, df in nets.items():
+        df = df.merge(runs[s][["point", "seed", "metabolic_cost", "train_rate_cost_tail"]],
+                      on=["point", "seed"], validate="1:1")
+        for p, g in df.groupby("point", sort=False):
+            rows.append({
+                "set": names[s], "condition": LABEL[p].replace("-\n", "-").replace("\n", " "),
+                "networks (feasible)": f"{len(g)} ({int(g['is_feasible'].sum())})",
+                "E breadth, mean (range)": f"{g['E_breadth'].mean():.2f} ({_rng(g['E_breadth'])})",
+                "active E": f"{g['E_active'].mean():.0f}",
+                "min task acc": _rng(g["min_task_acc"]),
+                "metabolic cost": _rng(g["metabolic_cost"], "{:#.2g}"),
+            })
+    return pd.DataFrame(rows)
+
+
+def verdict_table(verdicts, names):
+    """wrong_if.csv as a report table; names: {set: display name}."""
+    v = verdicts.copy()
+    v["set"] = v["set"].map(names)
+    v["verdict"] = [f"{x} (weak)" if str(r) == "5" else x for r, x in zip(v["rule"], v["verdict"])]
+    return v[["rule", "name", "set", "thr", "verdict", "numbers"]]
