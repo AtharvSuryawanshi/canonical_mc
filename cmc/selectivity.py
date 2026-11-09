@@ -150,8 +150,14 @@ def wrong_if(nets):
 ROLE_COLOR = {"control": "#3a3936", "rate": "#eb6834", "wiring": "#2a78d6", "both": "#1baf7a"}
 ROLE = {"control": "control", "A3": "rate", "B0": "wiring", "C0": "both",
         "rate_limited": "rate", "wiring_limited": "wiring", "knee": "both"}
-LABEL = {"control": "control", "A3": "A3\nrate", "B0": "B0\nwiring", "C0": "C0\nboth",
-         "rate_limited": "rate-\nlimited", "wiring_limited": "wiring-\nlimited", "knee": "knee\nboth"}
+LABEL = {"control": "control", "A3": "rate-\nonly", "B0": "wiring-\nonly", "C0": "both\nbudgets",
+         "rate_limited": "rate-\nlimited", "wiring_limited": "wiring-\nlimited", "knee": "both\nbudgets"}
+SET_NAME = {"150k": "main set", "50k": "second set"}
+
+
+def label(point):
+    """One-line condition name for legends and tables."""
+    return LABEL[point].replace("-\n", "-").replace("\n", " ")
 
 
 def plot_breadth(nets, points, out=None, feasible_min=0.6):
@@ -184,13 +190,13 @@ def plot_breadth(nets, points, out=None, feasible_min=0.6):
             for x, r in zip(xs, d.itertuples()):
                 dot(ax, x, r.E_breadth, c, r.is_feasible)
             ax.hlines(d["E_breadth"].mean(), j - 0.28, j + 0.28, color=c, lw=2, zorder=2)
-        ax.set_xticks(range(len(points[s])), [LABEL[p] for p in points[s]])
+        ax.set_xticks(range(len(points[s])), [LABEL[p] for p in points[s]], fontsize=7)
         ax.set_xlim(-0.6, len(points[s]) - 0.4)
         ax.grid(axis="y", color=grid, lw=0.6); ax.set_axisbelow(True)
-        ax.set_title(f"{s} set, threshold {thr}", fontsize=9, color=ink, loc="left")
+        ax.set_title(f"{SET_NAME[s]}, threshold {thr}", fontsize=9, color=ink, loc="left")
         if i == 0:
             ax.set_ylabel("E breadth (tasks per active E unit)")
-        ax.text(len(points[s]) - 0.45, ctl_min, "lowest control seed", fontsize=6.5, color=muted,
+        ax.text(len(points[s]) - 0.45, ctl_min, "lowest control network", fontsize=6.5, color=muted,
                 ha="right", va="bottom")
 
     for k, s in enumerate(("150k", "50k")):
@@ -201,7 +207,7 @@ def plot_breadth(nets, points, out=None, feasible_min=0.6):
             c = ROLE_COLOR[ROLE[p]]
             for r in d.itertuples():
                 dot(ax, r.min_task_acc, r.E_breadth, c, r.is_feasible)
-            ax.scatter([], [], s=26, color=c, label=LABEL[p].replace("-\n", "-").replace("\n", " "))
+            ax.scatter([], [], s=26, color=c, label=label(p))
         if s == "50k":
             ax.axvline(feasible_min, color=muted, lw=0.8, ls=(0, (3, 3)))
             ax.text(feasible_min, ax.get_ylim()[1], " feasibility 0.6", fontsize=6.5, color=muted, va="top")
@@ -209,11 +215,11 @@ def plot_breadth(nets, points, out=None, feasible_min=0.6):
         ax.set_xlabel("min task accuracy (worst of 20 tasks)")
         if k == 0:
             ax.set_ylabel("E breadth, threshold 0.5")
-        ax.set_title(f"{s} set: breadth vs accuracy, one dot per network", fontsize=9, color=ink, loc="left")
+        ax.set_title(f"{SET_NAME[s]}: breadth vs accuracy, one dot per network", fontsize=9, color=ink, loc="left")
         ax.legend(frameon=False, fontsize=7, loc="best")
 
-    fig.suptitle("Task breadth of excitatory units by cost budget. Dot = one network (150k: 5 seeds per "
-                 "condition, 50k: 12); bar = condition mean; hollow = infeasible (min task acc < 0.6)",
+    fig.suptitle("Task breadth of excitatory units by cost budget. Dot = one network (main set: 5 per "
+                 "condition, second set: 12); bar = condition mean; hollow = infeasible (min task acc < 0.6)",
                  fontsize=9, color=ink, x=0.06, ha="left")
     if out is None:
         return fig
@@ -237,10 +243,10 @@ def condition_table(nets, runs, names):
                       on=["point", "seed"], validate="1:1")
         for p, g in df.groupby("point", sort=False):
             rows.append({
-                "set": names[s], "condition": LABEL[p].replace("-\n", "-").replace("\n", " "),
+                "set": names[s], "condition": label(p),
                 "networks (feasible)": f"{len(g)} ({int(g['is_feasible'].sum())})",
                 "E breadth, mean (range)": f"{g['E_breadth'].mean():.2f} ({_rng(g['E_breadth'])})",
-                "active E": f"{g['E_active'].mean():.0f}",
+                "active E (of 204)": f"{g['E_active'].mean():.0f}",
                 "min task acc": _rng(g["min_task_acc"]),
                 "metabolic cost": _rng(g["metabolic_cost"], "{:#.2g}"),
             })
@@ -248,8 +254,18 @@ def condition_table(nets, runs, names):
 
 
 def verdict_table(verdicts, names):
-    """wrong_if.csv as a report table; names: {set: display name}."""
+    """wrong_if.csv as a report table, in the report's names; names: {set: display name}."""
     v = verdicts.copy()
     v["set"] = v["set"].map(names)
-    v["verdict"] = [f"{x} (weak)" if str(r) == "5" else x for r, x in zip(v["rule"], v["verdict"])]
-    return v[["rule", "name", "set", "thr", "verdict", "numbers"]]
+    v["rule"] = v["rule"].astype(str).replace({"5 (all)": "5, all 12 (supplementary)"})
+    v["verdict"] = [f"{x} (weak)" if r == "5" else x for r, x in zip(v["rule"], v["verdict"])]
+    words = [("control acc min", "lowest control min task acc"), ("A3 seeds at/above it", "rate-only networks at or above it"),
+             ("thr ", "threshold ")]
+    words += [(code, label(code)) for code in ("A3", "B0", "rate_limited")]
+    for a, b in words:
+        v["numbers"] = v["numbers"].str.replace(a, b, regex=False)
+    v["numbers"] = v["numbers"].str.replace(r"seed (\d+) acc ([\d.]+) breadth", r"seed \1: min task acc \2, E breadth",
+                                            regex=True)
+    v = v.rename(columns={"name": "registered name", "thr": "threshold",
+                          "numbers": "E breadth (unless stated)"})
+    return v[["rule", "registered name", "set", "threshold", "verdict", "E breadth (unless stated)"]]

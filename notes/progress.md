@@ -92,6 +92,15 @@ notes/idea.md (the spec; self-contained, written for the report).
   training on noise-free eval trials (20 tasks x 10 eval seeds x 64): 0.0018-0.0022 for A3.
   Ratio eval/train 1.3-2.0 in every budgeted condition incl. slack-rate B0 (1.34-1.43). Noise is not
   it: A3 seed 0 re-simulated, eval conditions 0.00183 vs training-like noise 0.00187.
+- Readability review (2026-11-09): fresh-context subagent (Read/Grep/Glob only) read study.qmd as an
+  outside professor; 15 findings, all applied (5/10/12 with corrections: "13-fold" is the mean squared
+  rate, not a 3.6-fold rate; names stay "main / second set", not "replication"; E = 204, not 205).
+  Descriptive condition names everywhere (rate-only (A3), wiring-only (B0), both budgets (C0 / knee);
+  second set keeps rate-limited / wiring-limited, as their other budget also binds or is not loose),
+  "Conditions and costs" block with both budgets and binding per condition, figure relabelled (main /
+  second set, "lowest control network", tick font 7). Evidence: only `figure` and `tables` rebuilt;
+  sha256 of all 7 committed CSVs identical before/after; `pixi run report` exit 0, no warnings;
+  tests 10 passed.
 
 ## Next — one at a time
 - [ ] Update PRESENTATION.md slide 22 with the verdict (see Internal cross-checks) — if still wanted.

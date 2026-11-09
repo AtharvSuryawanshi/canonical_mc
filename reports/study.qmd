@@ -1,5 +1,5 @@
 ---
-title: "Do cost budgets make neurons divide the tasks?"
+title: "Does biological constraints make neurons divide or share cognitive tasks?"
 subtitle: "Firing-rate vs wiring budgets and the task selectivity of excitatory units in multitask Dale RNNs"
 date: 2026-11-09
 format:
@@ -20,121 +20,175 @@ groups of units that serve particular tasks (Yang et al. 2019). What has not bee
 budget make excitatory (E) units carry fewer tasks than in unconstrained networks, and does a wiring
 budget do the same?
 
-**Expectation, fixed before this analysis.** It was informed by earlier exploratory analyses in the
-wider project, so this study is a test with a fixed metric, controls and a second set of networks,
-not a first look. A rate budget should narrow E units, because activity is paid for on every task a
-unit joins. A wiring budget (L1 on the recurrent weights) limits who talks to whom, not how many
-tasks a unit's activity varies with, so it should leave breadth about unchanged.
+**Expectation.** A rate budget should narrow E units, because activity is paid for on every task a
+unit joins. A wiring budget limits who talks to whom, not how many tasks a unit's activity varies
+with, so it should leave breadth about unchanged.
+
+**Order of events.** Earlier exploratory analyses in the wider project suggested this expectation.
+For this study, the expectation, the metric and six pass/fail rules were then written down; two of
+the rules (2 and 5) were clarified in writing; and only then was the analysis run. Nothing in the
+rules was changed after results existed.
 
 ## Approach
 
-**Networks (no new training).** Two existing sets of trained networks: 256 units (80 % E), 20 tasks.
-The figure labels them by training length.
+### Networks
 
-| set | training | conditions | networks |
-|---|---|---|---|
-| main ("150k") | 150 000 steps | control, A3 (rate budget), B0 (wiring budget), C0 (both) | 5 seeds each |
-| second set, consistency check ("50k") | 50 000 steps | control, rate-limited, wiring-limited, knee (both) | 12 seeds each |
+No new training: two existing sets of trained Dale's-law RNNs, each with 256 units (204 E,
+52 inhibitory, I) and 20 tasks. Networks in a condition differ only in their random seed, which is
+used below to identify them.
 
-A budget is a ceiling on a cost: the wiring budget is enforced exactly (projection of the
-recurrent weights onto an L1 ball after every step), the rate budget by a learned multiplier on an
-L2 firing-rate cost. The second set uses different budget values and shorter training; it checks
-direction, not exact numbers. A network is *feasible* if its worst task is solved at ≥ 60 %
-accuracy (min task accuracy).
+| set | training | conditions × networks |
+|---|---|---|
+| main set | 150 000 steps | 4 × 5 |
+| second set (consistency check) | 50 000 steps | 4 × 12 |
 
-**Metric: task breadth.** For each unit and task, the task variance is the variance of the unit's
-rate across noise-free trials, averaged over time after fixation onset (Yang et al. 2019).
+The second set uses different budget values and a third of the training; it checks direction, not
+exact numbers. A network is **feasible** if it solves its worst task with at least 60 % accuracy
+(its *min task accuracy* ≥ 0.6).
 
-- Active unit: total task variance > 1 % of the network's largest.
-- Each unit's 20 values are divided by its own maximum, so a quiet unit is not automatically "more
-  selective".
-- **Breadth** = number of tasks with normalized variance > 0.5 (1 = one task, 20 = all).
-  Per network: the mean over active E units. The unit of analysis is the network, not the neuron.
+### Conditions and costs
 
-**Pre-registered "wrong if" rules.** Written before any result, each a pass/fail test on the main
-set at threshold 0.5 unless stated:
+- **Rate cost** (also *metabolic cost*): the mean of the squared firing rate $r^2$ over units, time
+  steps and trials, with E and I units weighted by their share of the population. $r$ is a unit's
+  rectified (ReLU) activity, so the cost is dimensionless. Reference: control networks 0.36–0.55.
+- **Wiring cost**: the mean absolute recurrent weight per synapse (an L1 norm divided by the number
+  of synapses), with I weights rescaled so that E and I synapses count equally. Dimensionless.
+  Reference: control networks 0.024–0.036.
+- **Budget**: a ceiling on a cost during training. The wiring budget is enforced exactly: after
+  every training step the recurrent weights are projected back onto the ceiling if they exceed it. The rate budget is
+  enforced by a multiplier.
+- **Multiplier**: a learned weight on the rate cost in the loss (a Lagrange multiplier). It grows
+  while the rate cost is above its budget and shrinks while it is below, down to a floor of 10⁻⁶,
+  which means "off".
+- **Binding**: a budget binds if, at the end of training, the cost sits at the ceiling (for the
+  rate budget: and its multiplier is above the floor). A budget set far above what the network uses
+  is **loose** and never binds.
 
-1. *No rate effect*: any A3 network ≥ the lowest control network.
-2. *Threshold artefact*: rule 1's separation breaks at threshold 0.3 or 0.7.
-3. *Accuracy, not budget*: the A3 networks as accurate as the least accurate control network sit
-   inside the control breadth range.
-4. *Population artefact*: A3 keeps fewer than half as many active E units as control.
-5. *Does not replicate*: in the second set, rate-limited is not below control (decided on
-   feasible networks only; only 3 of 12 rate-limited networks are feasible, so this is weak either
-   way).
-6. *Wiring does specialize*: every B0 network is below the lowest control network.
+| set | condition | rate budget | wiring budget | which budget binds |
+|---|---|---|---|---|
+| main | control | none | none | — |
+| main | rate-only (A3) | 0.0011 | 1.0 (loose) | rate |
+| main | wiring-only (B0) | 10 (loose) | 0.0054 | wiring |
+| main | both budgets (C0) | 0.0115 | 0.0044 | wiring; rate cost sits at its ceiling, multiplier above the floor in 2 of 5 networks |
+| second | control | none | none | — |
+| second | rate-limited | 0.0037 | 0.0237 | both (the wiring budget is just below control's wiring cost) |
+| second | wiring-limited | 0.0231 | 0.0020 | wiring only (rate budget not binding) |
+| second | both budgets (knee) | 0.0046 | 0.0025 | both |
 
-Two clarifications (rules 2 and 5) were added and dated before any result was computed.
+The budgets act on the costs as measured on training batches; the costs reported in Results are
+measured after training on evaluation trials, which gives 1.3–2.0 times larger rate costs (see
+Limitations). The names in the "condition" column are used from here on.
+
+### Metric: task breadth
+
+For each unit and task, the **task variance** is the variance of the unit's rate across noise-free
+trials of that task, averaged over time after fixation onset (Yang et al. 2019).
+
+- **Active unit**: its total task variance (summed over tasks) is more than 1 % of the largest
+  unit's total in the same network.
+- Each unit's 20 task variances are divided by its own maximum, so a quiet unit is not
+  automatically "more selective".
+- **Breadth** of a unit = the number of tasks whose normalized variance exceeds a threshold
+  (0.5 unless stated; 1 = one task, 20 = all tasks).
+- **E breadth** of a network = the mean breadth over its active E units. The unit of analysis is
+  the network, not the neuron.
+
+### Pre-registered rules
+
+Each rule says when the expectation is *wrong*; each is tested on the main set at threshold 0.5
+unless stated. "Below" means lower E breadth.
+
+1. *No rate effect*: the highest rate-only E breadth ≥ the lowest control E breadth.
+2. *Threshold artefact*: the separation of rule 1 breaks at threshold 0.3 or at 0.7.
+3. *Accuracy, not budget*: any rate-only network with min task accuracy ≥ the lowest control min
+   task accuracy has an E breadth inside the control range.
+4. *Population artefact*: rate-only networks keep, on average, fewer than half as many active E
+   units as control.
+5. *Does not replicate*: in the second set, mean rate-limited E breadth is not below mean control
+   E breadth. Decided on feasible networks only; only 3 of 12 rate-limited networks are feasible,
+   so this test is weak either way.
+6. *Wiring does specialize*: every wiring-only network's E breadth is below the lowest control E
+   breadth.
 
 ## Results
 
-![E breadth per network. Top: main set ("150k") at thresholds 0.3, 0.5, 0.7, and the second set
-("50k") at 0.5 (dashed line: lowest control network; bar: condition mean; hollow: infeasible).
-Bottom: breadth against min task accuracy.](../results/selectivity/breadth.png){#fig-breadth}
+![**E breadth per network.** Breadth = the number of tasks (out of 20) whose normalized task
+variance exceeds the threshold, averaged over a network's active E units. Each dot is one network;
+the bar is the condition mean. Colours: grey control, orange rate budget, blue wiring budget, green
+both budgets (the same colours in both sets). Hollow dots are infeasible networks (min task
+accuracy < 0.6). Top row: main set at thresholds 0.3, 0.5 and 0.7, and the second set at 0.5; the
+dashed line marks the lowest control network. The y-axis range differs between panels, because a
+higher threshold counts fewer tasks. Bottom row: E breadth (threshold 0.5) against min task
+accuracy; the dashed line in the second-set panel is the feasibility limit (every main-set network
+is feasible).](../results/selectivity/breadth.png){#fig-breadth}
 
-**All six rules pass.** Generated by the pipeline from `results/selectivity/wrong_if.csv`:
+**All six registered rules pass** (pass = the claim survived this test). The table is generated by
+the pipeline; the row "5, all 12" repeats rule 5 on all networks including infeasible ones, for
+information only, and is not one of the six rules.
 
 {{< include ../results/selectivity/wrong_if.md >}}
 
-**Per condition**, threshold 0.5. Generated by the pipeline; metabolic cost is explained below the
-table.
+**Per condition**, threshold 0.5, generated by the pipeline. *Active E*: mean number of active E
+units, out of 204. *Metabolic cost*: the rate cost after training (control: 0.36–0.55).
 
 {{< include ../results/selectivity/conditions.md >}}
 
-**Metabolic cost vs the rate budget.** Both are the same quantity, the population-weighted mean
-squared firing rate, but measured on different trials. The rate budget caps it on the training
-batches (one random task per step, with input and recurrent noise), and in A3 that training-time
-cost sits at the budget, 0.0011. The metabolic cost in the table is the same formula evaluated after
-training on noise-free evaluation trials of all 20 tasks, which gives 0.0018–0.0022 for A3. The
-evaluation value is 1.3–2.0 times the training value in every budgeted condition, including B0,
-where the rate budget is slack, so the gap comes from the measurement, not from the budget. Noise is
-not the cause: re-simulating one A3 network with and without the training noise changes its cost by
-2 %. The source of the gap was not identified; comparisons between conditions use the evaluation
-value throughout.
+**Registered claim** (main set):
 
-**Registered claim.** In the main set, a binding rate budget (A3) narrows E task breadth: all 5 A3
-networks lie below all 5 control networks at thresholds 0.3, 0.5 and 0.7. A moderate wiring budget
-alone (B0) does not narrow it; B0 sits at or above control (above every control network at 0.3).
-B0 networks are about as accurate as A3 (overlapping ranges) yet stay broad, and the most accurate
-A3 network, inside the control accuracy range, is still narrow. The second set points the same way,
-but its rule 5 test rests on 3 feasible networks.
+- **Rate effect.** A binding rate budget narrows E task breadth: all 5 rate-only networks lie below
+  all 5 control networks, at thresholds 0.3, 0.5 and 0.7.
+- **No wiring effect.** A moderate wiring budget alone does not narrow it: wiring-only networks sit
+  at or above control (above every control network at threshold 0.3).
+- **Not accuracy.** Wiring-only networks are about as accurate as rate-only ones (overlapping
+  ranges) yet stay broad, and the most accurate rate-only network, whose min task accuracy is inside
+  the control range, is still narrow.
+- **Second set.** Rate-limited networks are below control too, but the registered test rests on 3
+  feasible networks.
 
 **Exploratory, not pre-registered: narrowing tracks realised firing rate.** Every narrow condition
-fires far less than control, whichever budget caused it. In the second set the wiring-limited
-networks narrow as much as the rate-limited ones although their rate budget never binds (its
-multiplier stays at its floor in 12 of 12): the tight wiring budget (0.0020, vs 0.0054 for B0)
-lowers the firing rate about 13-fold on its own. In C0 the rate multiplier is clearly active in only
-1 of 5 networks, yet rates sit at the ceiling. B0, the one condition that stays broad, fires *more*
-than control. So the cleaner statement is about low firing, not about which budget is switched on;
-this was found after the rules were fixed and needs its own test.
+has a far lower metabolic cost than control, whichever budget caused it:
+
+- In the second set, wiring-limited networks narrow as much as rate-limited ones although their
+  rate budget does not bind (the multiplier stays at its floor in all 12). Their tight wiring budget
+  (0.0020, against 0.0054 for wiring-only in the main set) lowers the metabolic cost, a mean squared
+  rate, about 13-fold on its own.
+- In the main set's both-budgets condition, the rate cost sits at its ceiling even though the
+  multiplier is above the floor in only 2 of 5 networks.
+- Wiring-only, the one budgeted condition that stays broad, has a *higher* metabolic cost than
+  control.
+
+So the cleaner statement is about low firing, not about which budget is switched on. This was found
+after the rules were fixed and needs its own test.
 
 ## Workflow
 
-Everything from checkpoints to this document is one Snakemake pipeline in a locked pixi
-environment (CPU-only; training ran elsewhere and is not part of it).
+Everything from the trained networks to this document is one Snakemake pipeline (a workflow tool
+that reruns only the steps whose inputs changed) in a locked pixi environment (a pinned list of
+software versions). It runs on CPU; training ran elsewhere and is not part of it.
 
-- `cmc/selectivity.py`: the metric (pure numpy on the stored task variance), the six rules, the
-  figure and the report tables.
-- `Snakefile`: `unit_table` (one checkpoint → per-unit table; threshold is a wildcard) →
-  `summary` (one row per network) → `verdicts` (`wrong_if.csv`), `figure` (`breadth.png`) and
-  `tables` (the two tables above, as markdown).
-- Checks, one per step: a ground-truth test on synthetic units with known breadth, boundary
-  tests on the rule operators (ties count against the claim), agreement with an independent
-  earlier implementation for all 20 main-set networks to 3 decimals, plotted values read back from
-  the figure, and a rebuild from scratch (204 checkpoint tables, 3.5 min on 4 cores) with
-  byte-identical outputs.
+- `cmc/selectivity.py`: the metric, the six rules, the figure and the report tables.
+- Pipeline steps (named "rules" by Snakemake; not the same as the six pre-registered rules):
+  `unit_table` (one saved network at one threshold → a table with one row per unit) →
+  `summary` (one row per network) → `verdicts` (pass/fail table), `figure` and `tables` (the two
+  tables above). There are 204 unit tables: 68 networks (20 + 48) × 3 thresholds.
+- Checks, one per step: a ground-truth test on synthetic units with known breadth; boundary tests
+  on the rule comparisons (a tie counts against the claim); agreement with an independent earlier
+  implementation for all 20 main-set networks to 3 decimals; the plotted values read back from the
+  figure; and a rebuild from scratch (3.5 min on 4 cores) with byte-identical outputs.
 
-![Rule graph of the pipeline.](dag.svg){#fig-dag}
+![Pipeline steps and their order.](dag.svg){#fig-dag}
 
 ### Reproduce
 
-The trained networks are committed to the repository, so a clone contains everything needed:
+The trained networks are committed to the repository, so a clone contains everything needed. They
+are saved model files ("checkpoints"), one per network:
 
 - main set: `runs/moo_zoom/dale_all_woutfree_fanin_4pt_5seed_150k/` (167 MB)
 - second set: `runs/moo_zoom/dale_all_4pt_12seed_50k/` (241 MB; only the final checkpoints
-  `{condition}/seed_XX.pt` are used, not the `step_025000/` snapshots)
+  `{condition}/seed_XX.pt` are used, not the mid-training ones in `step_025000/`)
 
-The whole `runs/` directory is about 1.7 GB, so the clone is large.
+The folder names are the training runs' internal names. The whole `runs/` directory is about
+1.7 GB, so the clone is large. The analysis lives on the branch `agent-course`.
 
 ```bash
 git clone https://github.com/AtharvSuryawanshi/canonical_mc.git
@@ -142,32 +196,36 @@ cd canonical_mc
 git checkout agent-course
 pixi install        # locked environment from pixi.lock
 pixi run test       # ground-truth tests
-pixi run pipeline   # checkpoints -> tables -> verdicts -> figure -> report tables
+pixi run pipeline   # networks -> tables -> verdicts -> figure -> report tables
 pixi run dag        # reports/dag.svg
 pixi run report     # this document
 ```
 
 ## How agents were used
 
-**Setup.** Three roles, all with a human approving every change:
+Two documents steered the work: the **spec**, a written study plan with the question, metric and
+pass/fail rules, fixed before any result; and a **progress file**, a running log of what was done,
+the evidence for it, what comes next and open questions.
+
+**Setup.** Three roles, with a human approving every change:
 
 - **Planning agent**: read the spec, the data and the code, and proposed a plan with one check per
   step. No edits until the human approved; the approved plan was written into the spec before any
   result.
 - **Builder agent**: the same session after approval. It built one step at a time, ran each step's
-  check, showed the output as evidence, and updated a progress file. It never committed: the human
+  check, showed the output as evidence, and updated the progress file. It never committed: the human
   committed after reading each diff.
 - **Reviewer agent**: a separate agent with a fresh context and read-only tools (read, search,
   shell), asked to break three summary claims against the result files and the training logs.
 
 | stage | delegated to an agent | decided by the human | checked by |
 |---|---|---|---|
-| question, expectation, "wrong if" rules | — | written before any pipeline run; never edited | — |
+| question, expectation, pass/fail rules | — | written before any analysis; never edited | — |
 | plan | reading the data, drafting steps and checks | approval; clarifications of rules 2 and 5; which outputs are tracked | plan fixed in the spec before results |
-| metric code | `selectivity.py`, tests | — | ground-truth tests; independent earlier implementation (20/20 networks) |
-| rule code | verdict logic | comparison operators, checked side by side with the plan | boundary tests (ties, closed ranges) |
-| figure, tables | plotting, markdown tables | panels, wording ("second set") | plotted dots read back against the tables |
-| reproducibility | rebuild from scratch | — | sha256 of every output, identical |
+| metric code | metric and tests | — | ground-truth tests; independent earlier implementation (20/20 networks) |
+| rule code | pass/fail logic | the comparisons, checked side by side with the plan | boundary tests (ties, closed ranges) |
+| figure, tables | plotting, generated tables | panels, condition and set names | plotted dots read back against the tables |
+| reproducibility | rebuild from scratch | — | checksums of every output, identical |
 | review | finding weaknesses in the claims | accepting all 5 findings; revising the explanation | builder re-ran the reviewer's key numbers |
 | commits, report text | drafts | every commit, every edit to the claim | diff read before each commit |
 
@@ -177,41 +235,46 @@ What the routine caught:
   that only 3 of 12 rate-limited networks are feasible. This was recorded before any result, and
   rule 5 was clarified (feasible only, called weak either way) before it was computed.
 - **Stray output commit.** A per-unit table from the first test run was committed by hand. Per-unit
-  tables are now regenerated rather than tracked, and only the network tables, verdicts and figure
-  are committed.
+  tables are now regenerated rather than tracked, and only the network tables, pass/fail table and
+  figure are committed.
 - **A leaking reference.** The first plan named the earlier implementation's file and its expected
-  value inside the spec. It was replaced by a pointer to the progress notes, so the spec does not
+  value inside the spec. It was replaced by a pointer to the progress file, so the spec does not
   carry a number the pipeline is meant to reproduce.
 - **A reviewer that broke the explanation.** The reviewer accepted the registered result but showed
   that the stated reason ("where a wiring budget narrows, a rate budget is also active") was wrong:
-  the second set's wiring-limited networks narrow with a rate budget that never binds. All five of
-  its findings were accepted. The verdicts did not change, the explanation did, and the firing-rate
-  account is labelled exploratory.
+  the second set's wiring-limited networks narrow with a rate budget that does not bind. All five
+  of its findings were accepted. The pass/fail results did not change, the explanation did, and
+  the firing-rate account is labelled exploratory.
 
 ## Limitations
 
 - **n = 5 per condition** in the main set. Full separation of 5 vs 5 has an exact one-sided
-  p ≈ 0.004; "every A3 network" describes these networks, not a population.
-- **One level per budget.** B0 is a single, moderate wiring level; the second set shows a tighter
-  one does narrow. The result is "a moderate wiring budget does not", not "wiring never does".
+  p ≈ 0.004; "all rate-only networks" describes these networks, not a population.
+- **One level per budget.** Wiring-only is a single, moderate wiring level; the second set shows a
+  tighter one does narrow. The result is "a moderate wiring budget does not", not "wiring never
+  does".
 - **Weak consistency check.** Most budgeted networks in the second set are infeasible, its budgets
   differ from the main set's, and training is a third as long.
-- **Population changes.** C0 and the second set's wiring-limited and knee conditions lose 11–23 %
-  of their active E units; rule 4 tests this only for A3.
+- **Population changes.** Both-budgets (main set) and the second set's wiring-limited and
+  both-budgets conditions lose 11–23 % of their active E units; rule 4 tests this only for
+  rate-only.
 - **Mechanism.** The rate cost is L2, which by itself favours spreading activity thinly, not
   concentrating it. Why low firing narrows tuning is not addressed here.
 - **Metric choices.** Breadth depends on the activity cut-off (1 %) and the normalization; the
   threshold was varied (0.3–0.7), the activity cut-off was not.
-- **Cost measurement.** The evaluated firing-rate cost is 1.3–2.0 times the training-time cost the
-  budget acts on, for reasons not identified (see Results).
+- **Cost measurement.** The rate cost measured after training is 1.3–2.0 times the training-time
+  value the budget acts on (rate-only: 0.0018–0.0022 against its 0.0011 budget). The ratio is
+  similar in every budgeted condition, including wiring-only, where the rate budget is loose, and
+  noise does not explain it (re-simulating one network with and without training noise changes the
+  cost by 2 %). Its source was not identified; all comparisons use the after-training value.
 
 ## Next steps
 
 - A wiring sweep with firing rate measured, to separate the wiring level from the firing rate it
   induces (the exploratory account predicts breadth follows firing rate across both budgets).
-- Matched-accuracy comparisons with more seeds per condition.
-- Find the source of the training vs evaluation gap in the firing-rate cost.
-- I units, reported but not analysed here (their breadth moves less than E's).
+- Matched-accuracy comparisons with more networks per condition.
+- Find the source of the gap between the training-time and after-training rate cost.
+- I units, reported but not analysed here (their breadth changes less than E's).
 
 ## References
 
