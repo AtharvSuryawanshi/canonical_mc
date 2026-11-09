@@ -1,6 +1,10 @@
 ---
 title: "Which cost makes neurons specialize?"
 subtitle: "Firing-rate and wiring budgets and the task breadth of excitatory units in multitask recurrent networks"
+author:
+  - name: Atharv Suryawanshi
+    affiliations:
+      - name: "MSc Neuroscience"
 date: 2026-11-09
 format:
   html:
@@ -8,6 +12,8 @@ format:
     toc: true
     number-sections: true
 ---
+
+**Matriculation number:** ____________
 
 **Code, data and pipeline:** [github.com/AtharvSuryawanshi/canonical_mc](https://github.com/AtharvSuryawanshi/canonical_mc/tree/selectivity-report-v1),
 at the tag `selectivity-report-v1`, the exact version this report was built from (see [Reproduce](#reproduce)).
