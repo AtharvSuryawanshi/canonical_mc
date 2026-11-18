@@ -1,0 +1,12 @@
+% Vector crops of Yang et al. 2019 (Nat. Neurosci.) figures, from papers/yang2019.pdf.
+% Build (in presentation/figs): pdflatex yang2019_crops.tex
+% Page 1 = Fig. 1b (inputs -> network -> outputs), page 2 = Fig. 2a-c (task variance, clusters).
+% trim = left bottom right top, in bp from the edges of the 595.276 x 790.866 page.
+\documentclass[multi=cropfig,border=0pt]{standalone}
+\usepackage{graphicx}
+\newenvironment{cropfig}{}{}
+\newcommand{\paper}{../../papers/yang2019.pdf}
+\begin{document}
+\begin{cropfig}\includegraphics[page=2,trim=284 612.866 89.276 65,clip]{\paper}\end{cropfig}
+\begin{cropfig}\includegraphics[page=3,trim=112 548.866 117.276 52,clip]{\paper}\end{cropfig}
+\end{document}

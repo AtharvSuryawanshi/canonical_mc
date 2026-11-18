@@ -1,12 +1,13 @@
-"""Task-variance clustering, E and I separately, for the four fanin save-at networks (150k, seed 0).
+"""Task-variance clustering, E and I separately, for the four fanin networks (150k; default: save-at run, seed 0).
 
 Same method as reports/ei_modularity/make_figures.py (cluster_pop and tv_panel copied from there):
 active units (total task variance > 1% of max), each unit divided by its own max, E and I clustered
 separately with k-means, k by the local-max silhouette rule (k > 2; E up to 20, I up to 10).
 
     python results/scripts/fig_tv_ei_fanin.py [step]    # default: final (150k); or e.g. 50000
+    python results/scripts/fig_tv_ei_fanin.py --run 5seed --seed 4    # the 5-seed run, seed 4 at every point
 
-Writes results/front/tv_ei_fanin_<step>.png, tv_ei_fanin_<step>_sil.png (silhouette vs k, E and I,
+Writes results/front/tv_ei_fanin_<step>.png (other run / seed: tv_ei_fanin_<run>_s<seed>_<step>.png, same suffixes), tv_ei_fanin_<step>_sil.png (silhouette vs k, E and I,
 chosen k as a dashed line) and tv_ei_fanin_<step>_wiring.png: task similarity and wiring between all E and
 I groups (as notebooks/ei_groups_figures.ipynb, Figure 2: standardised |w| = |W| / E-I row scale, mean over
 group pairs without self-pairs, z-scored against 500 shuffles of group labels within E and within I; groups
@@ -29,7 +30,9 @@ from cmc.task import rule_name
 from cmc.train_cog import load_checkpoint
 
 REPO = Path(__file__).resolve().parents[2]
-RUN = REPO / "runs/moo_zoom/dale_all_woutfree_fanin_4pt_1seed_150k_saveat"
+RUNS = {"saveat": REPO / "runs/moo_zoom/dale_all_woutfree_fanin_4pt_1seed_150k_saveat",   # 1 seed, saved along training
+        "5seed": REPO / "runs/moo_zoom/dale_all_woutfree_fanin_4pt_5seed_150k"}           # 5 seeds, final only
+RUN = RUNS["saveat"]
 POINTS = {"control": "Unconstrained", "A3": "A3, rate only", "B0": "B0, wiring only", "C0": "C0, both"}
 COLORS = {"control": "#444444", "A3": "#d62728", "B0": "#1f77b4", "C0": "#2ca02c"}   # as in the E/I report
 
@@ -88,25 +91,28 @@ def tv_panel(ax, R, pop, show_y, head=""):
     ax.spines[:].set_visible(False)
 
 
-def main(step=None):
+def main(step=None, run="saveat", seed=0):
     sub = "" if step is None else f"step_{int(step):06d}/"
     tag = "150k" if step is None else f"{int(step) // 1000}k"
+    if (run, seed) != ("saveat", 0):
+        tag = f"{run}_s{seed}_{tag}"
+    who = f"{run} run, seed {seed}"
     fig = plt.figure(figsize=(7.2, 9.6))
     gs = fig.add_gridspec(4, 2, width_ratios=[204, 80], left=0.12, right=0.99, top=0.93, bottom=0.03,
                           hspace=0.5, wspace=0.05)
     ALL = {}
     for i, (p, name) in enumerate(POINTS.items()):
-        R = ALL[p] = analyse(RUN / p / f"{sub}seed_00.pt")
+        R = ALL[p] = analyse(RUNS[run] / p / f"{sub}seed_{seed:02d}.pt")
         tv_panel(fig.add_subplot(gs[i, 0]), R, "E", True, head=f"{name} (min task acc {R['acc']:.2f})   ")
         tv_panel(fig.add_subplot(gs[i, 1]), R, "I", False)
         print(p, {pop: (R[pop]["K"], round(R[pop]["sil"], 2), round(R[pop]["breadth"], 1)) for pop in "EI"})
-    fig.suptitle(f"Task variance, E and I clustered separately: cog20, fanin, {tag} steps, seed 0", fontsize=9)
+    fig.suptitle(f"Task variance, E and I clustered separately: cog20, fanin, 150k steps, {who}", fontsize=9)
     out = REPO / "results/front" / f"tv_ei_fanin_{tag}.png"
     fig.savefig(out, dpi=200)
     plt.close(fig)
     print("->", out)
-    plot_silhouette(ALL, tag)
-    plot_wiring(ALL, tag)
+    plot_silhouette(ALL, tag, who)
+    plot_wiring(ALL, tag, who)
 
 
 N_SHUFFLE, MIN_GROUP = 500, 4
@@ -171,7 +177,7 @@ def matrix_panel(ax, M, w, cmap, lim, cbar_label):
     cb.ax.tick_params(labelsize=6)
 
 
-def plot_wiring(ALL, tag):
+def plot_wiring(ALL, tag, who="saveat run, seed 0"):
     fig, axes = plt.subplots(len(ALL), 2, figsize=(13, 6.2 * len(ALL)))
     for r, (p, R) in enumerate(ALL.items()):
         w = wiring(R)
@@ -194,7 +200,7 @@ def plot_wiring(ALL, tag):
         ax.set_title(f"wiring, row → column group\n{summ}", loc="left", fontsize=7.5)
         ax.set_xlabel("to (post)", fontsize=7); ax.set_ylabel("from (pre)", fontsize=7)
         print(p, {k: {kk: round(vv, 2) for kk, vv in v.items()} for k, v in w["q"].items()})
-    fig.suptitle(f"Task similarity (left) and wiring (right) between all E and I groups: fanin, {tag} steps, seed 0",
+    fig.suptitle(f"Task similarity (left) and wiring (right) between all E and I groups: fanin, 150k steps, {who}",
                  fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.985))
     out = REPO / "results/front" / f"tv_ei_fanin_{tag}_wiring.png"
@@ -203,7 +209,7 @@ def plot_wiring(ALL, tag):
     print("->", out)
 
 
-def plot_silhouette(ALL, tag):
+def plot_silhouette(ALL, tag, who="saveat run, seed 0"):
     fig, axes = plt.subplots(1, 2, figsize=(9, 3.4), sharey=True)
     for ax, pop in zip(axes, "EI"):
         for p, R in ALL.items():
@@ -217,7 +223,7 @@ def plot_silhouette(ALL, tag):
         ax.legend(fontsize=7, frameon=False)
         ax.spines[["top", "right"]].set_visible(False)
     axes[0].set_ylabel("silhouette score")
-    fig.suptitle(f"Silhouette vs k (dashed: chosen k, best local maximum with k > 2): fanin, {tag} steps, seed 0",
+    fig.suptitle(f"Silhouette vs k (dashed: chosen k, best local maximum with k > 2): fanin, 150k steps, {who}",
                  fontsize=9)
     fig.tight_layout()
     out = REPO / "results/front" / f"tv_ei_fanin_{tag}_sil.png"
@@ -227,4 +233,10 @@ def plot_silhouette(ALL, tag):
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:])
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("step", nargs="?", type=int, default=None)
+    ap.add_argument("--run", choices=sorted(RUNS), default="saveat")
+    ap.add_argument("--seed", type=int, default=0)
+    a = ap.parse_args()
+    main(a.step, a.run, a.seed)

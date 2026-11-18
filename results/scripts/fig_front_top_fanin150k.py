@@ -33,6 +33,7 @@ RUN_GLOBS = ["runs/moo/dale_all_grid29_fanin_150k_*",
              "runs/moo_zoom/dale_all_woutfree_fanin_4pt_5seed_150k",
              "runs/moo_zoom/dale_all_woutfree_fanin_4pt_1seed_150k_saveat"]
 OUT = REPO / "results/front"
+EXAMPLE = ("dale_all_woutfree_fanin_4pt_5seed_150k", 4)   # (run, seed): the example networks ringed on the top view
 
 
 def load():
@@ -66,10 +67,14 @@ def main():
         ax.annotate({"control": "Unconstrained", "A3": "A3 rate", "B0": "B0 wiring", "C0": "C0 both"}[p],
                     (g.x.mean(), g.y.mean()), xytext=(0, 10), textcoords="offset points", ha="center",
                     fontsize=8, color="#1f3b73")
+    ex = d[(d.run == EXAMPLE[0]) & (d.seed == EXAMPLE[1])]
+    ax.scatter(ex.x, ex.y, s=230, facecolors="none", edgecolors="#1f3b73", linewidths=1.8, zorder=4)
     fig.colorbar(sc, ax=ax).set_label("Min Task Accuracy")
     ax.scatter([], [], marker="X", c="0.6", label=f"infeasible (< {FEASIBLE_MIN_TASK_ACC})")
     ax.scatter([], [], c="0.6", label="feasible")
     ax.scatter([], [], c="0.6", edgecolors="k", label="Pareto front")
+    ax.scatter([], [], s=120, facecolors="none", edgecolors="#1f3b73", linewidths=1.8,
+               label=f"example network (seed {EXAMPLE[1]})")
     ax.legend(fontsize=7, frameon=False, loc="lower right")
     ax.set_xlabel("log(Firing cost)")
     ax.set_ylabel("log(Connectivity cost)")

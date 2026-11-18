@@ -1,0 +1,10 @@
+% Vector crop of Song, Yang & Wang 2016 (PLoS Comput. Biol.) Fig. 1, from papers/song2016.pdf.
+% Build (in presentation/figs): pdflatex song2016_crops.tex
+% trim = left bottom right top, in bp from the edges of the 612 x 792 page.
+\documentclass[multi=cropfig,border=0pt]{standalone}
+\usepackage{graphicx}
+\newenvironment{cropfig}{}{}
+\newcommand{\paper}{../../papers/song2016.pdf}
+\begin{document}
+\begin{cropfig}\includegraphics[page=3,trim=200 540 37 70,clip]{\paper}\end{cropfig}
+\end{document}
