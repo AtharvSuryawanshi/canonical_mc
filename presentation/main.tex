@@ -309,6 +309,107 @@
   This network (seed 4): $\rho_{\text{I}\to\text{E}} = +0.16$, $\rho_{\text{E}\to\text{I}} = +0.59$, E$\to$E within/between 7.77. \quad All 5 seeds: $\rho_{\text{I}\to\text{E}}$ $+0.07$ to $+0.39$; $\rho_{\text{E}\to\text{I}}$ $+0.36$ to $+0.62$; E$\to$E 2.84--7.77.
 \end{frame}
 
+% ---------------------------------------------------------------- experimental (draft, not decided)
+
+\begin{frame}
+  \centering
+  {\Large Experimental}\\[0.6em]
+  \small\color{gray} Draft slides: task periods (Driscoll et al.\ 2024) and like-to-like wiring
+\end{frame}
+
+\begin{frame}{Task variance per task period \hfill{\scriptsize\color{gray}experimental}}
+  \begin{columns}[c]
+    \begin{column}{0.6\textwidth}
+      \scriptsize
+      \textbf{Per task period}, not per task: periods $p \in \{$stimulus 1, memory 1, stimulus 2, memory 2,
+      response$\}$, fixation left out $\to$ 59 (task, period) rows.
+      \[
+        \mathrm{TV}_{i,(a,p)} = \frac{1}{|T_p|}\sum_{t \in T_p} \mathrm{Var}_{\text{trials}}\, r_i(t)
+      \]
+      Length-weighted mean over a task's periods = per-task TV (to $3\cdot10^{-7}$).\\[0.4em]
+      \textbf{Normalise}: each active neuron (total TV $> 1\%$ of max) divided by its max over the rows,
+      $x_i \in [0,1]^{59}$.\\[0.4em]
+      \textbf{Ward clustering} of neurons (columns) and of task periods (rows): merge the pair that least increases
+      the within-cluster variance,
+      \[
+        \Delta(A,B) = \frac{|A|\,|B|}{|A|+|B|}\,\big\lVert \mu_A - \mu_B \big\rVert^2 .
+      \]
+      $k$ per axis: highest silhouette over $k = 3,\dots,39$. \ \textbf{Sparsity}: fraction of entries $< 0.15$.\\[0.5em]
+      \tiny\color{gray} As Driscoll et al.\ except: active rule ($>1\%$ vs $>10^{-3}$), random trials instead of a
+      stimulus grid, $k$ by silhouette instead of a fixed cut height; E and I clustered together.
+    \end{column}
+    \begin{column}{0.38\textwidth}
+      \centering
+      \includegraphics[height=0.78\textheight]{figs/driscoll2024_crops.pdf}\\[0.2em]
+      \tiny\color{gray} Driscoll, Shenoy \& Sussillo (2024). \emph{Nat.\ Neurosci.} 27, 1349--1363. Fig.~3a.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Task periods: no budget vs.\ rate budget \hfill{\scriptsize\color{gray}experimental}}
+  \centering
+  \includegraphics[height=0.8\textheight]{../results/front/tv_period_driscoll_control_s4.png}\hspace{3em}
+  \includegraphics[height=0.8\textheight]{../results/front/tv_period_driscoll_A3_s4.png}\\[0.2em]
+  \scriptsize Example network (seed 4). Sparsity \textcolor{Ecol}{E} / \textcolor{Icol}{I}: control 0.43 / 0.39,
+  A3 0.79 / 0.62. Row label colour = period type.
+\end{frame}
+
+\begin{frame}{Task periods: wiring budget vs.\ both \hfill{\scriptsize\color{gray}experimental}}
+  \centering
+  \includegraphics[height=0.8\textheight]{../results/front/tv_period_driscoll_B0_s4.png}\hspace{3em}
+  \includegraphics[height=0.8\textheight]{../results/front/tv_period_driscoll_C0_s4.png}\\[0.2em]
+  \scriptsize Example network (seed 4). Sparsity \textcolor{Ecol}{E} / \textcolor{Icol}{I}: B0 0.48 / 0.48,
+  C0 0.69 / 0.63. Row label colour = period type.
+\end{frame}
+
+\begin{frame}{Like-to-like wiring \hfill{\scriptsize\color{gray}experimental}}
+  \footnotesize
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \textbf{Similarity} of neurons $i, j$: correlation of their period profiles
+      \[
+        s_{ij} = \mathrm{corr}(x_i, x_j), \qquad x_i \in [0,1]^{59}
+      \]
+      \textbf{Connected} $j \to i$ (same $c_j$ as the wiring cost):
+      \[
+        C_{ij} = \mathbb{1}\big[\, |W^{\mathrm{rec}}_{ij}| / c_j > 0.01 \,\big]
+      \]
+      Separately for \textcolor{Ecol}{E}$\to$\textcolor{Ecol}{E}, \textcolor{Ecol}{E}$\to$\textcolor{Icol}{I},
+      \textcolor{Icol}{I}$\to$\textcolor{Ecol}{E}, \textcolor{Icol}{I}$\to$\textcolor{Icol}{I}.
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{AUC}: are connected pairs more similar than unconnected ones?
+      \[
+        \mathrm{AUC} = P\big(s_{\text{conn}} > s_{\text{unconn}}\big) = \frac{R_1 - n_1(n_1+1)/2}{n_1\, n_0}
+      \]
+      $R_1$: rank sum of the $n_1$ connected pairs among all $n_1 + n_0$.\\[0.4em]
+      \textbf{ROC}: slide a threshold $\theta$ over $s$,
+      \begin{align*}
+        \mathrm{TPR}(\theta) &= P(s_{\text{conn}} > \theta), \quad \mathrm{FPR}(\theta) = P(s_{\text{unconn}} > \theta)\\
+        \mathrm{AUC} &= \textstyle\int_0^1 \mathrm{TPR}\; d\,\mathrm{FPR}
+      \end{align*}
+    \end{column}
+  \end{columns}
+  \vspace{0.6em}
+  \begin{itemize}
+    \item 0.5: no relation; $>0.5$ like-to-like; $<0.5$ like-to-unlike. Does not depend on how many synapses are kept.
+    \item Null: shuffle profiles within E and within I, wiring fixed, 500$\times$;
+          $p = \big(1 + \#\{|\mathrm{AUC}_{\text{null}} - 0.5| \geq |\mathrm{AUC} - 0.5|\}\big) / 501$.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Like-to-like wiring: example network \hfill{\scriptsize\color{gray}experimental}}
+  \centering
+  \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{../results/front/wiring_roc_all_s4.png}
+\end{frame}
+
+\begin{frame}{Like-to-like wiring: all 20 networks \hfill{\scriptsize\color{gray}experimental}}
+  \centering
+  \includegraphics[width=\textwidth,height=0.76\textheight,keepaspectratio]{../results/front/wiring_roc_all_5seed.png}\\[0.2em]
+  \scriptsize C0 is also the sparsest (0.7\% of synapses kept). Keeping only the strongest synapses of B0 at C0's
+  sparsity leaves \textcolor{Ecol}{E}$\to$\textcolor{Ecol}{E} at AUC 0.52 (C0: 0.68): not sparsity alone (post hoc, 5 seeds).
+\end{frame}
+
 \begin{frame}
   \centering\Huge Thank you
 \end{frame}

@@ -1,9 +1,10 @@
-# Session handoff, updated 2026-11-18 (late evening, Linux)
+# Session handoff, updated 2026-11-18 (night, Linux)
 
 Read this first in a new Claude Code session, together with `CLAUDE.md`. **Section 8 is the newest**: the
 Driscoll-style analysis (task variance per period, fixed points) and the clustering-free like-to-like wiring test,
-which is currently the strongest result. Section 7 is the talk in `presentation/`. Sections 1–6 are the project
-state.
+which is currently the strongest result. Both are now in the deck as a draft **Experimental** section (§7).
+§8.5 records the open "how does it work locally?" question and what was ruled out. Section 7 is the talk in
+`presentation/`. Sections 1–6 are the project state.
 
 ## 1. Working rules
 
@@ -132,7 +133,7 @@ Built in Beamer, `presentation/main.tex`; outline with talking points, sources a
 **`presentation/presentation.md`** (keep it in sync with main.tex). Build: `cd presentation && pdflatex main.tex`
 twice (needs `animate`; Okular is installed on Linux; on Windows present with Acrobat Reader or Okular).
 
-Current deck (21 pages), outline numbering:
+Current deck (28 pages), outline numbering:
 
 | # | slide | made from |
 |---|---|---|
@@ -152,6 +153,12 @@ Current deck (21 pages), outline numbering:
 | 13 | Task variance and the number of groups (TV + silhouette math) | seed-4 `_sil.png` |
 | 14–15 | E and I groups (2 points per slide) | seed-4 crops |
 | 16–19 | Task similarity and wiring, one per point | seed-4 crops, captions with 5-seed ranges |
+| – | **Experimental** divider (draft section, user decides later what stays) | Beamer |
+| E1 | Task variance per task period (math) + Driscoll Fig 3a crop | `figs/driscoll2024_crops.pdf` |
+| E2–E3 | Task periods, Driscoll style: control/A3, B0/C0 | `tv_period_driscoll_<p>_s4.png` |
+| E4 | Like-to-like wiring (math: s_ij, connected, AUC, ROC, shuffle p) | Beamer |
+| E5 | Like-to-like, seed 4 | `wiring_roc_all_s4.png` |
+| E6 | Like-to-like, all 20 networks + sparsity caveat | `wiring_roc_all_5seed.png` |
 | – | Thank you | |
 
 User's style preferences for the slides:
@@ -173,13 +180,17 @@ User's style preferences for the slides:
    barely binds), open questions, thank you.
 5. **One E/I colour convention**: Figma setup figure = red E / blue I; Beamer (Song colours) = blue E / red I.
 6. Figma `Fig_setup` says "Connectivity cost (L1)"; slides say "wiring". Unify.
-7. Commits: the user committed the deck and the first Driscoll work (`92aa206 driscoll analysis`). **Still
-   uncommitted** (see §8): the wiring scripts `results/scripts/fig_wiring_*.py`, their outputs in `results/front/`
-   (`wiring_*`, the 16 `tv_period_<point>_s{0..3}.npz` caches), `results/front/dynamics_gifs/` (~25 MB of GIFs),
-   and `papers/driscoll2024.pdf` (renamed from `discroll2022.pdf`; the paper is Nat Neurosci 2024). LaTeX aux files
-   and `frames/` PNGs could go in `.gitignore`.
-8. **None of §8 is in the deck yet.** Candidate slides: per-period task variance (Driscoll Fig 3a style, control vs
-   C0), the like-to-like ROC figure (`wiring_roc_all_s4.png` + `wiring_roc_all_5seed.png`), the E→E direction chain.
+7. Commits: HEAD `cf34f4a AUROC for correlation vs wiring` has the wiring scripts, their outputs, the
+   `tv_period_*` caches and `results/front/dynamics_gifs/`. **Uncommitted** (2026-11-18 night): the Experimental
+   slides (`presentation/main.tex`, `main.pdf`, `presentation.md`), the Driscoll crop
+   (`presentation/figs/driscoll2024_crops.{tex,pdf}`), `results/front/tv_period_driscoll_{A3,B0}_s4.png`, this
+   file, `papers/driscoll2024.pdf` (still untracked) and `results/front/wiring_tuning_s4.png` (the user's own try
+   at wiring vs tuning, no script in the repo). LaTeX aux files and `frames/` PNGs could go in `.gitignore`.
+8. §8.1 and §8.3 are in the deck as a draft **Experimental** section (E1–E6, 2026-11-18); the user decides
+   later what stays. Not in yet: fixed points (§8.2), the E→E direction chain; the old group-wiring slides 16–19
+   and the new AUC slides overlap (pick one). Known cosmetic issues: the two portrait Fig 3a figures per slide
+   are small (crop the suptitles/legends if they stay); the grey "experimental" tag sits mid-title, not
+   right-aligned.
 
 ## 8. Driscoll et al. 2024 and like-to-like wiring (2026-11-18, evening)
 
@@ -203,7 +214,7 @@ Their setup: 15 tasks, softplus, no Dale, L2 on activity and weights at only 1e-
   (same `cluster_pop`), crosstab + ARI; caches `results/front/tv_period_<point>_s<seed>.npz` (all 20 exist now).
 - `results/scripts/fig_tv_period_driscoll.py [--points ...] [--seed S]`: Driscoll Fig 3a replica (Ward on units
   and on task periods, k by global silhouette 3..39, one population + E/I strip) → `tv_period_driscoll_<p>_s<s>.png`
-  (control and C0 seed 4 made). C0 unit k hits the upper bound 39 (no natural k there).
+  (all four points, seed 4, in the deck as E2–E3; k units/periods: control 3/4, A3 3/5, B0 3/3, C0 39/20). C0 unit k hits the upper bound 39 (no natural k there).
 - Seed 4 findings: control = groups follow **task families**; A3 and C0 = groups follow **computations** shared
   across tasks (stimulus per modality, memory, shared response, memory-guided response separate). B0 ≈ control.
   Driscoll sparsity (fraction of entries < 15% of unit max), E / I: control 0.43/0.39, A3 0.79/0.62, B0 0.48/0.48,
@@ -282,3 +293,26 @@ Replaces the old group wiring analysis (§4, which the user found sloppy and har
 - Fixed-point/pair analysis and per-period clustering for the other points and seeds (only C0 seed 4 done for
   fixed points; GIFs for control and C0).
 - p-values for the direction-table cells; the I→E question at the group level is answered by the AUC flip.
+
+### 8.5 "How does it work locally?" (discussed 2026-11-18 night, nothing run)
+
+The user's question: the AUC is a global statistic ("it's there"); they want the mechanism: how exactly the
+wiring differs and how the constraints change the computation, i.e. the original compositionality vs clustering
+question. What was discussed:
+- **Reframe agreed as a hypothesis, not tested:** both control and C0 compose at the level of dynamics (Dly Anti
+  stores its flipped angle on Dly Go's memory ring in both, §8.2). The open question is *where* the shared part
+  lives: a shared activity subspace spread over many neurons (control?) vs shared neurons and synapses (C0?).
+  The constraints may tie the same computation to single units (rotation symmetry broken; Whittington 2023).
+- **Ruled out by the user: local wiring statistics in C0.** Plan was Dly Go vs Dly Anti, W_ij vs preferred-angle
+  difference per wire class (memory→memory ring, Go-stim→memory at 0°, Anti-stim→memory at 180°,
+  memory→response), plus wire-class lesions. The user tried it (`results/front/wiring_tuning_s4.png`): C0 keeps
+  too few synapses (~0.8% of pairs; ≈150 E→E, ≈55 I→E, ≈20 I→I) for per-class, per-angle statistics.
+- **Proposed, not run (activity / state space, Driscoll-like):** for every pair of the 59 task periods,
+  (1) subspace overlap O(A→B) = tr(U_Aᵀ C_B U_A) / tr(U_Bᵀ C_B U_B) with U_A the top-k PCs of period A
+  (invariant to rotating the neurons: measures shared computation) and (2) neuron overlap
+  s(A,B) = corr(diag C_A, diag C_B) (basis-dependent: measures alignment to units). Same-computation period
+  pairs vs different, distributions + ROC/AUC for O and s, control vs C0. Reading: control ≈ C0 on O but only C0
+  high on s → same computation, constraints only align it to neurons; C0 > control on O → constraints change the
+  computation (more reuse). Optional: varimax rotation of control activity to look for hidden modules.
+- **The user said the analysis was "getting out of hand"** and switched to putting the existing results in the
+  deck first. Don't push new analyses; wait for the user to pick one.

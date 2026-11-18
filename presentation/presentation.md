@@ -404,6 +404,86 @@ Notes:
 
 ---
 
+## Experimental (draft; the user decides later what stays)
+
+Divider slide, then six slides tagged "experimental" in the title. Seed 4 = example network throughout.
+
+### E1. Task variance per task period (math)
+
+Left: TV per (task, period), periods stimulus 1 / memory 1 / stimulus 2 / memory 2 / response, fixation out → 59
+rows; normalise each active neuron (total TV > 1% of max) by its max; Ward on neurons and on task periods
+(merge cost Δ(A,B) = |A||B|/(|A|+|B|)·‖μ_A − μ_B‖²); k per axis = highest silhouette over 3..39; sparsity =
+fraction of entries < 0.15. Right: vector crop of Driscoll et al. 2024 Fig. 3a (`figs/driscoll2024_crops.pdf`,
+build with `pdflatex driscoll2024_crops.tex` in `figs/`, page 6 of `papers/driscoll2024.pdf`).
+
+Code: `cmc/runner.py::period_variance` (same trials and noise-free simulation as the per-task TV; the length-weighted
+mean over a task's periods reproduces the stored per-task TV to 3e-7).
+
+Notes:
+- Driscoll split by period because a task is several computations in sequence (encode, hold, respond); per task,
+  a neuron that only holds memory looks like it "does Dly Go".
+- Differences from their code: active rule (> 1% of max vs > 1e-3), random eval trials instead of a stimulus grid,
+  k by silhouette instead of the fixed cut height in their figure notebook; E and I clustered together (strip
+  under the dendrogram marks E/I).
+
+### E2–E3. Task periods: control | A3, B0 | C0
+
+Make: `python results/scripts/fig_tv_period_driscoll.py --points control A3 B0 C0 --seed 4` →
+`results/front/tv_period_driscoll_<point>_s4.png` (uses the cached `tv_period_<point>_s4.npz`).
+
+| seed 4 | active (E/I) | k units (sil) | k periods (sil) | sparsity E / I |
+|---|---|---|---|---|
+| control | 256 (204/52) | 3 (0.17) | 4 (0.41) | 0.43 / 0.39 |
+| A3 | 247 (195/52) | 3 (0.25) | 5 (0.28) | 0.79 / 0.62 |
+| B0 | 256 (204/52) | 3 (0.22) | 3 (0.35) | 0.48 / 0.48 |
+| C0 | 188 (145/43) | 39 (0.19, upper bound) | 20 (0.22) | 0.69 / 0.63 |
+
+Notes:
+- Control and B0: neuron groups follow task families (Ctx/MultSen DM, matching tasks, the rest).
+- A3 and C0: groups follow computations shared across tasks (stimulus per modality, memory, response); the
+  memory-guided response is separate.
+- Silhouette is low everywhere (≤ 0.25 on units) and C0 has no natural k (hits 39): clusters are soft; the
+  sparsity numbers are the robust part. One seed only.
+
+### E4. Like-to-like wiring (math)
+
+s_ij = corr(x_i, x_j) of the period profiles; connected j → i = |W_ij|/c_j > 0.01 (c_j as in the wiring cost);
+per type E→E, E→I, I→E, I→I: AUC = P(s_conn > s_unconn) = (R₁ − n₁(n₁+1)/2)/(n₁n₀); ROC from a sliding threshold,
+AUC = ∫ TPR dFPR. Null: 500 shuffles of profiles within E and within I (wiring fixed), two-sided
+p = (1 + #{|AUC_null − 0.5| ≥ |AUC − 0.5|})/501.
+
+Code: `results/scripts/fig_wiring_like2like.py::network`.
+
+Notes:
+- AUC does not depend on connection density (control keeps 67% of pairs, C0 0.7–0.9%), so the points compare.
+- Pairs are not independent (a neuron appears in many pairs), hence the shuffle null, not a rank test p-value.
+
+### E5. Like-to-like wiring: example network
+
+Make: `python results/scripts/fig_wiring_roc_all.py` → `results/front/wiring_roc_all_s4.png` (4 types × 4 points,
+KDE of similarity for connected vs unconnected, ROC inset).
+
+### E6. Like-to-like wiring: all 20 networks
+
+Same script → `results/front/wiring_roc_all_5seed.png`. Mean AUC (sd) over 5 seeds:
+
+| | control | A3 | B0 | C0 |
+|---|---|---|---|---|
+| E→E | 0.53 (0.01) | 0.52 (0.00) | 0.52 (0.01) | 0.68 (0.02) |
+| E→I | 0.54 (0.00) | 0.54 (0.01) | 0.56 (0.01) | 0.73 (0.02) |
+| I→E | 0.45 (0.01) | 0.49 (0.01) | 0.51 (0.01) | 0.72 (0.02) |
+| I→I | 0.48 (0.01) | 0.49 (0.01) | 0.56 (0.02) | 0.71 (0.08) |
+
+Caption: sparsity caveat (`fig_wiring_matched_sparsity.py`): B0 cut post hoc to C0's sparsity keeps E→E at 0.52.
+
+Notes:
+- Only C0 wires like-to-like, in every seed and every type.
+- Inhibition flips: control I→E < 0.5 in all seeds (I targets E doing other computations), C0 0.72 (same
+  computation).
+- Post-hoc pruning is not training under the budget; the clean test (wiring-only networks at C0's sparsity) is open.
+
+---
+
 ## Thank you
 
 Make: Beamer, centred.

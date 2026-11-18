@@ -1,0 +1,10 @@
+% Vector crop of Driscoll, Shenoy & Sussillo 2024 (Nat. Neurosci.) Fig. 3a, from papers/driscoll2024.pdf.
+% Build (in presentation/figs): pdflatex driscoll2024_crops.tex
+% trim = left bottom right top, in bp from the edges of the 595.276 x 790.866 page.
+\documentclass[multi=cropfig,border=0pt]{standalone}
+\usepackage{graphicx}
+\newenvironment{cropfig}{}{}
+\newcommand{\paper}{../../papers/driscoll2024.pdf}
+\begin{document}
+\begin{cropfig}\includegraphics[page=6,trim=12 417 311 52,clip]{\paper}\end{cropfig}
+\end{document}
