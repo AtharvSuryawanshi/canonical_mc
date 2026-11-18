@@ -1,0 +1,29 @@
+% Test deck. Build: python presentation/make_frames.py, then pdflatex main.tex (in presentation/).
+% The animation plays in Acrobat / Okular; other viewers show the first frame.
+\documentclass[aspectratio=169]{beamer}
+\usetheme{default}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\usepackage{animate}
+
+\title{Multitask Dale's-law RNNs under metabolic and wiring budgets}
+\author{Atharv Suryawanshi}
+\institute{Helmholtz Munich}
+\date{\today}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Pareto front: cog20, 150k steps}
+  \centering
+  \animategraphics[autoplay,loop,controls,height=0.8\textheight]{10}{frames/front_}{000}{059}
+\end{frame}
+
+\begin{frame}
+  \centering\Huge Thank you
+\end{frame}
+
+\end{document}
