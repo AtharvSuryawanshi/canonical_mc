@@ -252,3 +252,37 @@ def activity_summary(model, train_config, active_tasks, device, eval_seeds, batc
             tvs.append(np.mean(per_seed_tv, axis=0))
             rates.append(np.mean(per_seed_rate, axis=0))
     return np.stack(tvs).astype(np.float32), np.stack(rates).astype(np.float32)
+
+
+def period_variance(model, train_config, active_tasks, device, eval_seeds, batch_size):
+    """Task variance split by task period (Driscoll et al. 2024): one row per (task, period).
+
+    Same trials and same quantity as activity_summary (variance across trials at each time
+    step, noise-free), averaged over each non-fixation epoch instead of the whole
+    post-fixation trial. Returns (tv, keys, tv_seed, lengths): tv (n_rows, N) is the mean
+    over eval seeds, keys the (task, period) of each row, tv_seed (n_seeds, n_rows, N) and
+    lengths (n_seeds, n_rows) the per-seed values and epoch lengths in steps. Per seed,
+    the length-weighted mean of a task's rows is exactly activity_summary's task variance.
+    """
+    keys, tv_seed, lengths = [], [], []          # tv_seed / lengths: one list over eval seeds per row
+    with torch.no_grad():
+        for rule in active_tasks:
+            rows = {}
+            for seed_k in eval_seeds:
+                cfg = eval_config_from(train_config, seed_k, easy_task=True)
+                trial = generate_trials(rule, cfg, batch_size, noise_on=False)
+                x, _, _, _ = trial_to_tensors(trial, device)
+                r_hist, _, _ = model.simulate(x, noise_level=0.0)
+                v = r_hist.var(dim=0).cpu().numpy()                       # (T, N): variance across trials
+                T = v.shape[0]
+                for e, (s, t) in trial.epochs.items():
+                    if e != "fix1":
+                        s, t = s or 0, t or T
+                        rows.setdefault(e, []).append((v[s:t].mean(axis=0), t - s))
+            for e, per_seed in rows.items():
+                keys.append((rule, e))
+                tv_seed.append([tv for tv, _ in per_seed])
+                lengths.append([n for _, n in per_seed])
+    tv_seed = np.swapaxes(np.array(tv_seed), 0, 1)                         # (n_seeds, n_rows, N)
+    lengths = np.array(lengths).T                                           # (n_seeds, n_rows)
+    return tv_seed.mean(axis=0).astype(np.float32), keys, tv_seed.astype(np.float32), lengths
