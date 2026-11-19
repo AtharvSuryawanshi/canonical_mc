@@ -230,3 +230,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Large paper PDFs (too big for git)
+papers/driscoll2024.pdf

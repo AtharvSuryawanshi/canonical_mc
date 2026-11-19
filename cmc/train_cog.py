@@ -55,12 +55,18 @@ def masked_mse(output, y, c_mask, per_trial=True):
     out on the ring with ``get_dist`` (circular distance), so a 1 deg error near
     180 deg costs the same as a 1 deg error near 0 deg. Only the *decoding* in
     batch_accuracy had a wrap bug.
+
+    The mask is squared, as in Yang's network.py (``tf.square((y - y_hat) * c_mask)``): with mask values
+    1 / 2 (pre-response ring / fixation) and 5 / 10 (response), the effective weights are 1 / 4 / 25 / 100.
+    Until 2026-11-19 the mask entered linearly (1 / 2 / 5 / 10), see FIXED_ISSUES #18. The per-trial
+    normalisation divides by the trial's sum of squared mask weights.
     """
-    err = c_mask * (output - y).square()
+    w = c_mask.square()
+    err = w * (output - y).square()
     if not per_trial:
         return err.mean()
     num = err.flatten(1).sum(dim=1)
-    den = c_mask.flatten(1).sum(dim=1).clamp_min(1e-8)
+    den = w.flatten(1).sum(dim=1).clamp_min(1e-8)
     return (num / den).mean()
 
 
@@ -596,8 +602,13 @@ def _serialize_config(config):
 
 
 def _restore_config(config_dict, seed=0):
-    """Rebuild config for trial generation, including a fresh RNG."""
+    """Rebuild config for trial generation, including a fresh RNG.
+
+    Checkpoints saved before the 2026-11-19 task fix have no "task_version" and are pinned to "v1", so
+    old networks are evaluated on the trials they were trained on (FIXED_ISSUES #15-#17).
+    """
     config = dict(config_dict)
+    config.setdefault("task_version", "v1")
     config["rng"] = np.random.RandomState(seed)
     return config
 

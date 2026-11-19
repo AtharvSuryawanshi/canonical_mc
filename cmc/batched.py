@@ -126,12 +126,13 @@ class BatchedDaleRNN(torch.nn.Module):
 # --------------------------------------------------------------------------- costs, [P] each
 
 def masked_mse_batched(output, y, c_mask, per_trial=True):
-    """train_cog.masked_mse per network. output (P,B,T,O); y, c_mask (B,T,O)."""
-    err = c_mask * (output - y).square()
+    """train_cog.masked_mse per network (squared mask, as Yang). output (P,B,T,O); y, c_mask (B,T,O)."""
+    w = c_mask.square()
+    err = w * (output - y).square()
     if not per_trial:
         return err.flatten(1).mean(dim=1)
     num = err.flatten(2).sum(dim=2)
-    den = c_mask.flatten(1).sum(dim=1).clamp_min(1e-8)
+    den = w.flatten(1).sum(dim=1).clamp_min(1e-8)
     return (num / den).mean(dim=1)
 
 

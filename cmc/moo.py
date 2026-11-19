@@ -512,6 +512,7 @@ def main(argv=None):
                   "final_lambda_rate", "final_lambda_connectivity", "min_task_acc",
                   "metabolic_cost", "wiring_cost", "conn_frac", "generation"]
     summary = {
+        "task_version": "yang",  # task generators + squared loss mask (FIXED_ISSUES #15-#18)
         "genome": args.genome,
         "model": args.model,
         "task_battery": battery_label,

@@ -63,6 +63,11 @@ regress them:
    rate, L1 for connectivity (wiring), both population-weighted so E and I
    aren't penalized asymmetrically by accident.
 6. Default eval noise level is `DALE_DEFAULT_NOISE_LEVEL = 0.1`.
+7. **Task generators match Yang 2019 (since 2026-11-19, `config["task_version"] = "yang"`).** Before
+   that, Go/Anti/RT always used ring 1, RT switched the fixation input off at stimulus onset, Go/Anti
+   switched the stimulus off at go, and the loss mask was linear instead of squared (reports/FIXED_ISSUES.md
+   #15-#18). Old checkpoints restore as `"v1"` and keep their old trials. **Every run before 2026-11-19 is
+   on the v1 battery** and not comparable with runs after the fix. `Trial.add("stim")` requires `mods`.
 
 **Deliberately not changed / open:** `rho(W_rec)` is only enforced at init
 and can drift during training; L1 is a proxy for connection count, not

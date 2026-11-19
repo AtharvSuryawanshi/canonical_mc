@@ -214,6 +214,7 @@ def main(argv=None):
         for name, lr, lc in points
     }
     summary = {
+        "task_version": "yang",  # task generators + squared loss mask (FIXED_ISSUES #15-#18)
         "model": args.model,
         "task_battery": battery_label,
         "active_tasks": list(active_tasks),

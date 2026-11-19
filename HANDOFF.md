@@ -1,10 +1,45 @@
-# Session handoff, updated 2026-11-18 (night, Linux)
+# Session handoff, updated 2026-11-19 (Windows) — read §0 first
 
 Read this first in a new Claude Code session, together with `CLAUDE.md`. **Section 8 is the newest**: the
 Driscoll-style analysis (task variance per period, fixed points) and the clustering-free like-to-like wiring test,
 which is currently the strongest result. Both are now in the deck as a draft **Experimental** section (§7).
 §8.5 records the open "how does it work locally?" question and what was ruled out. Section 7 is the talk in
 `presentation/`. Sections 1–6 are the project state.
+
+## 0. BIG FIX, 2026-11-19 (Windows): task generators and loss now match Yang. All earlier runs are "v1".
+
+A line-by-line audit against `gyyang/multitask` (subagent + bit-exact comparison on the same seeds) found
+that 6 of 20 tasks differed from Yang since the first commit, and that the loss mask entered linearly:
+- **Go/Anti/RT/Dly Go/Dly Anti never used ring 2** (no `mods`; `Trial.add` defaulted to ring 1).
+- **RT Go/Anti switched the fixation input off at stimulus onset** (Yang keeps it on: the stimulus is the go signal).
+- **Go/Anti switched the stimulus off at go** (Yang keeps it on through the response).
+- **Loss mask linear (1/2/5/10) instead of Yang's squared (1/4/25/100).**
+
+Fixed in `cmc/task.py`, `cmc/train_cog.py`, `cmc/batched.py`; details, checks and remaining deliberate
+differences (easy coherence band, 16-unit rings, mixed batches of 32) in `reports/FIXED_ISSUES.md` #15-#18.
+`config["task_version"]`: `"yang"` for new runs, old checkpoints restore as `"v1"` (same accuracy as before,
+checked). All six fixed tasks are bit-identical to Yang now. `tests/test_tasks.py` (21 tests incl.
+`test_batched.py`, all pass; pytest installed in cmc_env).
+
+**Consequence:** every run and result below (fronts, 4pt and grid runs, modularity, AUC, lesions, deck numbers)
+is on the v1 battery. Comparisons between budget points stay internally consistent, but nothing is "the Yang
+battery"; modality-related results are the most affected. The NSGA-III cluster run (§3) is also v1.
+
+Smoke test (`results/scripts/smoke_task_fix.py`, 1k steps, the 6 changed tasks, 256 Dale units, fanin, no budget,
+yang vs v1, same seed): both train. Go/Anti learn faster with the fix (stimulus visible during the response), RT
+the same, Dly Go/Anti slower (0.47/0.45 vs 1.00/0.69 at 1k: memory for two rings). Figures
+`results/front/smoke_task_fix_curves.png`, `smoke_task_fix_trials.png`.
+
+**Next (agreed):** retrain on the fixed battery, bigger runs after the smoke test: first 4 points x 5 seeds, 150k,
+fanin (+ one save-at seed), then the front. Then rerun the analyses (tuning breadth, like-to-like AUC, E/I
+modularity, per-period TV, lesions) and compare with v1.
+
+Lesion work from 2026-11-19 (v1 networks, seed 4, `results/scripts/fig_lesion_period.py`,
+`fig_lesion_contrast_grid.py`): per-period clusters, Driscoll Fig. 5 module contrasts. Results depend on k,
+not on k-means vs Ward; Driscoll's own k rule picks 3 for control/A3/B0 and 39 for C0 (E+I together), 3-5 for
+everything when E and I are separate. At a shared k (Ward 14 E / 5 I) A3 lesions do the least damage and are the
+most specific; control and C0 differ only modestly. Eval trials: Go/Anti matching-task rings drawn once per batch
+(as in Yang); task-variance profiles are reliable (split-half r ≈ 0.97).
 
 ## 1. Working rules
 

@@ -405,6 +405,45 @@ statistically valid but not bit-reproducible.
 
 ---
 
+## 15-18. Go / Anti / RT generators differed from Yang, and the loss mask was linear (2026-11-19)
+
+Found by a line-by-line audit of `cmc/task.py` against Yang's `gyyang/multitask/task.py` (and by running both
+generators on the same seeds). Present since the first commit; every network trained before 2026-11-19 has them.
+
+| # | Tasks | Yang | Ours before | Effect |
+|---|---|---|---|---|
+| 15 | Go, Anti, RT Go, RT Anti, Dly Go, Dly Anti | `stim_mod = rng.choice([1, 2])` once per batch | no `mods` argument; `Trial.add` defaulted to ring 1, so ring 2 never appeared in these 6 tasks (training and eval) | 6 of 20 tasks never used the second input modality |
+| 16 | RT Go, RT Anti | `trial.add('fix_in')`: fixation input on for the whole trial, stimulus onset is the go signal | `fix_in` off at stimulus onset | the reaction-time logic was lost: the network got the usual fixation-off go cue |
+| 17 | Go, Anti | stimulus stays on through the response (`add('stim', ...)` without `offs`) | stimulus off at the go cue | Go/Anti became Dly Go/Anti with zero delay (location held from memory during the response) |
+| 18 | all | `tf.square((y - y_hat) * c_mask)`: mask squared, effective weights 1 / 4 (pre-response ring / fixation), 25 / 100 (response) | `c_mask * err**2`: 1 / 2 / 5 / 10 | response vs pre-response weighted 5:1 instead of 25:1, fixation 2:1 instead of 4:1 |
+
+**Fix.**
+- `cmc/task.py`: the three generators draw the ring as Yang does (same RNG order, so trials are seed-for-seed
+  identical to Yang: all six tasks 40/40 bit-identical, with and without input noise); RT keeps `fix_in` on;
+  Go/Anti keep the stimulus on. `Trial.add("stim", ...)` now raises if `mods` is missing (the silent default
+  hid #15).
+- `config["task_version"]`: `"yang"` (new default in `default_config`) or `"v1"` (old generators). Checkpoints
+  saved before the fix have no key and are restored as `"v1"` (`train_cog._restore_config`), so all existing
+  networks are still evaluated on the trials they were trained on (checked: C0 seed 4 gives the same accuracy,
+  0.900 / 0.982, as before). Run summaries record `"task_version": "yang"`.
+- `train_cog.masked_mse` and `batched.masked_mse_batched` square the mask; the per-trial normalisation divides
+  by the trial's sum of squared mask weights. The loss is not versioned: retraining an old configuration now
+  uses the squared mask, and `task_loss` values stored in old `runs.csv` files used the linear one.
+- `tests/test_tasks.py`: ring 1/2 balance, RT fixation input, Go stimulus through the response, `v1` pinned,
+  missing `mods` raises. Smoke training: `results/scripts/smoke_task_fix.py`.
+
+**Consequence.** All results before 2026-11-19 (both fronts, all zoom runs) were trained on a battery in which
+6 of 20 tasks differ from Yang and with the linear mask. Comparisons between budget points within those runs
+are internally consistent (same battery everywhere), but they are not "the Yang battery", and modality-related
+results (modality modules, ring tuning) are the most affected. Not comparable with runs after the fix.
+
+Remaining known differences from Yang, kept deliberately or harmless: the easy-task coherence band (#6; note that
+Yang's default, which Yang trained on, is the hard set, not the easy branch), 16 instead of 32 units per ring,
+mixed batches of 32 instead of single-task batches of 64, multisensory DM drawn from the seeded `rng` (Yang uses
+the unseeded global generator), accuracy over the response window (#3-#5).
+
+---
+
 ## Still open (deliberately not changed)
 
 - **`rho(W_rec)` is only set at init.** `cmc/network.py:scale_recurrent_to_rho` is

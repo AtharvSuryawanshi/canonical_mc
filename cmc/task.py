@@ -89,9 +89,18 @@ def default_config(n_eachring=32, seed=0, easy_task=True, **kwargs):
         "n_output": 1 + n_eachring,
         "loss_type": "lsq",
         "easy_task": easy_task,
+        # "yang": Go/Anti/RT generators as in Yang et al. 2019 (FIXED_ISSUES #15-#17). "v1": the pre-2026-11-19
+        # generators (stimulus always on ring 1, Go/Anti stimulus off at go, RT fixation input off at stimulus).
+        # Configs without the key (checkpoints saved before the fix) mean "v1", see task_version().
+        "task_version": "yang",
         "rng": np.random.RandomState(seed),
     }
     return config
+
+
+def task_version(config):
+    """'yang' (fixed generators) or 'v1' (old ones); configs saved before the fix have no key and are 'v1'."""
+    return config.get("task_version", "v1")
 
 
 def get_rule_index(rule, config):
@@ -137,7 +146,11 @@ class Trial:
             var = [var] * self.batch_size
         return var
 
-    def add(self, loc_type, locs=None, ons=None, offs=None, strengths=1, mods=1):
+    def add(self, loc_type, locs=None, ons=None, offs=None, strengths=1, mods=None):
+        # mods (which ring a stimulus goes on) must be given for "stim", as in Yang's Trial.add: the old silent
+        # default of ring 1 hid that the Go/Anti/RT generators never set it (FIXED_ISSUES #15).
+        if loc_type == "stim" and mods is None:
+            raise ValueError("Trial.add('stim', ...): mods (ring 1 or 2) must be given")
         ons = self.expand(ons)
         offs = self.expand(offs)
         strengths = self.expand(strengths)
@@ -228,7 +241,10 @@ def _fdgo(config, batch_size, anti_response=False):
     """Fixation-delayed go/anti: stimulus on until go; saccade pro or anti."""
     dt = config["dt"]
     rng = config["rng"]
+    yang = task_version(config) == "yang"
     stim_locs = rng.rand(batch_size) * 2 * np.pi
+    # Yang: one random ring per batch, drawn here (same RNG order as Yang's fdgo_, so trials are seed-identical)
+    stim_mod = rng.choice([1, 2]) if yang else 1
     stim_ons = int(rng.uniform(300, 700) / dt)
     fix_offs = stim_ons + int(rng.uniform(500, 1500) / dt)
     tdim = int(500 / dt) + fix_offs
@@ -237,7 +253,8 @@ def _fdgo(config, batch_size, anti_response=False):
 
     trial = Trial(config, tdim, batch_size)
     trial.add("fix_in", offs=fix_offs)
-    trial.add("stim", stim_locs, ons=stim_ons, offs=fix_offs)
+    # Yang: the stimulus stays on through the response; v1 switched it off at the go cue (FIXED_ISSUES #17)
+    trial.add("stim", stim_locs, ons=stim_ons, offs=None if yang else fix_offs, mods=stim_mod)
     trial.add("fix_out", offs=fix_offs)
     trial.add("out", response_locs, ons=fix_offs)
     trial.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
@@ -263,15 +280,19 @@ def _reactgo(config, batch_size, anti_response=False):
     """Reaction-time go/anti: hold fixation until stimulus, then saccade immediately."""
     dt = config["dt"]
     rng = config["rng"]
+    yang = task_version(config) == "yang"
     stim_ons = int(rng.uniform(500, 2500) / dt)
     tdim = int(500 / dt) + stim_ons
     check_ons = stim_ons + int(100 / dt)
     stim_locs = rng.uniform(0, 2 * np.pi, (batch_size,))
+    stim_mod = rng.choice([1, 2]) if yang else 1          # Yang's reactgo_ draws the ring last
     response_locs = _response_locs(stim_locs, anti_response)
 
     trial = Trial(config, tdim, batch_size)
-    trial.add("fix_in", offs=stim_ons)
-    trial.add("stim", stim_locs, ons=stim_ons)
+    # Yang: the fixation input stays on for the whole trial, the stimulus onset itself is the go signal;
+    # v1 switched the fixation input off at stimulus onset (FIXED_ISSUES #16)
+    trial.add("fix_in", offs=None if yang else stim_ons)
+    trial.add("stim", stim_locs, ons=stim_ons, mods=stim_mod)
     trial.add("fix_out", offs=stim_ons)
     trial.add("out", response_locs, ons=stim_ons)
     trial.add_c_mask(pre_offs=stim_ons, post_ons=check_ons)
@@ -301,12 +322,13 @@ def _delaygo(config, batch_size, anti_response=False):
     stim_offs = stim_ons + int(rng.choice([200, 400, 600]) / dt)
     fix_offs = stim_offs + int(rng.choice([200, 400, 800, 1600]) / dt)
     tdim = fix_offs + int(500 / dt)
+    stim_mod = rng.choice([1, 2]) if task_version(config) == "yang" else 1   # Yang's delaygo_ draws it here
     check_ons = fix_offs + int(100 / dt)
     response_locs = _response_locs(stim_locs, anti_response)
 
     trial = Trial(config, tdim, batch_size)
     trial.add("fix_in", offs=fix_offs)
-    trial.add("stim", stim_locs, ons=stim_ons, offs=stim_offs)
+    trial.add("stim", stim_locs, ons=stim_ons, offs=stim_offs, mods=stim_mod)
     trial.add("fix_out", offs=fix_offs)
     trial.add("out", response_locs, ons=fix_offs)
     trial.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
