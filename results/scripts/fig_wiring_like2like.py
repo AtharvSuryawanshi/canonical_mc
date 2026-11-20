@@ -44,11 +44,11 @@ def auc(sim, conn):
     return (r[conn].sum() - n1 * (n1 + 1) / 2) / (n1 * n0)
 
 
-def network(point, seed, rng, keep_frac=None):
+def network(point, seed, rng, keep_frac=None, run="5seed", thresh=THRESH, n_shuffle=N_SHUFFLE):
     """keep_frac: if set, 'connected' = the strongest keep_frac of the (active, off-diagonal) synapses instead of
-    |W|/c > THRESH, to compare networks at matched sparsity."""
+    |W|/c > thresh, to compare networks at matched sparsity. run: key of fig_tv_ei_fanin.RUNS."""
     with contextlib.redirect_stdout(io.StringIO()):
-        model, ck, tv_t, tv_p, keys = load(point, seed)
+        model, ck, tv_t, tv_p, keys = load(point, seed, run)
     total = tv_t.sum(0)
     units = np.flatnonzero(total > 1e-2 * total.max())
     F = tv_p[:, units] / tv_p[:, units].max(0, keepdims=True)              # (rows, units)
@@ -57,7 +57,7 @@ def network(point, seed, rng, keep_frac=None):
     W = Wn[np.ix_(units, units)]                                             # W[pre, post]
     isE = units < model.n_e
     off = ~np.eye(len(units), dtype=bool)
-    C = W > (THRESH if keep_frac is None else np.quantile(W[off], 1 - keep_frac))
+    C = W > (thresh if keep_frac is None else np.quantile(W[off], 1 - keep_frac))
     masks = {q: off & np.outer(isE if q[0] == "E" else ~isE, isE if q[-1] == "E" else ~isE) for q in QUADS}
     ptype = np.array([[F[[i for i, (_, p) in enumerate(keys) if p in ps]].mean(0) for ps in TYPES.values()]]).squeeze(0)
     ptype = ptype.argmax(0)                                                  # main period type per unit
@@ -79,14 +79,14 @@ def network(point, seed, rng, keep_frac=None):
     curves = {q: curve(S, q) for q in QUADS}
     null_c, null_s = {q: [] for q in QUADS}, []
     iE, iI = np.flatnonzero(isE), np.flatnonzero(~isE)
-    for _ in range(N_SHUFFLE):
+    for _ in range(n_shuffle):
         perm = np.arange(len(units))
         perm[iE] = rng.permutation(iE); perm[iI] = rng.permutation(iI)
         Sp, Tp = S[np.ix_(perm, perm)], ptype[perm]
         null_s.append(stats(Sp, Tp))
         for q in QUADS:
             null_c[q].append(curve(Sp, q))
-    res = dict(obs=obs, curves=curves, edges=edges, n_units=len(units), conn=C[off].mean(), S=S, C=C, masks=masks,
+    res = dict(obs=obs, curves=curves, edges=edges, n_units=len(units), isE=isE, conn=C[off].mean(), S=S, C=C, masks=masks,
                n_conn={q: int(C[masks[q]].sum()) for q in QUADS}, types=np.bincount(ptype[isE], minlength=3))
     for q in QUADS:
         nul = np.array([n[q]["auc"] for n in null_s])

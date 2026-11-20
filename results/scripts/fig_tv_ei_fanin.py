@@ -31,7 +31,8 @@ from cmc.train_cog import load_checkpoint
 
 REPO = Path(__file__).resolve().parents[2]
 RUNS = {"saveat": REPO / "runs/moo_zoom/dale_all_woutfree_fanin_4pt_1seed_150k_saveat",   # 1 seed, saved along training
-        "5seed": REPO / "runs/moo_zoom/dale_all_woutfree_fanin_4pt_5seed_150k"}           # 5 seeds, final only
+        "5seed": REPO / "runs/moo_zoom/dale_all_woutfree_fanin_4pt_5seed_150k",            # 5 seeds, final only (v1 tasks)
+        "yang": REPO / "runs/moo_zoom/dale_all_woutfree_fanin_4pt_5seed_150k_yang"}        # same, fixed tasks + squared loss
 RUN = RUNS["saveat"]
 POINTS = {"control": "Control", "A3": "Firing constraint (A3)", "B0": "Wiring constraint (B0)", "C0": "Both constraints (C0)"}
 COLORS = {"control": "#444444", "A3": "#d62728", "B0": "#1f77b4", "C0": "#2ca02c"}   # as in the E/I report

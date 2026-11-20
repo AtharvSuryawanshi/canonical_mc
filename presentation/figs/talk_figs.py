@@ -2,15 +2,15 @@
 width ~5.6 in), large labels, little text. The detailed analysis figures in results/front/ are unchanged; anything
 precise that does not fit here goes in presentation/presentation.md.
 
-    python presentation/figs/talk_figs.py [frames front convergence like2like silhouette tv]   (default: all)
+    python presentation/figs/talk_figs.py [frames front convergence silhouette tv] [--run yang]   (default: all)
 
 Writes presentation/figs/talk/*.pdf (the original figures are not touched). Data and analysis come from the results/scripts modules:
   frames      fig_front_top_fanin150k.load, rotating 3D front for slide 11         -> frames/front_000..059.png
   front       fig_front_top_fanin150k (load, budget_means, accuracy_surface)    -> front_top.pdf
   convergence save-at run runs_by_step.csv (as fig_acc_vs_steps_grid.py)          -> convergence.pdf
-  like2like   fig_wiring_like2like.network, 4 points x 5 seeds (~3 min)           -> like2like_s4.pdf,
-                                                                                     like2like_5seed.pdf
+  (slides 15-16, like-to-like wiring: results/scripts/like2like.py, cached)
   silhouette  fig_tv_ei_fanin.analyse, 5-seed run, seed 4                         -> silhouette.pdf
+              (--run yang: the fixed-task 5-seed run                              -> silhouette_yang.pdf)
   tv          same                                                                -> tv_control_A3.pdf,
                                                                                      tv_B0_C0.pdf
 Accuracy colour: RdYlGn on 0-1 (0 red, 1 green), always.
@@ -29,24 +29,15 @@ import numpy as np
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
-OUT = HERE / "talk"
 REPO = HERE.parents[1]
 sys.path.insert(0, str(REPO / "results/scripts"))
 
 from fig_tv_ei_fanin import COLORS, RUNS, analyse            # noqa: E402
 from cmc.front import FEASIBLE_MIN_TASK_ACC                  # noqa: E402
 from cmc.task import rule_name                               # noqa: E402
+from talk_style import E_COL, I_COL, NAMES, OUT, UNCONN, W, save   # noqa: E402,F401
 
-NAMES = {"control": "Control", "A3": "Firing constraint", "B0": "Wiring constraint", "C0": "Both constraints"}
-E_COL, I_COL, UNCONN = "#1F8AD0", "#E0393E", "#b0b0b0"
 SEED = 4
-W = 5.6                                                       # Beamer 16:9 text width, inches
-
-plt.rcParams.update({
-    "font.size": 8, "axes.titlesize": 9, "axes.labelsize": 8, "xtick.labelsize": 7, "ytick.labelsize": 7,
-    "legend.fontsize": 7, "axes.spines.top": False, "axes.spines.right": False, "pdf.fonttype": 42,
-    "axes.linewidth": 0.6, "xtick.major.width": 0.6, "ytick.major.width": 0.6,
-})
 
 
 def _module(name, file):
@@ -54,14 +45,6 @@ def _module(name, file):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
-
-
-def save(fig, name):
-    OUT.mkdir(exist_ok=True)
-    out = OUT / f"{name}.pdf"
-    fig.savefig(out, bbox_inches="tight", pad_inches=0.02)
-    plt.close(fig)
-    print("->", out)
 
 
 # ---------------------------------------------------------------- slide 11: the front in 3D (animation frames)
@@ -165,98 +148,13 @@ def convergence():
     save(fig, "convergence")
 
 
-# ---------------------------------------------------------------- slides 15-16: like-to-like wiring
-
-def like2like():
-    import fig_wiring_like2like as L
-    from fig_wiring_roc import roc
-    rng = np.random.default_rng(0)
-    with contextlib.redirect_stdout(io.StringIO()):
-        R = {(p, s): L.network(p, s, rng) for p in NAMES for s in range(5)}
-    bins = np.linspace(-1, 1, 21)
-
-    # slide 15: one network, histograms + ROC
-    fig = plt.figure(figsize=(W, 3.0))
-    outer = fig.add_gridspec(4, 4, hspace=0.3, wspace=0.12, left=0.06, right=0.995, top=0.9, bottom=0.1)
-    for r, q in enumerate(L.QUADS):
-        col = E_COL if q[0] == "E" else I_COL
-        for j, p in enumerate(NAMES):
-            res = R[(p, SEED)]
-            mk = res["masks"][q]
-            s, c = res["S"][mk], res["C"][mk]
-            inner = outer[r, j].subgridspec(1, 2, width_ratios=[2.4, 1], wspace=0.06)
-            ax, ax_roc = fig.add_subplot(inner[0]), fig.add_subplot(inner[1])
-            hu = ax.hist(s[~c], bins, density=True, color=UNCONN, lw=0)[0]
-            hc = ax.hist(s[c], bins, density=True, histtype="step", color=col, lw=1.1)[0]
-            ax.set_xlim(-1, 1); ax.set_ylim(0, max(hu.max(), hc.max()) * 1.1)
-            ax.set_yticks([]); ax.spines["left"].set_visible(False)
-            ax.set_xticks([-1, 0, 1]); ax.tick_params(labelsize=6, length=2, pad=1)
-            if r < 3:
-                ax.set_xticklabels([])
-            f, t = roc(s, c)
-            sig = res[q]["auc_p"] < 0.05
-            ax_roc.fill_between(f, t, color=col, alpha=0.18, lw=0); ax_roc.plot(f, t, color=col, lw=0.9)
-            ax_roc.plot([0, 1], [0, 1], color="0.3", ls=":", lw=0.5)
-            ax_roc.set_xlim(0, 1); ax_roc.set_ylim(0, 1); ax_roc.set_xticks([]); ax_roc.set_yticks([])
-            ax_roc.set_box_aspect(1)
-            ax_roc.spines[["top", "right"]].set_visible(True)
-            ax_roc.set_title(f"{res[q]['auc']:.2f}" + ("" if sig else " n.s."), fontsize=7, pad=1.5,
-                             color="k" if sig else "0.45")
-            if r == 0:
-                ax.text(0.7, 1.32, NAMES[p], transform=ax.transAxes, ha="center", fontsize=9,
-                        color=COLORS[p])
-            if j == 0:
-                ax.set_ylabel(q, rotation=0, ha="right", va="center", fontsize=9, labelpad=4)
-    h = [plt.Rectangle((0, 0), 1, 1, color=UNCONN), plt.Line2D([], [], color="k", lw=1.1)]
-    fig.legend(h, ["unconnected pairs", "connected pairs (E: blue, I: red)"], loc="lower right", ncol=2,
-               frameon=False, bbox_to_anchor=(0.995, -0.03), fontsize=7)
-    save(fig, "like2like_s4")
-
-    # slide 16: all 20 networks
-    grid = np.linspace(0, 1, 101)
-    fig, axes = plt.subplots(2, 4, figsize=(W, 3.1), gridspec_kw=dict(height_ratios=[1, 0.9], hspace=0.45,
-                                                                      wspace=0.25))
-    xs = np.arange(len(NAMES))
-    for k, q in enumerate(L.QUADS):
-        ax = axes[0, k]
-        for p in NAMES:
-            T = np.array([np.interp(grid, *roc(R[(p, s)]["S"][R[(p, s)]["masks"][q]],
-                                               R[(p, s)]["C"][R[(p, s)]["masks"][q]])) for s in range(5)])
-            ax.fill_between(grid, T.min(0), T.max(0), color=COLORS[p], alpha=0.18, lw=0)
-            ax.plot(grid, T.mean(0), color=COLORS[p], lw=1.3, label=NAMES[p])
-        ax.plot([0, 1], [0, 1], color="0.3", ls=":", lw=0.6)
-        ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.set_box_aspect(1)
-        ax.set_xticks([0, 1]); ax.set_yticks([0, 1])
-        ax.set_title(q, fontsize=10)
-        ax.set_xlabel("FPR", labelpad=-6)
-        if k == 0:
-            ax.set_ylabel("TPR", labelpad=-4)
-        ax = axes[1, k]
-        for s in range(5):
-            ax.plot(xs, [R[(p, s)][q]["auc"] for p in NAMES], color="0.85", lw=0.6, zorder=1)
-        for i, p in enumerate(NAMES):
-            a = np.array([R[(p, s)][q]["auc"] for s in range(5)])
-            sig = np.array([R[(p, s)][q]["auc_p"] < 0.05 for s in range(5)])
-            jit = np.linspace(-0.12, 0.12, 5)
-            ax.scatter(xs[i] + jit[sig], a[sig], color=COLORS[p], s=10, zorder=3, lw=0)
-            ax.scatter(xs[i] + jit[~sig], a[~sig], facecolors="white", edgecolors=COLORS[p], s=10, zorder=3, lw=0.7)
-            ax.plot([xs[i] - 0.22, xs[i] + 0.22], [a.mean()] * 2, color=COLORS[p], lw=1.6, zorder=2)
-        ax.axhline(0.5, color="0.3", ls=":", lw=0.6)
-        ax.set_ylim(0.4, 0.85); ax.set_yticks([0.5, 0.6, 0.7, 0.8])
-        ax.set_xticks([])
-        if k == 0:
-            ax.set_ylabel("AUC")
-        else:
-            ax.set_yticklabels([])
-    fig.legend(*axes[0, 0].get_legend_handles_labels(), loc="lower center", ncol=4, frameon=False,
-               bbox_to_anchor=(0.5, 0.99))
-    save(fig, "like2like_5seed")
-
-
 # ---------------------------------------------------------------- slides 17-19: task variance groups
 
+RUN = "5seed"          # which run silhouette / tv use: "5seed" (v1 tasks) or "yang" (--run yang); yang outputs get _yang
+
+
 def _analyse_all():
-    return {p: analyse(RUNS["5seed"] / p / f"seed_{SEED:02d}.pt") for p in NAMES}
+    return {p: analyse(RUNS[RUN] / p / f"seed_{SEED:02d}.pt") for p in NAMES}
 
 
 def silhouette(A=None):
@@ -275,7 +173,7 @@ def silhouette(A=None):
     fig.supxlabel("number of groups k", fontsize=8, y=-0.1)
     fig.legend(*axes[0].get_legend_handles_labels(), loc="lower center", ncol=2, frameon=False,
                bbox_to_anchor=(0.5, 0.98), fontsize=6.5)
-    save(fig, "silhouette")
+    save(fig, "silhouette" + ("_yang" if RUN == "yang" else ""))
 
 
 def tv(A=None):
@@ -327,10 +225,15 @@ def tv(A=None):
 
 
 if __name__ == "__main__":
-    which = sys.argv[1:] or ["frames", "front", "convergence", "like2like", "silhouette", "tv"]
+    args = sys.argv[1:]
+    if "--run" in args:
+        i = args.index("--run")
+        RUN = args[i + 1]
+        del args[i:i + 2]
+    which = args or ["frames", "front", "convergence", "silhouette", "tv"]
     A = None
     if {"silhouette", "tv"} & set(which):
         A = _analyse_all()
     for w in which:
-        {"frames": frames, "front": front, "convergence": convergence, "like2like": like2like,
+        {"frames": frames, "front": front, "convergence": convergence,
          "silhouette": lambda: silhouette(A), "tv": lambda: tv(A)}[w]()

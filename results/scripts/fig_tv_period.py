@@ -37,11 +37,15 @@ PERIOD_COLOR = {"stim1": "#1f4e9c", "delay1": "#4daf4a", "stim2": "#8fb8e8", "de
 BATCH = 64                                    # eval batch size of the stored task variance (runner default)
 
 
-def load(point, seed):
-    ckpt = RUNS["5seed"] / point / f"seed_{seed:02d}.pt"
+def load(point, seed, run="5seed"):
+    """Per-period task variance of one network of RUNS[run], cached. The 5seed (v1) caches stay in results/front;
+    other runs cache in results/cache/<run>/."""
+    ckpt = RUNS[run] / point / f"seed_{seed:02d}.pt"
     with contextlib.redirect_stdout(io.StringIO()):
         model, cfg, ck = load_checkpoint(ckpt)
-    cache = REPO / "results/front" / f"tv_period_{point}_s{seed}.npz"
+    cache_dir = REPO / "results/front" if run == "5seed" else REPO / "results/cache" / run
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache = cache_dir / f"tv_period_{point}_s{seed}.npz"
     if cache.exists():
         z = np.load(cache, allow_pickle=True)
         tv_p, keys = z["tv"], [tuple(k) for k in z["keys"]]
