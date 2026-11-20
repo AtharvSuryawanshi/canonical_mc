@@ -1,0 +1,336 @@
+"""Talk versions of the figures on slides 12-19: drawn at the size they appear on the slide (16:9 Beamer, text
+width ~5.6 in), large labels, little text. The detailed analysis figures in results/front/ are unchanged; anything
+precise that does not fit here goes in presentation/presentation.md.
+
+    python presentation/figs/talk_figs.py [frames front convergence like2like silhouette tv]   (default: all)
+
+Writes presentation/figs/talk/*.pdf (the original figures are not touched). Data and analysis come from the results/scripts modules:
+  frames      fig_front_top_fanin150k.load, rotating 3D front for slide 11         -> frames/front_000..059.png
+  front       fig_front_top_fanin150k (load, budget_means, accuracy_surface)    -> front_top.pdf
+  convergence save-at run runs_by_step.csv (as fig_acc_vs_steps_grid.py)          -> convergence.pdf
+  like2like   fig_wiring_like2like.network, 4 points x 5 seeds (~3 min)           -> like2like_s4.pdf,
+                                                                                     like2like_5seed.pdf
+  silhouette  fig_tv_ei_fanin.analyse, 5-seed run, seed 4                         -> silhouette.pdf
+  tv          same                                                                -> tv_control_A3.pdf,
+                                                                                     tv_B0_C0.pdf
+Accuracy colour: RdYlGn on 0-1 (0 red, 1 green), always.
+"""
+import contextlib
+import importlib.util
+import io
+import sys
+from pathlib import Path
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+HERE = Path(__file__).resolve().parent
+OUT = HERE / "talk"
+REPO = HERE.parents[1]
+sys.path.insert(0, str(REPO / "results/scripts"))
+
+from fig_tv_ei_fanin import COLORS, RUNS, analyse            # noqa: E402
+from cmc.front import FEASIBLE_MIN_TASK_ACC                  # noqa: E402
+from cmc.task import rule_name                               # noqa: E402
+
+NAMES = {"control": "Control", "A3": "Firing constraint", "B0": "Wiring constraint", "C0": "Both constraints"}
+E_COL, I_COL, UNCONN = "#1F8AD0", "#E0393E", "#b0b0b0"
+SEED = 4
+W = 5.6                                                       # Beamer 16:9 text width, inches
+
+plt.rcParams.update({
+    "font.size": 8, "axes.titlesize": 9, "axes.labelsize": 8, "xtick.labelsize": 7, "ytick.labelsize": 7,
+    "legend.fontsize": 7, "axes.spines.top": False, "axes.spines.right": False, "pdf.fonttype": 42,
+    "axes.linewidth": 0.6, "xtick.major.width": 0.6, "ytick.major.width": 0.6,
+})
+
+
+def _module(name, file):
+    spec = importlib.util.spec_from_file_location(name, REPO / "results/scripts" / file)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def save(fig, name):
+    OUT.mkdir(exist_ok=True)
+    out = OUT / f"{name}.pdf"
+    fig.savefig(out, bbox_inches="tight", pad_inches=0.02)
+    plt.close(fig)
+    print("->", out)
+
+
+# ---------------------------------------------------------------- slide 11: the front in 3D (animation frames)
+
+def frames(n_frames=60, elev=22):
+    from scipy.spatial import Delaunay
+    fan = _module("front_top", "fig_front_top_fanin150k.py")
+    d = fan.load()
+    inf, rest, par = d[~d.feasible], d[d.feasible & ~d.pareto], d[d.pareto]
+    ex = d[(d.run == fan.EXAMPLE[0]) & (d.seed == fan.EXAMPLE[1])]
+    fig = plt.figure(figsize=(4.4, 3.6))
+    ax = fig.add_subplot(projection="3d", computed_zorder=False)
+    ax.scatter(inf.x, inf.y, inf.z, marker="x", s=12, c="0.55", depthshade=False)
+    ax.scatter(rest.x, rest.y, rest.z, s=6, c="0.4", alpha=0.5, depthshade=False)
+    tri = Delaunay(par[["x", "y"]].to_numpy())
+    ax.plot_trisurf(par.x, par.y, par.z, triangles=tri.simplices, cmap="RdYlGn", vmin=0, vmax=1, alpha=0.45,
+                    linewidth=0.2, edgecolor="0.5")
+    ax.scatter(par.x, par.y, par.z, s=18, c=par.z, cmap="RdYlGn", vmin=0, vmax=1, edgecolors="k",
+               linewidths=0.4, depthshade=False)
+    xx, yy = np.meshgrid([d.x.min(), d.x.max()], [d.y.min(), d.y.max()])
+    ax.plot_surface(xx, yy, np.full_like(xx, FEASIBLE_MIN_TASK_ACC), color="0.6", alpha=0.15, linewidth=0)
+    for _, r in ex.iterrows():
+        ax.scatter([r.x], [r.y], [r.z], s=90, facecolors="none", edgecolors="#1f3b73", linewidths=1.5, zorder=10,
+                   depthshade=False)
+        ax.text(r.x, r.y, r.z + {"C0": -0.16, "A3": 0.1}.get(r.point, 0.07), NAMES[r.point], fontsize=7,
+                color="#1f3b73", zorder=11,
+                ha="center")
+    ax.set_xlabel("firing cost (log$_{10}$)", labelpad=2)
+    ax.set_ylabel("wiring cost (log$_{10}$)", labelpad=2)
+    ax.set_zlabel("worst-task accuracy", labelpad=0)
+    ax.set_xticks([-3, -2, -1, 0]); ax.set_yticks([-2.6, -2.0, -1.4]); ax.set_zticks([0, 0.5, 1])
+    ax.tick_params(labelsize=7, pad=0)
+    ax.set_xlim(d.x.min() - 0.1, d.x.max() + 0.1); ax.set_ylim(d.y.min() - 0.1, d.y.max() + 0.1); ax.set_zlim(0, 1)
+    fig.subplots_adjust(left=0, right=0.94, bottom=0.02, top=1.0)
+    out = OUT / "frames"
+    out.mkdir(parents=True, exist_ok=True)
+    for i in range(n_frames):
+        ax.view_init(elev, -60 + 360 * i / n_frames)
+        fig.savefig(out / f"front_{i:03d}.png", dpi=220)
+    plt.close(fig)
+    print(f"-> {out} ({n_frames} frames)")
+
+
+# ---------------------------------------------------------------- slide 12: the front, top view
+
+def front():
+    fan = _module("front_top", "fig_front_top_fanin150k.py")
+    d = fan.load()
+    xx, yy, zz = fan.accuracy_surface(fan.budget_means(d))
+    fig, ax = plt.subplots(figsize=(3.0, 2.75))
+    cf = ax.contourf(xx, yy, zz, levels=np.arange(0, 1.0001, 0.05), cmap="RdYlGn", vmin=0, vmax=1, zorder=0)
+    cl = ax.contour(xx, yy, zz, levels=[0.8, 0.9], colors="0.15", linewidths=0.5, zorder=1)
+    for t in ax.clabel(cl, fmt="%.1f", fontsize=6.5, inline_spacing=2):
+        t.set_bbox(dict(boxstyle="round,pad=0.08", fc="white", ec="none", alpha=0.8))
+    ax.contour(xx, yy, zz, levels=[FEASIBLE_MIN_TASK_ACC], colors="k", linewidths=1, linestyles="--", zorder=1)
+    inf, rest, par = d[~d.feasible], d[d.feasible & ~d.pareto], d[d.pareto]
+    ax.scatter(inf.x, inf.y, marker="x", s=12, color="0.35", linewidths=0.8, zorder=2, label="infeasible")
+    ax.scatter(rest.x, rest.y, s=5, color="0.2", edgecolors="none", zorder=2, label="feasible")
+    ax.scatter(par.x, par.y, s=16, color="white", edgecolors="k", linewidths=0.6, zorder=3, label="Pareto front")
+    ex = d[(d.run == fan.EXAMPLE[0]) & (d.seed == fan.EXAMPLE[1])]
+    ax.scatter(ex.x, ex.y, s=110, facecolors="none", edgecolors="#1f3b73", linewidths=1.3, zorder=4)
+    offset = {"control": (0, 9, "center"), "A3": (8, 6, "left"), "B0": (-4, 9, "right"), "C0": (8, -12, "left")}
+    for p, g in d[d.point.isin(list(NAMES))].groupby("point"):
+        dx, dy, ha = offset[p]
+        ax.annotate(NAMES[p], (g.x.mean(), g.y.mean()), xytext=(dx, dy), textcoords="offset points", ha=ha,
+                    fontsize=7, color="#1f3b73",
+                    bbox=dict(boxstyle="round,pad=0.1", fc="white", ec="none", alpha=0.75))
+    cb = fig.colorbar(cf, ax=ax, ticks=[0, 0.2, 0.4, 0.6, 0.8, 1], fraction=0.05, pad=0.03)
+    cb.set_label("worst-task accuracy"); cb.ax.tick_params(labelsize=6.5)
+    ax.legend(loc="lower right", fontsize=6, frameon=True, framealpha=0.85, edgecolor="none", handletextpad=0.2,
+              borderpad=0.3, labelspacing=0.25)
+    ax.set_xlabel("firing cost (log$_{10}$)")
+    ax.set_ylabel("wiring cost (log$_{10}$)")
+    save(fig, "front_top")
+
+
+# ---------------------------------------------------------------- slide 13: convergence
+
+def convergence():
+    single = _module("acc_vs_steps", "fig_acc_vs_steps.py")
+    d = pd.read_csv(single.REPO / single.RUNS["fanin"][0] / "runs_by_step.csv")
+    fig, axes = plt.subplots(1, 4, figsize=(W, 1.9), sharey=True, gridspec_kw=dict(wspace=0.12))
+    for ax, p in zip(axes, NAMES):
+        m = d[d.point == p].groupby("step").mean(numeric_only=True)
+        k = m.index / 1000
+        for t in single.NAMES:
+            ax.plot(k, m[f"acc_{t}"], color="0.75", lw=0.6)
+        ax.plot(k, m["mean_acc"], color="k", lw=1.6, label="mean over tasks")
+        ax.plot(k, m["min_task_acc"], color="crimson", lw=1.6, label="worst task")
+        ax.text(k[-1] + 4, m["min_task_acc"].iloc[-1], f"{m['min_task_acc'].iloc[-1]:.2f}", color="crimson",
+                fontsize=7, ha="left", va="center")
+        ax.set_xlim(-5, 185)
+        ax.axhline(FEASIBLE_MIN_TASK_ACC, color="0.4", ls=":", lw=0.8)
+        ax.set_title(NAMES[p], color=COLORS[p])
+        ax.set_ylim(0, 1.02); ax.set_yticks([0, 0.5, 1]); ax.set_xticks([0, 50, 100, 150])
+        ax.set_xlabel("training steps (k)")
+    axes[0].set_ylabel("accuracy")
+    axes[0].plot([], [], color="0.75", lw=0.6, label="each task")
+    fig.legend(*axes[0].get_legend_handles_labels(), loc="lower center", ncol=3, frameon=False,
+               bbox_to_anchor=(0.5, 1.0))
+    save(fig, "convergence")
+
+
+# ---------------------------------------------------------------- slides 15-16: like-to-like wiring
+
+def like2like():
+    import fig_wiring_like2like as L
+    from fig_wiring_roc import roc
+    rng = np.random.default_rng(0)
+    with contextlib.redirect_stdout(io.StringIO()):
+        R = {(p, s): L.network(p, s, rng) for p in NAMES for s in range(5)}
+    bins = np.linspace(-1, 1, 21)
+
+    # slide 15: one network, histograms + ROC
+    fig = plt.figure(figsize=(W, 3.0))
+    outer = fig.add_gridspec(4, 4, hspace=0.3, wspace=0.12, left=0.06, right=0.995, top=0.9, bottom=0.1)
+    for r, q in enumerate(L.QUADS):
+        col = E_COL if q[0] == "E" else I_COL
+        for j, p in enumerate(NAMES):
+            res = R[(p, SEED)]
+            mk = res["masks"][q]
+            s, c = res["S"][mk], res["C"][mk]
+            inner = outer[r, j].subgridspec(1, 2, width_ratios=[2.4, 1], wspace=0.06)
+            ax, ax_roc = fig.add_subplot(inner[0]), fig.add_subplot(inner[1])
+            hu = ax.hist(s[~c], bins, density=True, color=UNCONN, lw=0)[0]
+            hc = ax.hist(s[c], bins, density=True, histtype="step", color=col, lw=1.1)[0]
+            ax.set_xlim(-1, 1); ax.set_ylim(0, max(hu.max(), hc.max()) * 1.1)
+            ax.set_yticks([]); ax.spines["left"].set_visible(False)
+            ax.set_xticks([-1, 0, 1]); ax.tick_params(labelsize=6, length=2, pad=1)
+            if r < 3:
+                ax.set_xticklabels([])
+            f, t = roc(s, c)
+            sig = res[q]["auc_p"] < 0.05
+            ax_roc.fill_between(f, t, color=col, alpha=0.18, lw=0); ax_roc.plot(f, t, color=col, lw=0.9)
+            ax_roc.plot([0, 1], [0, 1], color="0.3", ls=":", lw=0.5)
+            ax_roc.set_xlim(0, 1); ax_roc.set_ylim(0, 1); ax_roc.set_xticks([]); ax_roc.set_yticks([])
+            ax_roc.set_box_aspect(1)
+            ax_roc.spines[["top", "right"]].set_visible(True)
+            ax_roc.set_title(f"{res[q]['auc']:.2f}" + ("" if sig else " n.s."), fontsize=7, pad=1.5,
+                             color="k" if sig else "0.45")
+            if r == 0:
+                ax.text(0.7, 1.32, NAMES[p], transform=ax.transAxes, ha="center", fontsize=9,
+                        color=COLORS[p])
+            if j == 0:
+                ax.set_ylabel(q, rotation=0, ha="right", va="center", fontsize=9, labelpad=4)
+    h = [plt.Rectangle((0, 0), 1, 1, color=UNCONN), plt.Line2D([], [], color="k", lw=1.1)]
+    fig.legend(h, ["unconnected pairs", "connected pairs (E: blue, I: red)"], loc="lower right", ncol=2,
+               frameon=False, bbox_to_anchor=(0.995, -0.03), fontsize=7)
+    save(fig, "like2like_s4")
+
+    # slide 16: all 20 networks
+    grid = np.linspace(0, 1, 101)
+    fig, axes = plt.subplots(2, 4, figsize=(W, 3.1), gridspec_kw=dict(height_ratios=[1, 0.9], hspace=0.45,
+                                                                      wspace=0.25))
+    xs = np.arange(len(NAMES))
+    for k, q in enumerate(L.QUADS):
+        ax = axes[0, k]
+        for p in NAMES:
+            T = np.array([np.interp(grid, *roc(R[(p, s)]["S"][R[(p, s)]["masks"][q]],
+                                               R[(p, s)]["C"][R[(p, s)]["masks"][q]])) for s in range(5)])
+            ax.fill_between(grid, T.min(0), T.max(0), color=COLORS[p], alpha=0.18, lw=0)
+            ax.plot(grid, T.mean(0), color=COLORS[p], lw=1.3, label=NAMES[p])
+        ax.plot([0, 1], [0, 1], color="0.3", ls=":", lw=0.6)
+        ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.set_box_aspect(1)
+        ax.set_xticks([0, 1]); ax.set_yticks([0, 1])
+        ax.set_title(q, fontsize=10)
+        ax.set_xlabel("FPR", labelpad=-6)
+        if k == 0:
+            ax.set_ylabel("TPR", labelpad=-4)
+        ax = axes[1, k]
+        for s in range(5):
+            ax.plot(xs, [R[(p, s)][q]["auc"] for p in NAMES], color="0.85", lw=0.6, zorder=1)
+        for i, p in enumerate(NAMES):
+            a = np.array([R[(p, s)][q]["auc"] for s in range(5)])
+            sig = np.array([R[(p, s)][q]["auc_p"] < 0.05 for s in range(5)])
+            jit = np.linspace(-0.12, 0.12, 5)
+            ax.scatter(xs[i] + jit[sig], a[sig], color=COLORS[p], s=10, zorder=3, lw=0)
+            ax.scatter(xs[i] + jit[~sig], a[~sig], facecolors="white", edgecolors=COLORS[p], s=10, zorder=3, lw=0.7)
+            ax.plot([xs[i] - 0.22, xs[i] + 0.22], [a.mean()] * 2, color=COLORS[p], lw=1.6, zorder=2)
+        ax.axhline(0.5, color="0.3", ls=":", lw=0.6)
+        ax.set_ylim(0.4, 0.85); ax.set_yticks([0.5, 0.6, 0.7, 0.8])
+        ax.set_xticks([])
+        if k == 0:
+            ax.set_ylabel("AUC")
+        else:
+            ax.set_yticklabels([])
+    fig.legend(*axes[0, 0].get_legend_handles_labels(), loc="lower center", ncol=4, frameon=False,
+               bbox_to_anchor=(0.5, 0.99))
+    save(fig, "like2like_5seed")
+
+
+# ---------------------------------------------------------------- slides 17-19: task variance groups
+
+def _analyse_all():
+    return {p: analyse(RUNS["5seed"] / p / f"seed_{SEED:02d}.pt") for p in NAMES}
+
+
+def silhouette(A=None):
+    A = A or _analyse_all()
+    fig, axes = plt.subplots(1, 2, figsize=(3.5, 1.9), sharey=True, gridspec_kw=dict(wspace=0.1,
+                                                                                    width_ratios=[1.6, 1]))
+    for ax, pop in zip(axes, "EI"):
+        for p, R in A.items():
+            sc = R[pop]["sil_curve"]
+            ks = sorted(sc)
+            ax.plot(ks, [sc[k] for k in ks], color=COLORS[p], lw=1.1, label=NAMES[p])
+            ax.plot(R[pop]["K"], sc[R[pop]["K"]], "o", color=COLORS[p], ms=4.5, mec="k", mew=0.5, zorder=3)
+        ax.set_title(f"{pop} neurons", color=E_COL if pop == "E" else I_COL)
+        ax.set_xticks(range(2, max(ks) + 1, 4 if pop == "E" else 2))
+    axes[0].set_ylabel("silhouette")
+    fig.supxlabel("number of groups k", fontsize=8, y=-0.1)
+    fig.legend(*axes[0].get_legend_handles_labels(), loc="lower center", ncol=2, frameon=False,
+               bbox_to_anchor=(0.5, 0.98), fontsize=6.5)
+    save(fig, "silhouette")
+
+
+def tv(A=None):
+    A = A or _analyse_all()
+    for pair in (("control", "A3"), ("B0", "C0")):
+        fig = plt.figure(figsize=(W, 2.75))
+        n_units = {p: (len(A[p]["E"]["units"]), len(A[p]["I"]["units"])) for p in pair}
+        gs = fig.add_gridspec(1, 5, width_ratios=[n_units[pair[0]][0], n_units[pair[0]][1] * 1.4, 18,
+                                                  n_units[pair[1]][0], n_units[pair[1]][1] * 1.4],
+                              wspace=0.04, left=0.11, right=0.995, top=0.82, bottom=0.04)
+        cols = {pair[0]: (0, 1), pair[1]: (3, 4)}
+        for p in pair:
+            R = A[p]
+            for pop, gi in zip("EI", cols[p]):
+                ax = fig.add_subplot(gs[gi])
+                P = R[pop]
+                o = np.argsort(P["lab"], kind="stable")
+                im = ax.imshow(R["norm"][:, P["units"][o]], cmap="hot", aspect="auto", interpolation="nearest",
+                               vmin=0, vmax=1)
+                labs = P["lab"][o]
+                for c in range(1, P["K"]):
+                    ax.axvline(np.flatnonzero(labs == c)[0] - 0.5, color="white", lw=0.35)
+                ax.set_xticks([])
+                n_t = len(R["tasks"])
+                # group numbers under the columns; one moves down a row if it would touch its left neighbour
+                gap = 0.11 * len(labs) / (ax.get_position().width * fig.get_figwidth())   # ~0.11 in, in units
+                last = []                                # x of the last number in each row
+                for c in range(P["K"]):
+                    x = np.flatnonzero(labs == c).mean()
+                    row = next((i for i, xl in enumerate(last) if x - xl >= gap), len(last))
+                    if row == len(last):
+                        last.append(x)
+                    last[row] = x
+                    ax.text(x, n_t - 0.2 + 1.1 * row, str(c + 1), ha="center", va="top", fontsize=6.5)
+                ax.set_yticks(range(len(R["tasks"])))
+                show_y = p == pair[0] and pop == "E"
+                ax.set_yticklabels([rule_name[t] for t in R["tasks"]] if show_y else [], fontsize=6)
+                ax.tick_params(length=0, pad=1.5)
+                ax.spines[:].set_visible(False)
+                ax.set_title(f"{pop}: {P['K']} groups", fontsize=7.5, color=E_COL if pop == "E" else I_COL,
+                             pad=2)
+                if pop == "E":
+                    ax.text(0.0, 1.13, NAMES[p], transform=ax.transAxes, fontsize=9, color=COLORS[p])
+        cax = fig.add_axes([0.80, -0.16, 0.19, 0.025])
+        cb = fig.colorbar(im, cax=cax, orientation="horizontal", ticks=[0, 1])
+        cb.ax.tick_params(labelsize=6, length=2, pad=1)
+        cax.set_title("task variance / neuron max", fontsize=6, pad=1.5, loc="left")
+        save(fig, f"tv_{pair[0]}_{pair[1]}")
+
+
+if __name__ == "__main__":
+    which = sys.argv[1:] or ["frames", "front", "convergence", "like2like", "silhouette", "tv"]
+    A = None
+    if {"silhouette", "tv"} & set(which):
+        A = _analyse_all()
+    for w in which:
+        {"frames": frames, "front": front, "convergence": convergence, "like2like": like2like,
+         "silhouette": lambda: silhouette(A), "tv": lambda: tv(A)}[w]()

@@ -33,7 +33,7 @@ REPO = Path(__file__).resolve().parents[2]
 RUNS = {"saveat": REPO / "runs/moo_zoom/dale_all_woutfree_fanin_4pt_1seed_150k_saveat",   # 1 seed, saved along training
         "5seed": REPO / "runs/moo_zoom/dale_all_woutfree_fanin_4pt_5seed_150k"}           # 5 seeds, final only
 RUN = RUNS["saveat"]
-POINTS = {"control": "Unconstrained", "A3": "A3, rate only", "B0": "B0, wiring only", "C0": "C0, both"}
+POINTS = {"control": "Control", "A3": "Firing constraint (A3)", "B0": "Wiring constraint (B0)", "C0": "Both constraints (C0)"}
 COLORS = {"control": "#444444", "A3": "#d62728", "B0": "#1f77b4", "C0": "#2ca02c"}   # as in the E/I report
 
 
@@ -103,7 +103,7 @@ def main(step=None, run="saveat", seed=0):
     ALL = {}
     for i, (p, name) in enumerate(POINTS.items()):
         R = ALL[p] = analyse(RUNS[run] / p / f"{sub}seed_{seed:02d}.pt")
-        tv_panel(fig.add_subplot(gs[i, 0]), R, "E", True, head=f"{name} (min task acc {R['acc']:.2f})   ")
+        tv_panel(fig.add_subplot(gs[i, 0]), R, "E", True, head=f"{name} (worst task acc {R['acc']:.2f})   ")
         tv_panel(fig.add_subplot(gs[i, 1]), R, "I", False)
         print(p, {pop: (R[pop]["K"], round(R[pop]["sil"], 2), round(R[pop]["breadth"], 1)) for pop in "EI"})
     fig.suptitle(f"Task variance, E and I clustered separately: cog20, fanin, 150k steps, {who}", fontsize=9)
@@ -182,7 +182,7 @@ def plot_wiring(ALL, tag, who="saveat run, seed 0"):
     for r, (p, R) in enumerate(ALL.items()):
         w = wiring(R)
         matrix_panel(axes[r, 0], w["sim"], w, "coolwarm", 1, "r of the two groups' task profiles")
-        axes[r, 0].set_title(f"{POINTS[p]} (min task acc {R['acc']:.2f}): task similarity", loc="left",
+        axes[r, 0].set_title(f"{POINTS[p]} (worst task acc {R['acc']:.2f}): task similarity", loc="left",
                              fontsize=9, weight="bold")
         ax = axes[r, 1]
         matrix_panel(ax, w["z"], w, "RdBu_r", 4, "z vs shuffled groups (grey: group < 4 neurons)")

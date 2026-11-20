@@ -1,4 +1,4 @@
-# Session handoff, updated 2026-11-19 (Windows) — read §0 first
+# Session handoff, updated 2026-11-20 (Linux) — read §0 first, then §9 (deck polish, newest)
 
 Read this first in a new Claude Code session, together with `CLAUDE.md`. **Section 8 is the newest**: the
 Driscoll-style analysis (task variance per period, fixed points) and the clustering-free like-to-like wiring test,
@@ -61,6 +61,10 @@ most specific; control and C0 differ only modestly. Eval trials: Go/Anti matchin
   Side-by-side unconstrained vs constrained comparisons are wanted. The user likes the
   "two distributions + ROC/AUC" figure style (`wiring_roc_all_*`).
 - Temporary GIFs go in the scratchpad; the user asked to keep the useful ones in `results/front/dynamics_gifs/`.
+- **Figures and slides (2026-11-20):** accuracy is always RdYlGn on 0–1 (red 0, green 1) and called "worst-task
+  accuracy"; on slides the points are control / firing constraint / wiring constraint / both constraints; talk
+  figures are separate from analysis figures (§9), crisp, big normal-weight text; never delete the originals; no
+  AI-sounding phrasing on slides.
 
 ## 2. Where the project is
 
@@ -129,7 +133,7 @@ save-at network is weaker only in B0 I→E (≈ 0) and C0 E→E w/b (2.45). I→
 
 | script | output (in `results/front/` unless stated) |
 |---|---|
-| `results/scripts/fig_front_top_fanin150k.py` | `cog20_150k_fanin_front_top.png` (rings the example network, `EXAMPLE = (run, seed)`), `cog20_150k_fanin_front.gif`, `front_networks_150k_fanin.csv` |
+| `results/scripts/fig_front_top_fanin150k.py` | `cog20_150k_fanin_front_top.png` (filled contours of worst-task accuracy since 2026-11-20: thin-plate fit of per-budget seed means, inside their hull; rings the example network, `EXAMPLE = (run, seed)`), `cog20_150k_fanin_front.gif`, `front_networks_150k_fanin.csv` |
 | `results/scripts/fig_tv_ei_fanin.py [step] [--run saveat\|5seed] [--seed N]` | `tv_ei_fanin_<tag>.png`, `_sil.png`, `_wiring.png`; default tag `150k` (save-at, seed 0); `--run 5seed --seed 4` → `tv_ei_fanin_5seed_s4_150k*` |
 | `results/scripts/fig_acc_vs_steps_grid.py` (new) | `acc_vs_steps_fanin_grid.pdf`: 2 × 2 learning curves, one shared legend (save-at run) |
 | `results/scripts/fig_acc_vs_steps.py <point> [rays3\|fanin]` | `acc_vs_steps_<point>[_fanin].png` |
@@ -168,7 +172,13 @@ Built in Beamer, `presentation/main.tex`; outline with talking points, sources a
 **`presentation/presentation.md`** (keep it in sync with main.tex). Build: `cd presentation && pdflatex main.tex`
 twice (needs `animate`; Okular is installed on Linux; on Windows present with Acrobat Reader or Okular).
 
-Current deck (28 pages), outline numbering:
+Current deck (30 pages), outline numbering. **Since 2026-11-20:** slides 10–18 use *talk figures*
+(`presentation/figs/talk/`, made by `presentation/figs/talk_figs.py`, drawn at slide size with big labels and
+little text); the detailed analysis figures in `results/front/` are unchanged and stay the reference. Points are
+named *control / firing constraint / wiring constraint / both constraints* on slides (codes A3/B0/C0 only in notes
+and analysis figures, which now read e.g. "Firing constraint (A3)"). Like-to-like slides are no longer tagged
+experimental. Two experimental lesion slides (math + `lesion_period_s4_ward_contrast_grid.png`) sit before
+"Thank you". Wording was de-AI'd ("X, not Y" phrasing removed).
 
 | # | slide | made from |
 |---|---|---|
@@ -185,15 +195,16 @@ Current deck (28 pages), outline numbering:
 | 10 | The front (**placeholder: point scan**, animated) | `frames/` |
 | 11 | Four points on the front (5-seed means + seed-4 row, seed 4 ringed) | front top + table |
 | 12 | Do they converge? (separate save-at run, labelled) | `acc_vs_steps_fanin_grid.pdf` |
+| 12a | Like-to-like wiring (math: s_ij, connected, AUC, ROC, shuffle p), tagged experimental | Beamer |
+| 12b | Like-to-like, seed 4 | `wiring_roc_all_s4.png` |
+| 12c | Like-to-like, all 20 networks + sparsity caveat | `wiring_roc_all_5seed.png` |
 | 13 | Task variance and the number of groups (TV + silhouette math) | seed-4 `_sil.png` |
 | 14–15 | E and I groups (2 points per slide) | seed-4 crops |
 | 16–19 | Task similarity and wiring, one per point | seed-4 crops, captions with 5-seed ranges |
-| – | **Experimental** divider (draft section, user decides later what stays) | Beamer |
+| – | **Experimental** divider (draft section, user decides later what stays; like-to-like moved up to 12a–c on 2026-11-19) | Beamer |
 | E1 | Task variance per task period (math) + Driscoll Fig 3a crop | `figs/driscoll2024_crops.pdf` |
 | E2–E3 | Task periods, Driscoll style: control/A3, B0/C0 | `tv_period_driscoll_<p>_s4.png` |
-| E4 | Like-to-like wiring (math: s_ij, connected, AUC, ROC, shuffle p) | Beamer |
-| E5 | Like-to-like, seed 4 | `wiring_roc_all_s4.png` |
-| E6 | Like-to-like, all 20 networks + sparsity caveat | `wiring_roc_all_5seed.png` |
+| L1–L2 | Lesions on task-period groups (math; contrast grid as is), experimental | `lesion_period_s4_ward_contrast_grid.png` |
 | – | Thank you | |
 
 User's style preferences for the slides:
@@ -214,18 +225,23 @@ User's style preferences for the slides:
 4. Summary, limitations (L2 rate cost, L1 ≠ wire length, 5 seeds, soft clusters, A3 not converged, C0 rate budget
    barely binds), open questions, thank you.
 5. **One E/I colour convention**: Figma setup figure = red E / blue I; Beamer (Song colours) = blue E / red I.
-6. Figma `Fig_setup` says "Connectivity cost (L1)"; slides say "wiring". Unify.
-7. Commits: HEAD `cf34f4a AUROC for correlation vs wiring` has the wiring scripts, their outputs, the
-   `tv_period_*` caches and `results/front/dynamics_gifs/`. **Uncommitted** (2026-11-18 night): the Experimental
-   slides (`presentation/main.tex`, `main.pdf`, `presentation.md`), the Driscoll crop
-   (`presentation/figs/driscoll2024_crops.{tex,pdf}`), `results/front/tv_period_driscoll_{A3,B0}_s4.png`, this
-   file, `papers/driscoll2024.pdf` (still untracked) and `results/front/wiring_tuning_s4.png` (the user's own try
-   at wiring vs tuning, no script in the repo). LaTeX aux files and `frames/` PNGs could go in `.gitignore`.
-8. §8.1 and §8.3 are in the deck as a draft **Experimental** section (E1–E6, 2026-11-18); the user decides
-   later what stays. Not in yet: fixed points (§8.2), the E→E direction chain; the old group-wiring slides 16–19
-   and the new AUC slides overlap (pick one). Known cosmetic issues: the two portrait Fig 3a figures per slide
-   are small (crop the suptitles/legends if they stay); the grey "experimental" tag sits mid-title, not
-   right-aligned.
+6. Figma `Fig_setup` says "Connectivity cost (L1)"; slides say "wiring". The talk figures now say "wiring cost";
+   the analysis figures (`results/front/`) and Figma still say "Connectivity cost". Unify.
+7. Commits: HEAD `fee34bf` (task-battery fix + lesions, Windows). Everything in §9 is uncommitted until the
+   user commits it. `presentation/figs/driscoll2024_crops.pdf` is untracked and 12.8 MB (the crop embeds the whole
+   page's images); building it needs `papers/driscoll2024.pdf`, which is gitignored, so commit the PDF if the deck
+   must build on Windows. LaTeX aux files and the frame PNGs could go in `.gitignore`.
+8. Experimental section now = Driscoll per-period TV (E1–E3) + lesions (L1–L2). Like-to-like (§8.3) moved into
+   the main line after "Do they converge?" and is no longer tagged experimental. Not in the deck: fixed points
+   (§8.2), the E→E direction chain. The old group-wiring slides (task similarity and wiring, one per point) and
+   the like-to-like slides overlap: pick one. Cosmetic: the Driscoll Fig 3a figures are small; the grey
+   "experimental" tag sits mid-title.
+9. Like-to-like results are not cached: `fig_wiring_like2like.network` (20 networks × 500 shuffles, ~3 min) is
+   recomputed by `fig_wiring_like2like_seeds.py`, `fig_wiring_matched_sparsity.py`, `fig_wiring_roc_all.py` and
+   `talk_figs.py like2like`. Offered to cache per network (`results/front/like2like_<point>_s<seed>.npz`, own
+   shuffle seed per network: AUCs identical, p-values move slightly); the user said fine for now, not done.
+10. Talk versions still missing for: the task-similarity/wiring slides, the Driscoll slides, the lesion grid
+   (user: later).
 
 ## 8. Driscoll et al. 2024 and like-to-like wiring (2026-11-18, evening)
 
@@ -291,8 +307,8 @@ Replaces the old group wiring analysis (§4, which the user found sloppy and har
   P(connected) type→type, observed / shuffled.
 - Scripts: `fig_wiring_like2like.py` (one seed; network() has `keep_frac` for matched sparsity),
   `fig_wiring_like2like_seeds.py` (all 20 → `wiring_like2like_5seed.png/.csv`), `fig_wiring_matched_sparsity.py`,
-  `fig_wiring_roc.py`, **`fig_wiring_roc_all.py` → `wiring_roc_all_s4.png` (4 types × 4 points, KDE
-  distributions + ROC inset) and `wiring_roc_all_5seed.png` (mean ROC per point + AUC per network)**: the
+  `fig_wiring_roc.py`, **`fig_wiring_roc_all.py` → `wiring_roc_all_s4.png` (4 types × 4 points, 20-bin histograms,
+  no KDE since 2026-11-20: it blurred C0's few connected pairs; ROC panel beside each) and `wiring_roc_all_5seed.png` (mean ROC per point + AUC per network)**: the
   figures the user liked.
 - Results, mean AUC (sd) over 5 seeds:
 
@@ -351,3 +367,43 @@ question. What was discussed:
   computation (more reuse). Optional: varimax rotation of control activity to look for hidden modules.
 - **The user said the analysis was "getting out of hand"** and switched to putting the existing results in the
   deck first. Don't push new analyses; wait for the user to pick one.
+
+## 9. Deck polish, 2026-11-20 (Linux, after pulling `fee34bf`)
+
+All in `presentation/` unless stated; deck builds (30 pages, no errors). Details per slide in
+`presentation/presentation.md`.
+
+- **Slide order:** the three like-to-like slides moved up to right after "Do they converge?" (before the task
+  variance slides) and lost the "experimental" tag.
+- **Like-to-like histogram (seed-4 figure):** the Gaussian KDE was dropped. It widened C0's few connected pairs
+  (22–146) 3–4× more than the unconnected ones and lost up to 4% of mass past +1, hiding the like-to-like spike near
+  0.9. Now plain histograms, **20 bins of width 0.1**, same bins for both, each scaled to area 1 (chosen over 40
+  bins and √n bins after comparing all three); ROC moved from an inset (which covered the right end) to its own
+  panel. `fig_wiring_roc_all.py --bins {20,40,sqrt}` (20 default). AUC/ROC/medians were always on raw values.
+- **Front, top view:** filled contours of worst-task accuracy instead of coloured points: thin-plate-spline fit
+  (scipy `RBFInterpolator`, smoothing 1e-3) through the 33 per-budget seed means, only inside their convex hull;
+  lines 0.7/0.8/0.9, dashed 0.6. `fig_front_top_fanin150k.py` (`budget_means`, `accuracy_surface`).
+- **Accuracy colour rule (user, permanent):** RdYlGn on 0–1, red 0, green 1, every accuracy figure (also the 3D
+  front, `fig_front_gif_150k.py`, vmin 0.5 → 0).
+- **"Worst-task accuracy" everywhere** in user-visible labels (never "min task accuracy"); internal keys unchanged.
+- **Point names on slides:** control / firing constraint / wiring constraint / both constraints. Analysis figures
+  of the 4-point run: `POINTS` in `fig_tv_ei_fanin.py`, `fig_acc_vs_steps_grid.py`, `fig_lesion_contrast_grid.py`,
+  `HIGHLIGHT_NAMES` in `fig_front_gif_150k.py` and the annotation in `fig_front_top_fanin150k.py` now read
+  "Control", "Firing constraint (A3)", "Wiring constraint (B0)", "Both constraints (C0)". Regenerated: front top
+  + GIF, `tv_ei_fanin_5seed_s4_150k*` and its crops, `tv_period_driscoll_*_s4`, the lesion contrast grid.
+- **Wording:** AI-sounding phrases rewritten in the user's voice (no "X, not Y", no slogan colons, no dramatic
+  "…"; "we" and full sentences). 15 changes, slides 4–13, 15 and E1.
+- **Talk figures (new):** `presentation/figs/talk_figs.py` → `presentation/figs/talk/` (`frames/front_000–059.png`,
+  `front_top.pdf`, `convergence.pdf`, `like2like_s4.pdf`, `like2like_5seed.pdf`, `silhouette.pdf`,
+  `tv_control_A3.pdf`, `tv_B0_C0.pdf`). Drawn at slide size (text width 5.6 in), 7–9 pt normal-weight fonts,
+  minimal text; slides 10–18 use them. Originals untouched (old frames still in `presentation/frames/`, old crops
+  in `presentation/figs/`). User's rule: two kinds of figures, analysis (detailed) and talk (crisp), never delete
+  the analysis ones; detail that does not fit goes in `presentation.md`.
+- **Lesion slides (experimental, before "Thank you"):** math slide (Ward groups 14 E / 5 I on per-period TV;
+  rates of the group set to 0 all trial; Δ = (acc_lesioned − acc_full)/acc_full; Driscoll module contrast
+  C = ⟨Δ⟩_module − ⟨Δ⟩_reference, C < 0 = module hurt more) + the existing contrast grid as it is. Mean change per
+  lesion control −0.16, firing −0.05, wiring −0.16, both −0.13; |C| ≥ 0.2 in 6/5/9/9 of 19 groups. Seed 4, v1.
+- **Checked on request:** A3's wiring cost is really above control's, in all 5 seeds (0.047 vs 0.030 mean,
+  1.4–1.7× per seed, same init and trials), though A3 keeps fewer synapses (61% vs 70%): fewer but stronger.
+  Guess, not tested: with ~250× less firing it needs larger weights to drive its targets.
+- Memory updated: `accuracy-colormap.md` (new), `talk-slide-style.md` (names, wording, two figure types, no bold).

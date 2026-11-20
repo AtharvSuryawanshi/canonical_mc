@@ -74,7 +74,7 @@ def main():
         ax.annotate(front.HIGHLIGHT_NAMES.get(r.point, r.point), (r.x, r.y), xytext=(0, 9),
                     textcoords="offset points", ha="center", fontsize=7, color="#1f3b73")
     ax.scatter(p.x, p.y, marker="s", s=70, facecolors="none", edgecolors="k", linewidths=1.2, zorder=5)
-    fig.colorbar(sc, ax=ax).set_label("Min Task Accuracy (existing networks)")
+    fig.colorbar(sc, ax=ax).set_label("Worst-task accuracy (existing networks)")
     ax.scatter([], [], marker="X", c="0.6", label="existing, infeasible")
     ax.scatter([], [], c="0.6", label="existing, feasible")
     ax.scatter([], [], marker="s", facecolors="none", edgecolors="k", label=f"proposed ({len(p)} points)")

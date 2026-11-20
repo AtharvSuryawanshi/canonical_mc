@@ -11,7 +11,7 @@ cmc.front.pareto_mask: maximise min_task_acc, minimise both costs.
     python results/scripts/fig_front_gif_150k.py
 
 Writes results/front/cog20_150k_front.gif, a still front view
-(cog20_150k_front_pic.png), a 2D top view coloured by min task accuracy
+(cog20_150k_front_pic.png), a 2D top view coloured by worst-task accuracy
 (cog20_150k_front_top.png) and front_networks_150k.csv (the Pareto-optimal networks).
 """
 from pathlib import Path
@@ -35,7 +35,7 @@ RUNS = [
 ]
 FANIN_RUN = "runs/moo_zoom/dale_all_woutfree_fanin_4pt_5seed_150k"
 HIGHLIGHT_RUN = FANIN_RUN   # best seed per point gets a label
-HIGHLIGHT_NAMES = {"control": "Unconstrained", "A3": "A3 rate", "B0": "B0 wiring", "C0": "C0 both"}
+HIGHLIGHT_NAMES = {"control": "Control", "A3": "Firing constraint (A3)", "B0": "Wiring constraint (B0)", "C0": "Both constraints (C0)"}
 OUT_DIR = REPO / "results" / "front"
 N_FRAMES, FPS, DPI = 120, 10, 110
 ELEV = 22
@@ -67,9 +67,9 @@ def draw(ax, d, hl):
     ax.scatter(feas.x, feas.y, feas.z, s=9, c="0.45", alpha=0.35, depthshade=False)
     if len(par) >= 3:
         tri = Delaunay(par[["x", "y"]].to_numpy())
-        ax.plot_trisurf(par.x, par.y, par.z, triangles=tri.simplices, cmap="RdYlGn", vmin=0.5, vmax=1,
+        ax.plot_trisurf(par.x, par.y, par.z, triangles=tri.simplices, cmap="RdYlGn", vmin=0.0, vmax=1,
                         alpha=0.35, linewidth=0.2, edgecolor="0.5")
-    ax.scatter(par.x, par.y, par.z, s=30, c=par.z, cmap="RdYlGn", vmin=0.5, vmax=1,
+    ax.scatter(par.x, par.y, par.z, s=30, c=par.z, cmap="RdYlGn", vmin=0.0, vmax=1,
                edgecolors="k", linewidths=0.5, depthshade=False)
     for _, r in hl.iterrows():
         ax.scatter([r.x], [r.y], [r.z], s=140, facecolors="none", edgecolors="#1f3b73", linewidths=2, zorder=10,
@@ -81,12 +81,12 @@ def draw(ax, d, hl):
                     linewidth=0)
     ax.set_xlabel("log(Firing cost)", labelpad=6)
     ax.set_ylabel("log(Connectivity cost)", labelpad=6)
-    ax.set_zlabel("Min Task Accuracy", labelpad=6)
+    ax.set_zlabel("Worst-task accuracy", labelpad=6)
     ax.set_zlim(0.0, 1.0)
 
 
 def draw_top(d, hl, out):
-    """Top view: every network at its reached costs, coloured by min task accuracy."""
+    """Top view: every network at its reached costs, coloured by worst-task accuracy."""
     fig, ax = plt.subplots(figsize=(6.4, 5))
     kw = dict(cmap="RdYlGn", vmin=0.0, vmax=1)
     inf, feas, par = d[~d.feasible], d[d.feasible & ~d.pareto], d[d.pareto]
@@ -99,7 +99,7 @@ def draw_top(d, hl, out):
         ax.scatter([r.x], [r.y], s=260, facecolors="none", edgecolors="#1f3b73", linewidths=2, zorder=4)
         ax.annotate(HIGHLIGHT_NAMES.get(r.point, r.point), (r.x, r.y), xytext=(0, 13),
                     textcoords="offset points", ha="center", fontsize=8, color="#1f3b73", zorder=5)
-    fig.colorbar(sc, ax=ax).set_label("Min Task Accuracy")
+    fig.colorbar(sc, ax=ax).set_label("Worst-task accuracy")
     ax.set_xlabel("log(Firing cost)")
     ax.set_ylabel("log(Connectivity cost)")
     ax.scatter([], [], marker="X", c="0.6", label=f"infeasible (< {FEASIBLE_MIN_TASK_ACC})")

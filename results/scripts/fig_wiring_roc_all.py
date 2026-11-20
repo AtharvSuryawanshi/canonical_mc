@@ -3,12 +3,13 @@
 Measure as in fig_wiring_like2like.py: per type (E->E, E->I, I->E, I->I), fingerprint similarity of connected vs
 unconnected pairs (connected = |W|/c > 0.01); sliding a threshold over similarity gives the ROC, its area the AUC.
 
-Figure 1 (one seed): rows = types, columns = points; each panel shows the two similarity distributions (smoothed,
-Gaussian KDE) with the ROC as an inset.
+Figure 1 (one seed): rows = types, columns = points; each panel shows the two similarity distributions as
+histograms (20 bins of width 0.1 on [-1, 1], same bins for both, each scaled to area 1; no smoothing, which blurred C0's few connected pairs), with the
+ROC in a small panel to the right (an inset hid the right end of the histograms).
 Figure 2 (all 5 seeds): top row = mean ROC per point (vertical average over seeds, band = min-max), bottom row = AUC
 per network (filled = p < 0.05 against 500 fingerprint shuffles), grey lines join the same seed.
 
-    python results/scripts/fig_wiring_roc_all.py [--seed 4]
+    python results/scripts/fig_wiring_roc_all.py [--seed 4] [--bins 40 20 sqrt]
 
 Writes results/front/wiring_roc_all_s<seed>.png and wiring_roc_all_5seed.png.
 """
@@ -19,7 +20,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.stats import gaussian_kde
 
 from fig_tv_ei_fanin import COLORS, POINTS
 from fig_wiring_like2like import QUADS, network
@@ -29,50 +29,61 @@ REPO = Path(__file__).resolve().parents[2]
 SEEDS = range(5)
 E_COL, I_COL, UNCONN = "#1F8AD0", "#E0393E", "#a8a8a8"
 GRID = np.linspace(0, 1, 101)
+BIN_RULES = ("40", "20", "sqrt")
 
 
-def kde(x, xs):
-    return gaussian_kde(x)(xs) if len(x) > 2 and np.std(x) > 0 else np.zeros_like(xs)
+def bins_for(rule, n_small):
+    """Bin edges on [-1, 1], one width for both histograms of a panel: 40 or 20 bins, or (sqrt) sqrt(n) bins of the
+    smaller group (connected or unconnected), 5..40."""
+    k = int(np.clip(np.ceil(np.sqrt(n_small)), 5, 40)) if rule == "sqrt" else int(rule)
+    return np.linspace(-1, 1, k + 1)
 
 
-def one_seed(R, seed):
-    fig, axes = plt.subplots(len(QUADS), len(POINTS), figsize=(16, 13), sharex=True,
-                             gridspec_kw=dict(hspace=0.42, wspace=0.12, left=0.07, right=0.99, top=0.86, bottom=0.05))
-    xs = np.linspace(-1, 1, 300)
+def one_seed(R, seed, rule="20"):
+    fig = plt.figure(figsize=(18, 13))
+    outer = fig.add_gridspec(len(QUADS), len(POINTS), hspace=0.42, wspace=0.14, left=0.06, right=0.99, top=0.86,
+                             bottom=0.05)
     for r, q in enumerate(QUADS):
         col = E_COL if q[0] == "E" else I_COL
         for j, p in enumerate(POINTS):
             res = R[(p, seed)]
             mk = res["masks"][q]
             s, c = res["S"][mk], res["C"][mk]
-            ax = axes[r, j]
-            ku, kc = kde(s[~c], xs), kde(s[c], xs)
-            ax.fill_between(xs, ku, color=UNCONN, alpha=0.5, lw=0, label=f"unconnected ({(~c).sum()})")
-            ax.plot(xs, kc, color=col, lw=2.2, label=f"connected ({c.sum()})")
+            inner = outer[r, j].subgridspec(1, 2, width_ratios=[2.6, 1], wspace=0.08)
+            ax, ax_roc = fig.add_subplot(inner[0]), fig.add_subplot(inner[1])
+            bins = bins_for(rule, min(c.sum(), (~c).sum()))
+            hu = ax.hist(s[~c], bins, density=True, color=UNCONN, alpha=0.5, label=f"unconnected ({(~c).sum()})")[0]
+            hc = ax.hist(s[c], bins, density=True, histtype="step", color=col, lw=1.8, label=f"connected ({c.sum()})")[0]
+            ax.text(0.99, 0.97, f"{len(bins) - 1} bins", transform=ax.transAxes, ha="right", va="top", fontsize=6,
+                    color="0.4")
             ax.axvline(np.median(s[~c]), color="0.45", ls=":", lw=1.2)
             ax.axvline(np.median(s[c]), color=col, ls=":", lw=1.2)
-            ax.set_ylim(0, max(ku.max(), kc.max()) * 1.55)
+            ax.set_xlim(-1, 1); ax.set_xticks([-1, -0.5, 0, 0.5, 1])
+            ax.set_ylim(0, max(hu.max(), hc.max()) * 1.3)
             ax.set_yticks([]); ax.spines[["top", "right", "left"]].set_visible(False)
-            ax.legend(fontsize=7, frameon=False, loc="upper left")
-            ax.set_title(f"AUC {res[q]['auc']:.2f}" + ("" if res[q]["auc_p"] < 0.05 else "  (n.s.)"), fontsize=10,
-                         loc="right")
+            ax.tick_params(labelsize=7)
+            ax.legend(fontsize=6.5, frameon=False, loc="upper left")
             if r == 0:
-                ax.text(0.5, 1.2, POINTS[p], transform=ax.transAxes, ha="center", fontsize=12, color=COLORS[p],
+                ax.text(0.68, 1.25, POINTS[p], transform=ax.transAxes, ha="center", fontsize=12, color=COLORS[p],
                         weight="bold")
             if j == 0:
                 ax.set_ylabel(q, fontsize=13, rotation=0, ha="right", va="center", labelpad=12)
             if r == len(QUADS) - 1:
-                ax.set_xlabel("fingerprint similarity (pre, post)", fontsize=9)
-            ins = ax.inset_axes([0.70, 0.40, 0.29, 0.55])
+                ax.set_xlabel("fingerprint similarity (pre, post)", fontsize=8)
             f, t = roc(s, c)
-            ins.fill_between(f, t, color=col, alpha=0.15); ins.plot(f, t, color=col, lw=1.5)
-            ins.plot([0, 1], [0, 1], "k--", lw=0.6)
-            ins.set_xlim(0, 1); ins.set_ylim(0, 1); ins.set_xticks([]); ins.set_yticks([])
-            ins.set_title("ROC", fontsize=7, pad=2)
+            ax_roc.fill_between(f, t, color=col, alpha=0.15); ax_roc.plot(f, t, color=col, lw=1.5)
+            ax_roc.plot([0, 1], [0, 1], "k--", lw=0.6)
+            ax_roc.set_xlim(0, 1); ax_roc.set_ylim(0, 1); ax_roc.set_xticks([]); ax_roc.set_yticks([])
+            ax_roc.set_box_aspect(1)
+            ax_roc.set_title(f"AUC {res[q]['auc']:.2f}" + ("" if res[q]["auc_p"] < 0.05 else "\n(n.s.)"),
+                             fontsize=9, pad=3)
+            if r == len(QUADS) - 1:
+                ax_roc.set_xlabel("ROC", fontsize=8)
     fig.suptitle(f"Are neurons that work in the same task periods more often connected? Seed {seed} (5-seed run, fanin, "
-                 f"150k)\nfingerprint similarity of connected (colour) vs unconnected (grey) pairs, dotted = medians; "
-                 f"inset: ROC, its area = AUC (0.5 = same distributions)", fontsize=11, y=0.985)
-    out = REPO / "results/front" / f"wiring_roc_all_s{seed}.png"
+                 f"150k)\nfingerprint similarity of connected (colour) vs unconnected (grey) pairs, histograms scaled "
+                 f"to area 1, dotted = medians; right: ROC, its area = AUC (0.5 = same distributions)", fontsize=11,
+                 y=0.985)
+    out = REPO / "results/front" / f"wiring_roc_all_s{seed}{'' if rule == '20' else '_bins' + rule}.png"
     fig.savefig(out, dpi=150)
     plt.close(fig)
     print("->", out)
@@ -130,10 +141,11 @@ def all_seeds(R):
     print("->", out)
 
 
-def main(seed=4):
+def main(seed=4, rules=("20",)):
     rng = np.random.default_rng(0)
     R = {(p, s): network(p, s, rng) for p in POINTS for s in SEEDS}
-    one_seed(R, seed)
+    for rule in rules:
+        one_seed(R, seed, rule)
     all_seeds(R)
 
 
@@ -141,4 +153,7 @@ if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, default=4)
-    main(ap.parse_args().seed)
+    ap.add_argument("--bins", nargs="+", choices=BIN_RULES, default=["20"],
+                    help="histogram bins of figure 1: 20 (default, no suffix), 40, or sqrt(n) of the smaller group (suffix _bins<rule>)")
+    a = ap.parse_args()
+    main(a.seed, a.bins)

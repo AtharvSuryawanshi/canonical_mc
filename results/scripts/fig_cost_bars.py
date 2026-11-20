@@ -26,7 +26,7 @@ POINT_ORDER = ["control", "rate_limited", "wiring_limited", "both"]
 
 
 def plot(row, acc_col, cost_max, out):
-    labels = ["Min Task\n Accuracy", "Connectivity\ncost (L1)", "Firing\ncost (L2)"]
+    labels = ["Worst-task\n accuracy", "Connectivity\ncost (L1)", "Firing\ncost (L2)"]
     raw = [row[acc_col], row.wiring_cost, row.metabolic_cost]
     scaled = [raw[0], raw[1] / cost_max["wiring_cost"], raw[2] / cost_max["metabolic_cost"]]
     fig, ax = plt.subplots(figsize=(2.6, 1.3))

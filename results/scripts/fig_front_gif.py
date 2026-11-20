@@ -9,7 +9,7 @@ cmc.front.pareto_mask: maximise min_task_acc, minimise both costs.
     python results/scripts/fig_front_gif.py
 
 Writes results/front/cog20_50k_front.gif, a still front view
-(cog20_50k_front_pic.png), a 2D top view coloured by min task accuracy
+(cog20_50k_front_pic.png), a 2D top view coloured by worst-task accuracy
 (cog20_50k_front_top.png) and front_networks.csv (the Pareto-optimal networks).
 """
 from pathlib import Path
@@ -79,12 +79,12 @@ def draw(ax, d, hl):
                     linewidth=0)
     ax.set_xlabel("log(Firing cost)", labelpad=6)
     ax.set_ylabel("log(Connectivity cost)", labelpad=6)
-    ax.set_zlabel("Min Task Accuracy", labelpad=6)
+    ax.set_zlabel("Worst-task accuracy", labelpad=6)
     ax.set_zlim(0.0, 1.0)
 
 
 def draw_top(d, hl, out):
-    """Top view: every network at its reached costs, coloured by min task accuracy."""
+    """Top view: every network at its reached costs, coloured by worst-task accuracy."""
     fig, ax = plt.subplots(figsize=(6.4, 5))
     kw = dict(cmap="RdYlGn", vmin=0.0, vmax=1)
     inf, feas, par = d[~d.feasible], d[d.feasible & ~d.pareto], d[d.pareto]
@@ -95,7 +95,7 @@ def draw_top(d, hl, out):
         ax.scatter([r.x], [r.y], s=260, facecolors="none", edgecolors="#1f3b73", linewidths=2, zorder=4)
         ax.annotate(HIGHLIGHT_NAMES.get(r.point, r.point), (r.x, r.y), xytext=(0, 13),
                     textcoords="offset points", ha="center", fontsize=8, color="#1f3b73", zorder=5)
-    fig.colorbar(sc, ax=ax).set_label("Min Task Accuracy")
+    fig.colorbar(sc, ax=ax).set_label("Worst-task accuracy")
     ax.set_xlabel("log(Firing cost)")
     ax.set_ylabel("log(Connectivity cost)")
     ax.scatter([], [], marker="X", c="0.6", label=f"infeasible (< {FEASIBLE_MIN_TASK_ACC})")

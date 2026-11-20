@@ -23,7 +23,7 @@ spec.loader.exec_module(single)
 
 REPO = single.REPO
 RUN = REPO / single.RUNS["fanin"][0]
-POINTS = {"control": "Unconstrained", "A3": "A3, rate only", "B0": "B0, wiring only", "C0": "C0, both"}
+POINTS = {"control": "Control", "A3": "Firing constraint (A3)", "B0": "Wiring constraint (B0)", "C0": "Both constraints (C0)"}
 
 
 def main():

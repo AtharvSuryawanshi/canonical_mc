@@ -77,13 +77,11 @@
 \begin{frame}{Real neurons pay for firing and for wiring}
   \vfill
   \begin{itemize}\setlength{\itemsep}{1.4em}
-    \item \textbf{Firing costs energy.} Spikes and synaptic transmission dominate the brain's energy budget,
-          so activity has to be sparse.\\
+    \item \textbf{Firing costs energy.} Most of the brain's energy goes into spikes and synaptic transmission.\\
           {\scriptsize\color{gray} Attwell \& Laughlin 2001; Lennie 2003}
-    \item \textbf{Wiring costs space.} Axons and dendrites fill most of the grey matter,
-          so connections have to be few.\\
+    \item \textbf{Wiring costs space.} Axons and dendrites take up most of the grey matter.\\
           {\scriptsize\color{gray} Chklovskii, Schikorski \& Stevens 2002}
-    \item \textbf{\dots and the circuit must still solve its tasks.}
+    \item \textbf{So what does a circuit look like when it pays for both and still has to solve many tasks?}
   \end{itemize}
   \vfill
 \end{frame}
@@ -129,7 +127,8 @@
     \item Task: squared error where the target matters ($m$), each trial weighted equally.
     \item Firing: mean squared rate over trials, time and neurons.
     \item Wiring: L1 of the recurrent weights, which pushes weak synapses to zero (fewer connections).
-          $c_j$ divides out the $\sim$4$\times$ stronger I synapses, so inhibition is not pruned first.
+          I synapses are about 4$\times$ stronger, so we divide by $c_j$; otherwise the L1 cost would prune
+          inhibition first.
   \end{itemize}
 \end{frame}
 
@@ -137,8 +136,8 @@
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
       \textbf{Wiring: hard limit}\\[0.3em]
-      \footnotesize Not in the loss. After every Adam step, all synapses shrink by the same amount
-      until the cost fits; weak synapses reach zero (projection onto the L1 ball).
+      \footnotesize This one is not a loss term. After every Adam step we shrink all synapses by the same amount
+      until the cost is back under budget, and the weak ones end up at zero (projection onto the L1 ball).
       \small
       \[
         |W_{ij}| \leftarrow \max\big(|W_{ij}| - \theta,\ 0\big),\quad
@@ -147,8 +146,8 @@
     \end{column}
     \begin{column}{0.48\textwidth}
       \textbf{Firing: soft limit}\\[0.3em]
-      \footnotesize Activity cannot be clipped, so it is penalised with a weight $\lambda$ that tunes itself:
-      up while over budget, down while under.
+      \footnotesize Firing rates can't be projected like weights, so we add a penalty instead. Its weight $\lambda$
+      goes up while the network is over budget and down while it is under.
       \small
       \begin{align*}
         L &= L_{\text{task}} + \lambda\,C_{\text{fire}} + \tfrac{\rho}{2}\,B_{\text{fire}}\big[\tfrac{C_{\text{fire}}}{B_{\text{fire}}} - 1\big]_+^2\\
@@ -157,8 +156,8 @@
     \end{column}
   \end{columns}
   \vfill
-  \footnotesize No hand-set trade-off weights: each network gets two ceilings, $(B_{\text{fire}}, B_{\text{wire}})$,
-  and is trained to be as accurate as possible under them.
+  \footnotesize So we never set trade-off weights by hand. Each network gets two ceilings
+  $(B_{\text{fire}}, B_{\text{wire}})$ and is trained to be as accurate as it can under them.
   \vfill
   {\scriptsize\color{gray} L1 projection: Duchi et al.\ 2008.}
 \end{frame}
@@ -181,8 +180,8 @@
   \vspace{0.4em}
   \footnotesize
   \begin{itemize}
-    \item Worst task, not mean: a network could drop one task and still average $\sim$0.9.
-    \item Budgets, not a weighted sum: also reaches the non-convex parts of the front.
+    \item We use the worst task because a network could give up on one task and still average $\sim$0.9.
+    \item Setting budgets instead of weighting the costs also reaches the non-convex parts of the front.
   \end{itemize}
   \vfill
   {\scriptsize\color{gray} Deb \& Jain 2014 (NSGA-III); Blank \& Deb 2020 (pymoo).}
@@ -190,25 +189,26 @@
 
 \begin{frame}{The front (placeholder: budget point scan)}
   \centering
-  \animategraphics[autoplay,loop,controls,height=0.72\textheight]{10}{frames/front_}{000}{059}\\[0.3em]
-  \scriptsize Point scan, not yet NSGA-III: 29 budget points $\times$ 3 seeds + 4 zoom points, 150k steps
-  (111 networks, 89 feasible, 38 on the front). To be replaced by the NSGA-III run.
+  \animategraphics[autoplay,loop,controls,height=0.72\textheight]{10}{figs/talk/frames/front_}{000}{059}\\[0.3em]
+  \scriptsize This is still a scan over fixed budgets (29 points $\times$ 3 seeds + 4 zoom points, 150k steps;
+  111 networks, 89 feasible, 38 on the front). The NSGA-III run will replace it.
 \end{frame}
 
 \begin{frame}{Four points on the front}
   \begin{columns}[c]
-    \begin{column}{0.45\textwidth}
+    \begin{column}{0.44\textwidth}
       \centering
-      \includegraphics[width=\linewidth]{../results/front/cog20_150k_fanin_front_top.png}
+      \includegraphics[width=\linewidth]{figs/talk/front_top.pdf}
     \end{column}
-    \begin{column}{0.53\textwidth}
+    \begin{column}{0.55\textwidth}
       \scriptsize
+      \setlength{\tabcolsep}{3pt}
       \begin{tabular}{@{}lcccc@{}}
         \toprule
-                            & control & A3     & B0     & C0     \\
-                            & none    & rate   & wiring & both   \\
+                            & control & firing     & wiring     & both        \\
+                            &         & constraint & constraint & constraints \\
         \midrule
-        rate budget         & --      & 0.0011 & --     & 0.0115 \\
+        firing budget       & --      & 0.0011 & --     & 0.0115 \\
         wiring budget       & --      & --     & 0.0054 & 0.0044 \\
         \midrule
         worst-task accuracy & 0.96    & 0.85   & 0.87   & 0.88   \\
@@ -224,8 +224,9 @@
       \footnotesize
       \begin{itemize}
         \item 5 seeds per point, means shown. Ringed: example network (seed 4), used from here on.
-        \item A3 fires $\sim$250$\times$ less than control; B0 and C0 keep 6\% and 0.7\% of synapses.
-        \item All solve the tasks: mean accuracy $>0.95$ everywhere.
+        \item With the firing constraint, neurons fire $\sim$250$\times$ less than control. With the wiring
+              constraint and with both, 6\% and 0.7\% of synapses are kept.
+        \item Mean accuracy is above 0.95 at all four points.
       \end{itemize}
     \end{column}
   \end{columns}
@@ -233,136 +234,12 @@
 
 \begin{frame}{Do they converge?}
   \centering
-  \includegraphics[width=\textwidth,height=0.8\textheight,keepaspectratio]{../results/front/acc_vs_steps_fanin_grid.pdf}\\[0.3em]
-  \scriptsize Convergence checked on a separate run of the same four points (one network each, accuracy saved along
-  training), not the example network.
+  \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{figs/talk/convergence.pdf}\\[0.3em]
+  \scriptsize These curves come from a separate run of the same four points (one network each, accuracy saved
+  during training), so they are not the example network.
 \end{frame}
 
-\begin{frame}{Task variance and the number of groups}
-  \begin{columns}[c]
-    \begin{column}{0.36\textwidth}
-      \footnotesize
-      \textbf{Task variance} (Yang et al.\ 2019)
-      \[
-        \mathrm{TV}_{i,a} = \big\langle \mathrm{Var}_{\text{trials}}\, r_i(t) \big\rangle_{t\,>\,\text{fixation}}
-      \]
-      neuron $i$, task $a$. Each neuron divided by its maximum over tasks: a task profile.\\[0.6em]
-      \textbf{Groups}: k-means on the profiles, \textcolor{Ecol}{E} and \textcolor{Icol}{I} separately.\\[0.6em]
-      \textbf{Silhouette}
-      \[
-        s = \frac{b - a}{\max(a, b)}
-      \]
-      $a$: mean distance to its own group, $b$: to the nearest other group.
-      $k$ = best local maximum with $k > 2$.
-    \end{column}
-    \begin{column}{0.62\textwidth}
-      \centering
-      \includegraphics[width=\linewidth]{../results/front/tv_ei_fanin_5seed_s4_150k_sil.png}\\[0.4em]
-      \scriptsize Silhouette vs $k$, example network (seed 4) at each point. Dashed: chosen $k$.
-    \end{column}
-  \end{columns}
-\end{frame}
-
-\begin{frame}{E and I groups: no budget vs.\ rate budget}
-  \centering
-  \includegraphics[height=0.4\textheight]{figs/tv_ei_control.png}\\[0.3em]
-  \includegraphics[height=0.4\textheight]{figs/tv_ei_A3.png}\\[0.2em]
-  \scriptsize Normalised task variance (black 0, white 1); units sorted by group; left \textcolor{Ecol}{E}, right \textcolor{Icol}{I}. Example network (seed 4).
-\end{frame}
-
-\begin{frame}{E and I groups: wiring budget vs.\ both}
-  \centering
-  \includegraphics[height=0.4\textheight]{figs/tv_ei_B0.png}\\[0.3em]
-  \includegraphics[height=0.4\textheight]{figs/tv_ei_C0.png}\\[0.2em]
-  \scriptsize Normalised task variance (black 0, white 1); units sorted by group; left \textcolor{Ecol}{E}, right \textcolor{Icol}{I}. Example network (seed 4).
-\end{frame}
-
-\begin{frame}{Task similarity and wiring: Unconstrained}
-  \centering
-  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/wiring_control.png}\\[0.2em]
-  \scriptsize Left: task similarity $r$ between group profiles. Right: wiring row $\to$ column group, $z$ vs 500 shuffles
-  of group labels (grey: group $<4$ neurons).\\
-  This network (seed 4): $\rho_{\text{I}\to\text{E}} = -0.69$, $\rho_{\text{E}\to\text{I}} = -0.13$, E$\to$E within/between 1.07. \quad All 5 seeds: $\rho_{\text{I}\to\text{E}}$ $-0.69$ to $-0.31$; $\rho_{\text{E}\to\text{I}}$ $-0.13$ to $+0.05$; E$\to$E 1.05--1.15.
-\end{frame}
-
-\begin{frame}{Task similarity and wiring: A3, rate budget}
-  \centering
-  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/wiring_A3.png}\\[0.2em]
-  \scriptsize Left: task similarity $r$ between group profiles. Right: wiring row $\to$ column group, $z$ vs 500 shuffles
-  of group labels (grey: group $<4$ neurons).\\
-  This network (seed 4): $\rho_{\text{I}\to\text{E}} = +0.09$, $\rho_{\text{E}\to\text{I}} = 0.00$, E$\to$E within/between 1.04. \quad All 5 seeds: $\rho_{\text{I}\to\text{E}}$ $-0.05$ to $+0.09$; $\rho_{\text{E}\to\text{I}}$ $-0.15$ to $+0.14$; E$\to$E 1.02--1.09.
-\end{frame}
-
-\begin{frame}{Task similarity and wiring: B0, wiring budget}
-  \centering
-  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/wiring_B0.png}\\[0.2em]
-  \scriptsize Left: task similarity $r$ between group profiles. Right: wiring row $\to$ column group, $z$ vs 500 shuffles
-  of group labels (grey: group $<4$ neurons).\\
-  This network (seed 4): $\rho_{\text{I}\to\text{E}} = +0.17$, $\rho_{\text{E}\to\text{I}} = +0.33$, E$\to$E within/between 1.22. \quad All 5 seeds: $\rho_{\text{I}\to\text{E}}$ $-0.05$ to $+0.45$; $\rho_{\text{E}\to\text{I}}$ $-0.03$ to $+0.40$; E$\to$E 1.15--5.89.
-\end{frame}
-
-\begin{frame}{Task similarity and wiring: C0, both budgets}
-  \centering
-  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/wiring_C0.png}\\[0.2em]
-  \scriptsize Left: task similarity $r$ between group profiles. Right: wiring row $\to$ column group, $z$ vs 500 shuffles
-  of group labels (grey: group $<4$ neurons).\\
-  This network (seed 4): $\rho_{\text{I}\to\text{E}} = +0.16$, $\rho_{\text{E}\to\text{I}} = +0.59$, E$\to$E within/between 7.77. \quad All 5 seeds: $\rho_{\text{I}\to\text{E}}$ $+0.07$ to $+0.39$; $\rho_{\text{E}\to\text{I}}$ $+0.36$ to $+0.62$; E$\to$E 2.84--7.77.
-\end{frame}
-
-% ---------------------------------------------------------------- experimental (draft, not decided)
-
-\begin{frame}
-  \centering
-  {\Large Experimental}\\[0.6em]
-  \small\color{gray} Draft slides: task periods (Driscoll et al.\ 2024) and like-to-like wiring
-\end{frame}
-
-\begin{frame}{Task variance per task period \hfill{\scriptsize\color{gray}experimental}}
-  \begin{columns}[c]
-    \begin{column}{0.6\textwidth}
-      \scriptsize
-      \textbf{Per task period}, not per task: periods $p \in \{$stimulus 1, memory 1, stimulus 2, memory 2,
-      response$\}$, fixation left out $\to$ 59 (task, period) rows.
-      \[
-        \mathrm{TV}_{i,(a,p)} = \frac{1}{|T_p|}\sum_{t \in T_p} \mathrm{Var}_{\text{trials}}\, r_i(t)
-      \]
-      Length-weighted mean over a task's periods = per-task TV (to $3\cdot10^{-7}$).\\[0.4em]
-      \textbf{Normalise}: each active neuron (total TV $> 1\%$ of max) divided by its max over the rows,
-      $x_i \in [0,1]^{59}$.\\[0.4em]
-      \textbf{Ward clustering} of neurons (columns) and of task periods (rows): merge the pair that least increases
-      the within-cluster variance,
-      \[
-        \Delta(A,B) = \frac{|A|\,|B|}{|A|+|B|}\,\big\lVert \mu_A - \mu_B \big\rVert^2 .
-      \]
-      $k$ per axis: highest silhouette over $k = 3,\dots,39$. \ \textbf{Sparsity}: fraction of entries $< 0.15$.\\[0.5em]
-      \tiny\color{gray} As Driscoll et al.\ except: active rule ($>1\%$ vs $>10^{-3}$), random trials instead of a
-      stimulus grid, $k$ by silhouette instead of a fixed cut height; E and I clustered together.
-    \end{column}
-    \begin{column}{0.38\textwidth}
-      \centering
-      \includegraphics[height=0.78\textheight]{figs/driscoll2024_crops.pdf}\\[0.2em]
-      \tiny\color{gray} Driscoll, Shenoy \& Sussillo (2024). \emph{Nat.\ Neurosci.} 27, 1349--1363. Fig.~3a.
-    \end{column}
-  \end{columns}
-\end{frame}
-
-\begin{frame}{Task periods: no budget vs.\ rate budget \hfill{\scriptsize\color{gray}experimental}}
-  \centering
-  \includegraphics[height=0.8\textheight]{../results/front/tv_period_driscoll_control_s4.png}\hspace{3em}
-  \includegraphics[height=0.8\textheight]{../results/front/tv_period_driscoll_A3_s4.png}\\[0.2em]
-  \scriptsize Example network (seed 4). Sparsity \textcolor{Ecol}{E} / \textcolor{Icol}{I}: control 0.43 / 0.39,
-  A3 0.79 / 0.62. Row label colour = period type.
-\end{frame}
-
-\begin{frame}{Task periods: wiring budget vs.\ both \hfill{\scriptsize\color{gray}experimental}}
-  \centering
-  \includegraphics[height=0.8\textheight]{../results/front/tv_period_driscoll_B0_s4.png}\hspace{3em}
-  \includegraphics[height=0.8\textheight]{../results/front/tv_period_driscoll_C0_s4.png}\\[0.2em]
-  \scriptsize Example network (seed 4). Sparsity \textcolor{Ecol}{E} / \textcolor{Icol}{I}: B0 0.48 / 0.48,
-  C0 0.69 / 0.63. Row label colour = period type.
-\end{frame}
-
-\begin{frame}{Like-to-like wiring \hfill{\scriptsize\color{gray}experimental}}
+\begin{frame}{Like-to-like wiring}
   \footnotesize
   \begin{columns}[T]
     \begin{column}{0.5\textwidth}
@@ -392,22 +269,181 @@
   \end{columns}
   \vspace{0.6em}
   \begin{itemize}
-    \item 0.5: no relation; $>0.5$ like-to-like; $<0.5$ like-to-unlike. Does not depend on how many synapses are kept.
+    \item AUC 0.5 means no relation, above 0.5 like-to-like, below 0.5 like-to-unlike. It doesn't change with the
+          number of synapses kept, so sparse and dense networks can be compared.
     \item Null: shuffle profiles within E and within I, wiring fixed, 500$\times$;
           $p = \big(1 + \#\{|\mathrm{AUC}_{\text{null}} - 0.5| \geq |\mathrm{AUC} - 0.5|\}\big) / 501$.
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Like-to-like wiring: example network \hfill{\scriptsize\color{gray}experimental}}
+\begin{frame}{Like-to-like wiring: example network}
   \centering
-  \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{../results/front/wiring_roc_all_s4.png}
+  \includegraphics[width=\textwidth,height=0.8\textheight,keepaspectratio]{figs/talk/like2like_s4.pdf}\\[0.2em]
+  \scriptsize x: similarity of the two neurons' task-period profiles. Right of each histogram: ROC; number = AUC
+  (grey: n.s.). Example network (seed 4).
 \end{frame}
 
-\begin{frame}{Like-to-like wiring: all 20 networks \hfill{\scriptsize\color{gray}experimental}}
+\begin{frame}{Like-to-like wiring: all 20 networks}
   \centering
-  \includegraphics[width=\textwidth,height=0.76\textheight,keepaspectratio]{../results/front/wiring_roc_all_5seed.png}\\[0.2em]
-  \scriptsize C0 is also the sparsest (0.7\% of synapses kept). Keeping only the strongest synapses of B0 at C0's
-  sparsity leaves \textcolor{Ecol}{E}$\to$\textcolor{Ecol}{E} at AUC 0.52 (C0: 0.68): not sparsity alone (post hoc, 5 seeds).
+  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/talk/like2like_5seed.pdf}\\[0.2em]
+  \scriptsize Filled: $p < 0.05$. The both-constraints networks are also the sparsest (0.7\% of synapses kept). If we
+  prune the wiring-constraint networks down to that, keeping their strongest synapses, \textcolor{Ecol}{E}$\to$\textcolor{Ecol}{E}
+  stays at AUC 0.52 (both constraints: 0.68).
+  So sparsity alone doesn't explain it (post hoc, 5 seeds).
+\end{frame}
+
+\begin{frame}{Task variance and the number of groups}
+  \begin{columns}[c]
+    \begin{column}{0.36\textwidth}
+      \footnotesize
+      \textbf{Task variance} (Yang et al.\ 2019)
+      \[
+        \mathrm{TV}_{i,a} = \big\langle \mathrm{Var}_{\text{trials}}\, r_i(t) \big\rangle_{t\,>\,\text{fixation}}
+      \]
+      neuron $i$, task $a$. Each neuron divided by its maximum over tasks: a task profile.\\[0.6em]
+      \textbf{Groups}: k-means on the profiles, \textcolor{Ecol}{E} and \textcolor{Icol}{I} separately.\\[0.6em]
+      \textbf{Silhouette}
+      \[
+        s = \frac{b - a}{\max(a, b)}
+      \]
+      $a$: mean distance to its own group, $b$: to the nearest other group.
+      $k$ = best local maximum with $k > 2$.
+    \end{column}
+    \begin{column}{0.62\textwidth}
+      \centering
+      \includegraphics[width=\linewidth]{figs/talk/silhouette.pdf}\\[0.4em]
+      \scriptsize Example network (seed 4). Dot: chosen $k$.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{E and I groups: control vs.\ firing constraint}
+  \centering
+  \includegraphics[width=\textwidth,height=0.8\textheight,keepaspectratio]{figs/talk/tv_control_A3.pdf}\\[0.2em]
+  \scriptsize Each column one neuron, sorted by group. Example network (seed 4).
+\end{frame}
+
+\begin{frame}{E and I groups: wiring constraint vs.\ both constraints}
+  \centering
+  \includegraphics[width=\textwidth,height=0.8\textheight,keepaspectratio]{figs/talk/tv_B0_C0.pdf}\\[0.2em]
+  \scriptsize Each column one neuron, sorted by group. Example network (seed 4).
+\end{frame}
+
+\begin{frame}{Task similarity and wiring: control}
+  \centering
+  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/wiring_control.png}\\[0.2em]
+  \scriptsize Left: task similarity $r$ between group profiles. Right: wiring row $\to$ column group, $z$ vs 500 shuffles
+  of group labels (grey: group $<4$ neurons).\\
+  This network (seed 4): $\rho_{\text{I}\to\text{E}} = -0.69$, $\rho_{\text{E}\to\text{I}} = -0.13$, E$\to$E within/between 1.07. \quad All 5 seeds: $\rho_{\text{I}\to\text{E}}$ $-0.69$ to $-0.31$; $\rho_{\text{E}\to\text{I}}$ $-0.13$ to $+0.05$; E$\to$E 1.05--1.15.
+\end{frame}
+
+\begin{frame}{Task similarity and wiring: firing constraint}
+  \centering
+  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/wiring_A3.png}\\[0.2em]
+  \scriptsize Left: task similarity $r$ between group profiles. Right: wiring row $\to$ column group, $z$ vs 500 shuffles
+  of group labels (grey: group $<4$ neurons).\\
+  This network (seed 4): $\rho_{\text{I}\to\text{E}} = +0.09$, $\rho_{\text{E}\to\text{I}} = 0.00$, E$\to$E within/between 1.04. \quad All 5 seeds: $\rho_{\text{I}\to\text{E}}$ $-0.05$ to $+0.09$; $\rho_{\text{E}\to\text{I}}$ $-0.15$ to $+0.14$; E$\to$E 1.02--1.09.
+\end{frame}
+
+\begin{frame}{Task similarity and wiring: wiring constraint}
+  \centering
+  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/wiring_B0.png}\\[0.2em]
+  \scriptsize Left: task similarity $r$ between group profiles. Right: wiring row $\to$ column group, $z$ vs 500 shuffles
+  of group labels (grey: group $<4$ neurons).\\
+  This network (seed 4): $\rho_{\text{I}\to\text{E}} = +0.17$, $\rho_{\text{E}\to\text{I}} = +0.33$, E$\to$E within/between 1.22. \quad All 5 seeds: $\rho_{\text{I}\to\text{E}}$ $-0.05$ to $+0.45$; $\rho_{\text{E}\to\text{I}}$ $-0.03$ to $+0.40$; E$\to$E 1.15--5.89.
+\end{frame}
+
+\begin{frame}{Task similarity and wiring: both constraints}
+  \centering
+  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/wiring_C0.png}\\[0.2em]
+  \scriptsize Left: task similarity $r$ between group profiles. Right: wiring row $\to$ column group, $z$ vs 500 shuffles
+  of group labels (grey: group $<4$ neurons).\\
+  This network (seed 4): $\rho_{\text{I}\to\text{E}} = +0.16$, $\rho_{\text{E}\to\text{I}} = +0.59$, E$\to$E within/between 7.77. \quad All 5 seeds: $\rho_{\text{I}\to\text{E}}$ $+0.07$ to $+0.39$; $\rho_{\text{E}\to\text{I}}$ $+0.36$ to $+0.62$; E$\to$E 2.84--7.77.
+\end{frame}
+
+% ---------------------------------------------------------------- experimental (draft, not decided)
+
+\begin{frame}
+  \centering
+  {\Large Experimental}\\[0.6em]
+  \small\color{gray} Draft slides: task periods and lesions (Driscoll et al.\ 2024)
+\end{frame}
+
+\begin{frame}{Task variance per task period \hfill{\scriptsize\color{gray}experimental}}
+  \begin{columns}[c]
+    \begin{column}{0.6\textwidth}
+      \scriptsize
+      We split each task into its \textbf{periods} $p \in \{$stimulus 1, memory 1, stimulus 2, memory 2,
+      response$\}$, leave out fixation, and get 59 (task, period) rows.
+      \[
+        \mathrm{TV}_{i,(a,p)} = \frac{1}{|T_p|}\sum_{t \in T_p} \mathrm{Var}_{\text{trials}}\, r_i(t)
+      \]
+      Length-weighted mean over a task's periods = per-task TV (to $3\cdot10^{-7}$).\\[0.4em]
+      \textbf{Normalise}: each active neuron (total TV $> 1\%$ of max) divided by its max over the rows,
+      $x_i \in [0,1]^{59}$.\\[0.4em]
+      \textbf{Ward clustering} of neurons (columns) and of task periods (rows): merge the pair that least increases
+      the within-cluster variance,
+      \[
+        \Delta(A,B) = \frac{|A|\,|B|}{|A|+|B|}\,\big\lVert \mu_A - \mu_B \big\rVert^2 .
+      \]
+      $k$ per axis: highest silhouette over $k = 3,\dots,39$. \ \textbf{Sparsity}: fraction of entries $< 0.15$.\\[0.5em]
+      \tiny\color{gray} Differences from Driscoll et al.: active rule ($>1\%$ vs $>10^{-3}$), random trials instead of a
+      stimulus grid, $k$ by silhouette instead of a fixed cut height; E and I clustered together.
+    \end{column}
+    \begin{column}{0.38\textwidth}
+      \centering
+      \includegraphics[height=0.78\textheight]{figs/driscoll2024_crops.pdf}\\[0.2em]
+      \tiny\color{gray} Driscoll, Shenoy \& Sussillo (2024). \emph{Nat.\ Neurosci.} 27, 1349--1363. Fig.~3a.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Task periods: control vs.\ firing constraint \hfill{\scriptsize\color{gray}experimental}}
+  \centering
+  \includegraphics[height=0.8\textheight]{../results/front/tv_period_driscoll_control_s4.png}\hspace{3em}
+  \includegraphics[height=0.8\textheight]{../results/front/tv_period_driscoll_A3_s4.png}\\[0.2em]
+  \scriptsize Example network (seed 4). Sparsity \textcolor{Ecol}{E} / \textcolor{Icol}{I}: control 0.43 / 0.39,
+  firing constraint 0.79 / 0.62. Row label colour = period type.
+\end{frame}
+
+\begin{frame}{Task periods: wiring vs.\ both constraints \hfill{\scriptsize\color{gray}experimental}}
+  \centering
+  \includegraphics[height=0.8\textheight]{../results/front/tv_period_driscoll_B0_s4.png}\hspace{3em}
+  \includegraphics[height=0.8\textheight]{../results/front/tv_period_driscoll_C0_s4.png}\\[0.2em]
+  \scriptsize Example network (seed 4). Sparsity \textcolor{Ecol}{E} / \textcolor{Icol}{I}: wiring constraint 0.48 / 0.48,
+  both constraints 0.69 / 0.63. Row label colour = period type.
+\end{frame}
+
+\begin{frame}{Lesions on task-period groups \hfill{\scriptsize\color{gray}experimental}}
+  \footnotesize
+  \textbf{Groups}: per-period task variance (59 rows, each neuron divided by its max), Ward clustering,
+  \textcolor{Ecol}{E} and \textcolor{Icol}{I} separately, fixed $k$: 14 \textcolor{Ecol}{E} groups
+  (5 task families $\times$ stimulus / memory / response; DM has no memory period), 5 \textcolor{Icol}{I} groups
+  (the task families).\\[0.6em]
+  \textbf{Lesion} group $g$: $r_i(t) = 0$ for all $i \in g$ at every time step (Driscoll et al.\ 2024).\\[0.6em]
+  \textbf{Damage} on task $a$, relative to the intact network (10 eval seeds $\times$ 64 trials, no noise):
+  \[
+    \Delta_{g,a} = \frac{\mathrm{acc}_{g,a} - \mathrm{acc}_a}{\mathrm{acc}_a}
+  \]
+  \textbf{Module contrast}: does lesioning $g$ hurt a set of tasks $M$ more than a reference set?
+  \[
+    C_{g,M} = \big\langle \Delta_{g,a} \big\rangle_{a \in M} - \big\langle \Delta_{g,a} \big\rangle_{a \in \mathrm{ref}(M)},
+    \qquad C < 0:\ M \text{ hurt more}
+  \]
+  \begin{tabular}{@{}ll@{}}
+    Anti tasks & vs.\ all other tasks \\
+    tasks with a delay (Dly, Go, Anti) & vs.\ all other tasks \\
+    modality 1 DM tasks & vs.\ modality 2 \\
+    DMC (categorical memory) & vs.\ Dly tasks (continuous memory) \\
+  \end{tabular}\\[0.4em]
+  \scriptsize\color{gray} As Driscoll et al.\ Fig.~5. No control for group size. v1 task battery, seed 4.
+\end{frame}
+
+\begin{frame}{Lesions on task-period groups: four points \hfill{\scriptsize\color{gray}experimental}}
+  \centering
+  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{../results/front/lesion_period_s4_ward_contrast_grid.png}\\[0.2em]
+  \scriptsize Mean change per lesion: control $-0.16$, firing constraint $-0.05$, wiring constraint $-0.16$,
+  both constraints $-0.13$. Groups with $|C| \geq 0.2$: 6, 5, 9 and 9 of 19. Results change with $k$.
 \end{frame}
 
 \begin{frame}

@@ -3,6 +3,13 @@
 > Format: one `---` block = one slide. `Make:` = how the slide is built (Figma / Beamer / animate) and which
 > file it uses. `Notes:` = what to say; not for the slide. Built in `presentation/main.tex`.
 > Based on `reports/PRESENTATION_old.md`.
+>
+> **Names (2026-11-20):** on slides the four points are *control*, *firing constraint* (A3), *wiring constraint*
+> (B0) and *both constraints* (C0); never "rate only" / "wiring only" / "unconstrained". Codes stay in these notes.
+> **Two kinds of figures:** analysis figures in `results/front/` (detailed, for us; unchanged) and talk figures in
+> `presentation/figs/talk/` (drawn at slide size, big labels, little text) from `presentation/figs/talk_figs.py`
+> (`python presentation/figs/talk_figs.py [frames front convergence like2like silhouette tv]`). Slides 10–18 use the
+> talk figures; detail left off them is in the notes below. Accuracy colour: RdYlGn, 0 red to 1 green, always.
 
 ---
 
@@ -243,7 +250,8 @@ Notes:
 points × 3 seeds + 4 zoom points, 150k steps (111 networks, 89 feasible, 38 on the front). To be replaced by the
 NSGA-III run.
 
-Make: Beamer `\animategraphics` on `frames/front_000–059.png`. **To replace** with the cog20 fanin 150k NSGA-III
+Make: Beamer `\animategraphics` on `figs/talk/frames/front_000–059.png` (`talk_figs.py frames`; the seed-4
+networks ringed, as on slide 11; the old frames from `make_frames.py` are kept in `frames/`). **To replace** with the cog20 fanin 150k NSGA-III
 run from the cluster when it is done (re-render the frames from that run).
 
 Notes:
@@ -271,8 +279,12 @@ Notes:
 
 Plus a table row for the example network (seed 4): worst-task accuracy 0.95 / 0.78 / 0.89 / 0.89.
 
-Make: Beamer. Figure `results/front/cog20_150k_fanin_front_top.png` (`fig_front_top_fanin150k.py`; the seed-4
-networks are ringed, `EXAMPLE` in the script). Numbers: 5-seed means from `reports/ei_modularity/fig/summary.csv`
+Make: Beamer. Figure `figs/talk/front_top.pdf` (`talk_figs.py front`; analysis version
+`results/front/cog20_150k_fanin_front_top.png` from `fig_front_top_fanin150k.py`; the seed-4 networks are ringed,
+`EXAMPLE` in the script). Background = filled contours of worst-task accuracy (RdYlGn, 0–1): thin-plate-spline fit
+through the 33 per-budget seed means, only inside their convex hull; lines at 0.8 and 0.9, dashed at 0.6
+(feasibility). Symbols: × infeasible network, dot feasible, white circle on the Pareto front. Table header uses
+the point names; firing budget = rate budget in the code. Numbers: 5-seed means from `reports/ei_modularity/fig/summary.csv`
 (run `dale_all_woutfree_fanin_4pt_5seed_150k`).
 
 **Example network = seed 4 of that run, at every point.** In this run the seed fixes the initial weights and all
@@ -295,8 +307,9 @@ Notes:
 
 [2 × 2: accuracy of all 20 tasks over training, mean (black), worst task (red), per point.]
 
-Make: `results/front/acc_vs_steps_fanin_grid.pdf` (`results/scripts/fig_acc_vs_steps_grid.py`, 2 × 2 with one
-shared legend; data: `runs/moo_zoom/dale_all_woutfree_fanin_4pt_1seed_150k_saveat/runs_by_step.csv`).
+Make: `figs/talk/convergence.pdf` (`talk_figs.py convergence`: 1 × 4, each task grey, mean black, worst task
+red with its 150k value; analysis version `results/front/acc_vs_steps_fanin_grid.pdf` from
+`results/scripts/fig_acc_vs_steps_grid.py`, 2 × 2 with every task named; data: `runs/moo_zoom/dale_all_woutfree_fanin_4pt_1seed_150k_saveat/runs_by_step.csv`).
 
 Notes:
 - Convergence is checked on a **separate run** of the same four points (one network each, seed 0, accuracy saved
@@ -310,14 +323,65 @@ Notes:
 
 ---
 
+## 12a. Like-to-like wiring (moved up from the Experimental section; no longer tagged experimental)
+
+### 12a.1 Like-to-like wiring (math)
+
+s_ij = corr(x_i, x_j) of the period profiles; connected j → i = |W_ij|/c_j > 0.01 (c_j as in the wiring cost);
+per type E→E, E→I, I→E, I→I: AUC = P(s_conn > s_unconn) = (R₁ − n₁(n₁+1)/2)/(n₁n₀); ROC from a sliding threshold,
+AUC = ∫ TPR dFPR. Null: 500 shuffles of profiles within E and within I (wiring fixed), two-sided
+p = (1 + #{|AUC_null − 0.5| ≥ |AUC − 0.5|})/501.
+
+Code: `results/scripts/fig_wiring_like2like.py::network`.
+
+Notes:
+- AUC does not depend on connection density (control keeps 67% of pairs, C0 0.7–0.9%), so the points compare.
+- Pairs are not independent (a neuron appears in many pairs), hence the shuffle null, not a rank test p-value.
+
+### 12a.2 Like-to-like wiring: example network
+
+Make: `figs/talk/like2like_s4.pdf` (`talk_figs.py like2like`, ~3 min: same 20-bin histograms, ROC beside each,
+number = AUC, grey "n.s." when p ≥ 0.05; no counts or medians on the talk version). Analysis version:
+`python results/scripts/fig_wiring_roc_all.py` → `results/front/wiring_roc_all_s4.png` (4 types × 4 points,
+histograms of similarity for connected vs unconnected, 20 bins of width 0.1 (same for both; chosen over 40 and
+√n bins on 2026-11-20), each scaled to area 1, ROC in a panel to the right).
+No smoothing: a Gaussian KDE (used until 2026-11-20) widened C0's few connected pairs (22–146) 3–4× more than the
+unconnected ones and cut mass off at +1, hiding the like-to-like spike near 0.9. AUC, ROC and medians were always
+computed on the raw values.
+
+### 12a.3 Like-to-like wiring: all 20 networks
+
+Make: `figs/talk/like2like_5seed.pdf` (`talk_figs.py like2like`: top mean ROC per point, band = min–max over
+seeds; bottom AUC per network, filled = p < 0.05, bar = mean, grey lines join the same seed). Analysis version:
+`fig_wiring_roc_all.py` → `results/front/wiring_roc_all_5seed.png`. Mean AUC (sd) over 5 seeds:
+
+| | control | A3 | B0 | C0 |
+|---|---|---|---|---|
+| E→E | 0.53 (0.01) | 0.52 (0.00) | 0.52 (0.01) | 0.68 (0.02) |
+| E→I | 0.54 (0.00) | 0.54 (0.01) | 0.56 (0.01) | 0.73 (0.02) |
+| I→E | 0.45 (0.01) | 0.49 (0.01) | 0.51 (0.01) | 0.72 (0.02) |
+| I→I | 0.48 (0.01) | 0.49 (0.01) | 0.56 (0.02) | 0.71 (0.08) |
+
+Caption: sparsity caveat (`fig_wiring_matched_sparsity.py`): B0 cut post hoc to C0's sparsity keeps E→E at 0.52.
+
+Notes:
+- Only C0 wires like-to-like, in every seed and every type.
+- Inhibition flips: control I→E < 0.5 in all seeds (I targets E doing other computations), C0 0.72 (same
+  computation).
+- Post-hoc pruning is not training under the budget; the clean test (wiring-only networks at C0's sparsity) is open.
+
+
+---
+
 ## 13. Task variance and the number of groups
 
 [Left: definitions. Right: silhouette vs k, E and I, four points, chosen k dashed.]
 
 $$\mathrm{TV}_{i,a} = \big\langle \mathrm{Var}_{\text{trials}}\, r_i(t) \big\rangle_{t > \text{fixation}},\qquad s = \frac{b-a}{\max(a,b)}$$
 
-Make: Beamer, definitions in the left column, `results/front/tv_ei_fanin_5seed_s4_150k_sil.png`
-(`python results/scripts/fig_tv_ei_fanin.py --run 5seed --seed 4`: the example network at each point).
+Make: Beamer, definitions in the left column, `figs/talk/silhouette.pdf` (`talk_figs.py silhouette`; dot =
+chosen k; analysis version `results/front/tv_ei_fanin_5seed_s4_150k_sil.png` from
+`python results/scripts/fig_tv_ei_fanin.py --run 5seed --seed 4`: the example network at each point).
 Code: `cmc.runner.activity_summary` (variance across trials at each time step after fixation onset, averaged over
 time and eval seeds, noise-free); `fig_tv_ei_fanin.cluster_pop` (active units: total TV > 1% of max; each unit
 divided by its max; k-means, n_init 10; k = best local maximum of the silhouette with k > 2; E up to 20, I up to 10).
@@ -337,13 +401,14 @@ Notes:
 
 ---
 
-## 14. E and I groups: no budget vs. rate budget
+## 14. E and I groups: control vs. firing constraint
 
 [Task-variance heatmaps, units sorted by group, E left, I right: control, then A3.]
 
-Make: crops of `results/front/tv_ei_fanin_5seed_s4_150k.png` → `figs/tv_ei_{control,A3}.png`
-(`python presentation/figs/crop_tv_rows.py`, default tag `5seed_s4_150k`; re-check the row boxes if the source
-layout changes). Example network (seed 4).
+Make: `figs/talk/tv_control_A3.pdf` (`talk_figs.py tv`: E and I heatmaps side by side per point, group numbers
+under the columns, number of groups in the panel titles; units, silhouette and tasks/neuron left for these
+notes). Analysis version: `results/front/tv_ei_fanin_5seed_s4_150k.png`; the old crops `figs/tv_ei_*.png`
+(`crop_tv_rows.py`) are kept. Example network (seed 4).
 
 Notes:
 - Control: broad groups that follow task families (all DM, all delayed DM, the matching tasks); neurons take
@@ -353,11 +418,11 @@ Notes:
 
 ---
 
-## 15. E and I groups: wiring budget vs. both
+## 15. E and I groups: wiring constraint vs. both constraints
 
 [Same for B0 and C0.]
 
-Make: `figs/tv_ei_{B0,C0}.png`, as slide 14.
+Make: `figs/talk/tv_B0_C0.pdf`, as slide 14.
 
 Notes:
 - B0: the broadest neurons (E 5.2 tasks per neuron), few large groups.
@@ -406,7 +471,7 @@ Notes:
 
 ## Experimental (draft; the user decides later what stays)
 
-Divider slide, then six slides tagged "experimental" in the title. Seed 4 = example network throughout.
+Divider slide, then three slides tagged "experimental" (E1–E3; the like-to-like slides E4–E6 moved up to 12a). Seed 4 = example network throughout.
 
 ### E1. Task variance per task period (math)
 
@@ -445,42 +510,22 @@ Notes:
 - Silhouette is low everywhere (≤ 0.25 on units) and C0 has no natural k (hits 39): clusters are soft; the
   sparsity numbers are the robust part. One seed only.
 
-### E4. Like-to-like wiring (math)
+---
 
-s_ij = corr(x_i, x_j) of the period profiles; connected j → i = |W_ij|/c_j > 0.01 (c_j as in the wiring cost);
-per type E→E, E→I, I→E, I→I: AUC = P(s_conn > s_unconn) = (R₁ − n₁(n₁+1)/2)/(n₁n₀); ROC from a sliding threshold,
-AUC = ∫ TPR dFPR. Null: 500 shuffles of profiles within E and within I (wiring fixed), two-sided
-p = (1 + #{|AUC_null − 0.5| ≥ |AUC − 0.5|})/501.
+## Lesions on task-period groups (experimental, 2 slides, at the end)
 
-Code: `results/scripts/fig_wiring_like2like.py::network`.
-
-Notes:
-- AUC does not depend on connection density (control keeps 67% of pairs, C0 0.7–0.9%), so the points compare.
-- Pairs are not independent (a neuron appears in many pairs), hence the shuffle null, not a rank test p-value.
-
-### E5. Like-to-like wiring: example network
-
-Make: `python results/scripts/fig_wiring_roc_all.py` → `results/front/wiring_roc_all_s4.png` (4 types × 4 points,
-KDE of similarity for connected vs unconnected, ROC inset).
-
-### E6. Like-to-like wiring: all 20 networks
-
-Same script → `results/front/wiring_roc_all_5seed.png`. Mean AUC (sd) over 5 seeds:
-
-| | control | A3 | B0 | C0 |
-|---|---|---|---|---|
-| E→E | 0.53 (0.01) | 0.52 (0.00) | 0.52 (0.01) | 0.68 (0.02) |
-| E→I | 0.54 (0.00) | 0.54 (0.01) | 0.56 (0.01) | 0.73 (0.02) |
-| I→E | 0.45 (0.01) | 0.49 (0.01) | 0.51 (0.01) | 0.72 (0.02) |
-| I→I | 0.48 (0.01) | 0.49 (0.01) | 0.56 (0.02) | 0.71 (0.08) |
-
-Caption: sparsity caveat (`fig_wiring_matched_sparsity.py`): B0 cut post hoc to C0's sparsity keeps E→E at 0.52.
-
-Notes:
-- Only C0 wires like-to-like, in every seed and every type.
-- Inhibition flips: control I→E < 0.5 in all seeds (I targets E doing other computations), C0 0.72 (same
-  computation).
-- Post-hoc pruning is not training under the budget; the clean test (wiring-only networks at C0's sparsity) is open.
+Math slide + `results/front/lesion_period_s4_ward_contrast_grid.png` as it is (no talk version yet).
+Code: `results/scripts/fig_lesion_period.py --method ward` per point (seed 4, v1 networks), then
+`fig_lesion_contrast_grid.py --seed 4 --tag _ward`.
+- Groups: per-period task variance, Ward, E and I separately, k = 14 E (5 families × stimulus/memory/response,
+  DM has no memory) and 5 I (families).
+- Lesion: rates of the group set to 0 at every step (Driscoll). Damage Δ = (acc_lesioned − acc_full)/acc_full per
+  task, 10 eval seeds × 64 noise-free trials.
+- Module contrast C = mean Δ over module tasks − mean Δ over reference tasks (Anti vs not Anti; delay tasks (Dly,
+  Go, Anti) vs the rest; modality 1 vs 2; DMC vs Dly tasks), as Driscoll Fig. 5. C < 0: module hurt more.
+- Mean change per lesion: control −0.16, firing −0.05, wiring −0.16, both −0.13; |C| ≥ 0.2 in 6, 5, 9, 9 of 19
+  groups. Results depend on k (not on k-means vs Ward). No group-size control. v1 battery: redo on the retrained
+  networks.
 
 ---
 
