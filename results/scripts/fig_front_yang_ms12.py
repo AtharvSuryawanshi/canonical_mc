@@ -5,12 +5,17 @@ training seed 0, batched): 288 networks. The front is recomputed over all of the
 >= 0.6), so a network from one search can drop off the front because of one from the other. Background: worst-task
 accuracy contours, thin-plate-spline fit (accuracy_surface from fig_front_top_fanin150k.py), inside the convex hull.
 
-    python results/scripts/fig_front_yang_ms12.py
+    python results/scripts/fig_front_yang_ms12.py          # ms1 + ms2 -> ..._ms12
+    python results/scripts/fig_front_yang_ms12.py ext      # extended box (rate 0.001-0.5, wiring 0.002-0.06),
+                                                           # ext_ms3 + ext_ms4 -> ..._ext_ms34
 
 Writes to runs/moo/dale_all_nsga3_budget_p48g3_fanin_150k_yang_fullgpu_ms12/: runs.csv (both searches, with a `run`
-column and the pooled `is_pareto`), front.csv (the pooled front), front_top.png.
+column, the pooled `is_pareto` and `is_pareto_all`), front.csv (the pooled front), front_all.csv (the front over
+every network, no feasibility cut: its rows with min_task_acc >= t are exactly the front at threshold t, for any t),
+front_top.png.
 """
 import importlib.util
+import sys
 from pathlib import Path
 
 import matplotlib
@@ -27,9 +32,13 @@ top = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(top)
 
 REPO = Path(__file__).resolve().parents[2]
-RUNS = ["runs/moo/dale_all_nsga3_budget_p48g3_fanin_150k_yang_fullgpu_ms1",
-        "runs/moo/dale_all_nsga3_budget_p48g3_fanin_150k_yang_fullgpu_ms2"]
-OUT = REPO / "runs/moo/dale_all_nsga3_budget_p48g3_fanin_150k_yang_fullgpu_ms12"
+BASE = "runs/moo/dale_all_nsga3_budget_p48g3_fanin_150k_yang_fullgpu_"
+# set name -> (pooled searches, output run, NSGA seeds for the title)
+SETS = {"ms12": (["ms1", "ms2"], "ms12", "1+2"),
+        "ext": (["ext_ms3", "ext_ms4"], "ext_ms34", "3+4, extended box")}
+SET = sys.argv[1] if len(sys.argv) > 1 else "ms12"
+RUNS = [BASE + t for t in SETS[SET][0]]
+OUT = REPO / (BASE + SETS[SET][1])
 
 
 def load():
@@ -46,6 +55,7 @@ def load():
     d["is_pareto"] = False
     f = d.feasible
     d.loc[f, "is_pareto"] = pareto_mask(d.loc[f, ["z", "x", "y"]].to_numpy(), maximize=(True, False, False))
+    d["is_pareto_all"] = pareto_mask(d[["z", "x", "y"]].to_numpy(), maximize=(True, False, False))
     return d
 
 
@@ -72,7 +82,7 @@ def main():
     ax.legend(fontsize=7, frameon=True, framealpha=0.9, edgecolor="none", loc="lower right")
     ax.set_xlabel("log(Firing cost)")
     ax.set_ylabel("log(Connectivity cost)")
-    ax.set_title(f"cog20, 150k, Yang tasks, NSGA seeds 1+2: {len(d)} networks, "
+    ax.set_title(f"cog20, 150k, Yang tasks, NSGA seeds {SETS[SET][2]}: {len(d)} networks, "
                  f"{int(d.feasible.sum())} feasible, {int(d.is_pareto.sum())} on the front", fontsize=9)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
@@ -80,8 +90,10 @@ def main():
     d = d.drop(columns=["x", "y", "z", "feasible"])
     d.to_csv(OUT / "runs.csv", index=False)
     d[d.is_pareto].sort_values("min_task_acc", ascending=False).to_csv(OUT / "front.csv", index=False)
+    d[d.is_pareto_all].sort_values("min_task_acc", ascending=False).to_csv(OUT / "front_all.csv", index=False)
     print(d.groupby("run").agg(n=("is_pareto", "size"), feasible=("is_feasible", "sum"), pareto=("is_pareto", "sum")))
-    print(f"{len(d)} networks, {int(d.is_feasible.sum())} feasible, {int(d.is_pareto.sum())} Pareto -> {OUT}")
+    print(f"{len(d)} networks, {int(d.is_feasible.sum())} feasible, {int(d.is_pareto.sum())} Pareto, "
+          f"{int(d.is_pareto_all.sum())} Pareto without the cut -> {OUT}")
 
 
 if __name__ == "__main__":
