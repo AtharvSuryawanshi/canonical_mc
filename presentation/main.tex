@@ -234,34 +234,26 @@
 \end{frame}
 
 \begin{frame}{Like-to-like connectivity}
-  \footnotesize
+  \centering
+  \includegraphics[width=\textwidth,height=0.47\textheight,keepaspectratio]{figs/talk/like2like_schematic_front.pdf}\\[0.2em]
+  \raggedright\scriptsize
   \begin{columns}[T]
     \begin{column}{0.5\textwidth}
-      Task profile of neuron $i$: its task variance (how much its rate varies across trials) in each of the 20
-      tasks, divided by its largest value,
-      \[
-        x_i = \big(x_{i,1}, \dots, x_{i,20}\big), \qquad 0 \le x_{i,a} \le 1 .
-      \]
-      $x_{i,a} = 1$: the task neuron $i$ is most involved in; near 0: not involved.\\[0.4em]
-      Similarity of neurons $i, j$: $s_{ij} = \mathrm{corr}(x_i, x_j)$.\\[0.4em]
-      Connected $j \to i$: $|W^{\mathrm{rec}}_{ij}| / c_j > 0.01$, separately for \textcolor{Ecol}{E}$\to$\textcolor{Ecol}{E},
-      \textcolor{Ecol}{E}$\to$\textcolor{Icol}{I}, \textcolor{Icol}{I}$\to$\textcolor{Ecol}{E},
-      \textcolor{Icol}{I}$\to$\textcolor{Icol}{I}.
+      Task profile $x_i$: neuron $i$'s task variance (how much its rate varies across trials) in each of the 20
+      tasks, divided by its largest value, so $0 \le x_{i,a} \le 1$ (bars above).\\[0.3em]
+      Similarity: $r_{ij} = \mathrm{corr}(x_i, x_j)$. \ Connected $j \to i$: $|W^{\mathrm{rec}}_{ij}| / c_j > 0.01$;
+      separately for \textcolor{Ecol}{E}$\to$\textcolor{Ecol}{E}, \textcolor{Ecol}{E}$\to$\textcolor{Icol}{I},
+      \textcolor{Icol}{I}$\to$\textcolor{Ecol}{E}, \textcolor{Icol}{I}$\to$\textcolor{Icol}{I}.
     \end{column}
     \begin{column}{0.48\textwidth}
-      AUC: the chance that a connected pair is more similar than an unconnected one,
-      \[
-        \mathrm{AUC} = P\big(s_{\text{conn}} > s_{\text{unconn}}\big).
-      \]
-      ROC: slide a threshold $\theta$ over $s$; $\mathrm{TPR}(\theta) = P(s_{\text{conn}} > \theta)$,
-      $\mathrm{FPR}(\theta) = P(s_{\text{unconn}} > \theta)$; AUC is the area under it.\\[0.4em]
-      0.5: no relation; above 0.5: like-to-like; below 0.5: like-to-unlike. It doesn't depend on how many
-      synapses are kept.\\[0.4em]
+      AUC $= P(r_{\text{conn}} > r_{\text{unconn}})$, the area under the ROC: 0.5 no relation, above 0.5
+      like-to-like, below 0.5 like-to-unlike. It doesn't depend on how many synapses are kept.\\[0.3em]
       Significance: shuffle the profiles within \textcolor{Ecol}{E} and within \textcolor{Icol}{I}, synapses fixed,
       500$\times$.
     \end{column}
   \end{columns}
-  \takeaway{Question: are neurons that work in the same tasks more likely to be connected?}
+  \takeaway{Question: are neurons that work in the same tasks more likely to be connected? (Example: both
+  constraints, seed 0.)}
 \end{frame}
 
 \begin{frame}{Like-to-like connectivity: example network}
@@ -299,7 +291,8 @@
     \begin{column}{0.64\textwidth}
       \centering
       \includegraphics[width=\linewidth]{figs/talk/silhouette_seeds_task_front.pdf}\\[0.2em]
-      \scriptsize 5 seeds per point. Line: mean; band: seed range; dots: each seed's chosen $k$.
+      \scriptsize 5 seeds per point. Line: mean; band: seed range; dashed: chosen $k$ (highest peak of the mean,
+      $k > 2$).
     \end{column}
   \end{columns}
   \takeaway{Under a rate budget the groups are the most distinct (highest silhouette, \textcolor{Ecol}{E} and

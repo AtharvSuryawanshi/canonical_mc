@@ -180,7 +180,7 @@ def _dots(ax, df, points, seeds, q, mode, xs, dx=0.0, open_all=False, jw=0.12):
 def plot_seeds(run, R, df, points, seeds):
     """Slide 16: all networks; mean ROC (band: seed range) and AUC per network (filled: p < 0.05)."""
     grid = np.linspace(0, 1, 101)
-    fig, axes = plt.subplots(2, 4, figsize=(W, 3.1), gridspec_kw=dict(height_ratios=[1, 0.9], hspace=0.45,
+    fig, axes = plt.subplots(2, 4, figsize=(W, 3.4), gridspec_kw=dict(height_ratios=[1, 0.9], hspace=0.45,
                                                                       wspace=0.25))
     xs = np.arange(len(points))
     for k, q in enumerate(QUADS):
@@ -207,7 +207,12 @@ def plot_seeds(run, R, df, points, seeds):
         _dots(ax, df, points, seeds, q, "trained", xs)
         ax.axhline(0.5, color="0.3", ls=":", lw=0.6)
         ax.set_ylim(0.4, 0.85); ax.set_yticks([0.5, 0.6, 0.7, 0.8])
-        ax.set_xticks([])
+        ax.set_xticks(xs)
+        ax.set_xticklabels([LABEL[p].replace(" constraints", "").replace(" constraint", "") for p in points],
+                           rotation=45, ha="right", rotation_mode="anchor", fontsize=7)
+        for t, p in zip(ax.get_xticklabels(), points):
+            t.set_color(COLORS[p])
+        ax.tick_params(axis="x", length=0, pad=2)
         if k == 0:
             ax.set_ylabel("AUC (one dot per network)")
         else:

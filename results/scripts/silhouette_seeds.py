@@ -82,20 +82,28 @@ def plot(run, df, points, seeds, basis):
     fig, axes = plt.subplots(1, 2, figsize=(5.2, 2.4), sharey=True, gridspec_kw=dict(wspace=0.08))
     for ax, pop in zip(axes, "EI"):
         d = df[df["pop"] == pop]
+        chosen = {}
         for i, p in enumerate(points):
             t = d[d.point == p].pivot(index="k", columns="seed", values="silhouette")
+            chosen[p], _ = pick_k(t.mean(1).to_dict())          # the rule on the mean curve (k > 2)
+            t = t[t.index >= 3]                                 # k = 2 is never chosen: not shown
             ax.fill_between(t.index, t.min(1), t.max(1), color=COLORS[p], alpha=0.15, lw=0)
-            ax.plot(t.index, t.mean(1), color=COLORS[p], lw=1.1, label=LABEL[p])
-            c = d[(d.point == p) & d.chosen.astype(bool)].sort_values("seed")
-            jit = (i - (len(points) - 1) / 2) * 0.12
-            ax.plot(c.k + jit, c.silhouette, "o", color=COLORS[p], ms=4, mec="k", mew=0.4, zorder=3)
-        ax.set_title(f"{pop} neurons", color=E_COL if pop == "E" else I_COL, fontsize=11)
-        ax.set_xticks(range(2, K_MAX[pop] + 1, 4))
+            ax.plot(t.index, t.mean(1), color=COLORS[p], lw=1.2, label=LABEL[p])
+            ax.axvline(chosen[p], color=COLORS[p], ls="--", lw=1.1)
+        last = -np.inf                                          # k labels above the panel, at least 1.4 apart
+        for p in sorted(chosen, key=chosen.get):
+            x = max(chosen[p], last + 1.4)
+            ax.text(x, 1.01, str(chosen[p]), transform=ax.get_xaxis_transform(), color=COLORS[p], fontsize=8.5,
+                    ha="center", va="bottom")
+            last = x
+        ax.set_title(f"{pop} neurons", color=E_COL if pop == "E" else I_COL, fontsize=11, pad=15)
+        ax.set_xlim(2.5, K_MAX[pop] + 0.5)
+        ax.set_xticks([3, 6, 9, 12, 15, 18])
         ax.tick_params(labelsize=9)
         ax.set_xlabel("number of groups k", fontsize=10)
     axes[0].set_ylabel("silhouette", fontsize=10)
     fig.legend(*axes[0].get_legend_handles_labels(), loc="lower center", ncol=4, frameon=False,
-               bbox_to_anchor=(0.5, 0.97), fontsize=8, handlelength=1.2, columnspacing=1)
+               bbox_to_anchor=(0.5, 1.03), fontsize=8, handlelength=1.2, columnspacing=1)
     save(fig, f"silhouette_seeds_{basis}", run)
 
     print(f"chosen k ({basis} variance), seeds {seeds}:")
