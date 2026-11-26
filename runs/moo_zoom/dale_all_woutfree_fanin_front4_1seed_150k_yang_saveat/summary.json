@@ -1,0 +1,122 @@
+{
+  "task_version": "yang",
+  "model": "dale",
+  "task_battery": "all",
+  "active_tasks": [
+    "fdgo",
+    "reactgo",
+    "delaygo",
+    "fdanti",
+    "reactanti",
+    "delayanti",
+    "dm1",
+    "dm2",
+    "contextdm1",
+    "contextdm2",
+    "multidm",
+    "delaydm1",
+    "delaydm2",
+    "contextdelaydm1",
+    "contextdelaydm2",
+    "multidelaydm",
+    "dmsgo",
+    "dmsnogo",
+    "dmcgo",
+    "dmcnogo"
+  ],
+  "steps": 150000,
+  "seeds": [
+    0
+  ],
+  "save_at": [
+    1000,
+    5000,
+    10000,
+    25000,
+    50000,
+    75000,
+    100000,
+    125000
+  ],
+  "points": {
+    "control": {
+      "rate_budget": null,
+      "conn_budget": null,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "loose": {
+      "rate_budget": 0.015,
+      "conn_budget": 0.028,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "firing": {
+      "rate_budget": 0.0013,
+      "conn_budget": 0.05,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "wiring": {
+      "rate_budget": 0.18,
+      "conn_budget": 0.0043,
+      "n_trained": 1,
+      "n_feasible": 1
+    },
+    "both": {
+      "rate_budget": 0.01,
+      "conn_budget": 0.0057,
+      "n_trained": 1,
+      "n_feasible": 1
+    }
+  },
+  "feasible_min_task_acc": 0.6,
+  "args": {
+    "model": "dale",
+    "task_battery": "all",
+    "tasks": null,
+    "steps": 150000,
+    "batch_size": 32,
+    "n_rnn": 256,
+    "n_neurons": 256,
+    "n_eachring": 16,
+    "frac_e": 0.8,
+    "g": 1.0,
+    "sigma_rec": 0.05,
+    "noise_level": null,
+    "lr": 0.001,
+    "log_every": 20,
+    "seed": 0,
+    "device": "cuda",
+    "eval_batch_size": 64,
+    "feasible_min_task_acc": 0.6,
+    "eval_seeds": null,
+    "n_seeds": 1,
+    "rate_kind": "l2",
+    "rate_inh_scale": 1.0,
+    "conn_kind": "l1",
+    "conn_target": "w_rec",
+    "conn_inh_scale": 1.0,
+    "prune_eps": 0.0,
+    "loss_per_trial": true,
+    "eval_noise_level": 0.0,
+    "eval_input_noise": false,
+    "freeze": "",
+    "w_out_init": "fanin",
+    "output_dir": "runs/moo_zoom/dale_all_woutfree_fanin_front4_1seed_150k_yang_saveat",
+    "budget_lr": 0.01,
+    "budget_kp": 0.0,
+    "budget_ramp": 0.0,
+    "conn_budget_mode": "projection",
+    "budget_rho": 1.0,
+    "budget_lambda_init": 0.01,
+    "budget_ema": 0.9,
+    "points": "control=none; loose=0.015,0.028; firing=0.0013,0.05; wiring=0.18,0.0043; both=0.010,0.0057",
+    "overwrite": false,
+    "workers": 1,
+    "batched": true,
+    "batch_pop": 5,
+    "devices": null,
+    "save_at": "1000,5000,10000,25000,50000,75000,100000,125000"
+  }
+}
