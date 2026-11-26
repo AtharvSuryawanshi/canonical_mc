@@ -12,6 +12,17 @@ REPO = Path(__file__).resolve().parents[2]
 OUT = REPO / "presentation/figs/talk"
 
 NAMES = {"control": "Control", "A3": "Firing constraint", "B0": "Wiring constraint", "C0": "Both constraints"}
+# labels of every point name (old 4-point runs first, so list(LABEL).index of an old point is unchanged)
+LABEL = {**NAMES, "firing": "Firing constraint", "wiring": "Wiring constraint", "both": "Both constraints",
+         "loose": "Loose budgets"}
+# default points per run (fig_tv_ei_fanin.RUNS keys); runs not listed: the old four
+RUN_POINTS = {"front": ["control", "firing", "wiring", "both"]}
+
+
+def run_points(run):
+    return RUN_POINTS.get(run, list(NAMES))
+
+
 E_COL, I_COL, UNCONN = "#1F8AD0", "#E0393E", "#b0b0b0"
 W = 5.6                                                       # Beamer 16:9 text width, inches
 

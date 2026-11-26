@@ -28,10 +28,11 @@ import pandas as pd
 from fig_tv_ei_fanin import COLORS, RUNS
 from fig_wiring_like2like import N_SHUFFLE, QUADS, THRESH, network
 from fig_wiring_roc import roc
-from talk_style import E_COL, I_COL, NAMES, REPO, UNCONN, W, save
+from talk_style import E_COL, I_COL, LABEL, REPO, UNCONN, W, run_points, save
 
 MODES = ("trained", "matched")
-REF = "C0"                                          # matched mode: sparsity of the same-seed network at this point
+REFS = ("C0", "both")                               # matched mode: sparsity of the same-seed network at this point
+REF = "C0"                                          # set in __main__ from the points (C0 or both)
 
 
 def cache_dir(run):
@@ -56,7 +57,7 @@ def compute_one(run, point, seed, keep, thresh, n_shuffle):
     """keep: fraction of synapses kept in 'matched' mode; None = this network's own 'trained' fraction (the C0 case)."""
     C, stats = {}, []
     for m, mode in enumerate(MODES):
-        rng = np.random.default_rng([seed, list(NAMES).index(point), m])      # per network: recompute one alone
+        rng = np.random.default_rng([seed, list(LABEL).index(point), m])      # per network: recompute one alone
         k = None if mode == "trained" else keep
         res = network(point, seed, rng, keep_frac=k, run=run, thresh=thresh, n_shuffle=n_shuffle)
         if mode == "trained" and keep is None:
@@ -149,7 +150,7 @@ def plot_example(run, R, df, points, seed):
             ax_roc.set_title(f"{st.auc:.2f}" + ("" if sig else " n.s."), fontsize=7, pad=1.5,
                              color="k" if sig else "0.45")
             if r == 0:
-                ax.text(0.7, 1.32, NAMES[p], transform=ax.transAxes, ha="center", fontsize=9, color=COLORS[p])
+                ax.text(0.7, 1.32, LABEL[p], transform=ax.transAxes, ha="center", fontsize=9, color=COLORS[p])
             if j == 0:
                 ax.set_ylabel(q, rotation=0, ha="right", va="center", fontsize=9, labelpad=4)
     h = [plt.Rectangle((0, 0), 1, 1, color=UNCONN), plt.Line2D([], [], color="k", lw=1.1)]
@@ -185,7 +186,7 @@ def plot_seeds(run, R, df, points, seeds):
                 T.append(np.interp(grid, *roc(c["S"][mk], c["C"]["trained"][mk])))
             T = np.array(T)
             ax.fill_between(grid, T.min(0), T.max(0), color=COLORS[p], alpha=0.18, lw=0)
-            ax.plot(grid, T.mean(0), color=COLORS[p], lw=1.3, label=NAMES[p])
+            ax.plot(grid, T.mean(0), color=COLORS[p], lw=1.3, label=LABEL[p])
         ax.plot([0, 1], [0, 1], color="0.3", ls=":", lw=0.6)
         ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.set_box_aspect(1)
         ax.set_xticks([0, 1]); ax.set_yticks([0, 1])
@@ -226,8 +227,8 @@ def plot_matched(run, df, points, seeds):
     h = [plt.Line2D([], [], marker="o", ls="", mfc="white", mec="0.3", ms=4),
          plt.Line2D([], [], marker="o", ls="", color="0.3", ms=4)]
     h += [plt.Line2D([], [], color=COLORS[p], lw=1.6) for p in points]
-    fig.legend(h, ["as trained", f"strongest synapses, {NAMES[REF].lower()} sparsity (filled: p < 0.05)"]
-               + [NAMES[p] for p in points], loc="lower center", ncol=3, frameon=False, bbox_to_anchor=(0.5, 0.98),
+    fig.legend(h, ["as trained", f"strongest synapses, {LABEL[REF].lower()} sparsity (filled: p < 0.05)"]
+               + [LABEL[p] for p in points], loc="lower center", ncol=3, frameon=False, bbox_to_anchor=(0.5, 0.98),
                fontsize=6.5)
     save(fig, "like2like_matched", run)
 
@@ -255,7 +256,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", default="yang", choices=sorted(RUNS))
     ap.add_argument("--seeds", default="0-4")
-    ap.add_argument("--points", default=",".join(NAMES))
+    ap.add_argument("--points", default=None, help="default: the run's points (talk_style.RUN_POINTS)")
     ap.add_argument("--example-seed", type=int, default=4)
     ap.add_argument("--n-shuffle", type=int, default=N_SHUFFLE)
     ap.add_argument("--thresh", type=float, default=THRESH)
@@ -263,7 +264,8 @@ if __name__ == "__main__":
     g.add_argument("--plot-only", action="store_true")
     g.add_argument("--recompute", action="store_true")
     a = ap.parse_args()
-    points, seeds = a.points.split(","), seed_list(a.seeds)
+    points, seeds = (a.points.split(",") if a.points else run_points(a.run)), seed_list(a.seeds)
+    REF = next(r for r in REFS if r in points)
     if not a.plot_only:
         compute(a.run, points, seeds, a.thresh, a.n_shuffle, a.recompute)
     R, df = load_all(a.run, points, seeds)

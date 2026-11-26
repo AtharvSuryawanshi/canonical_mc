@@ -1,4 +1,4 @@
-# Session handoff, updated 2026-11-26 (Linux) — read §0 first, then §10 (Yang front + new 5 points, newest), then §9
+# Session handoff, updated 2026-11-26 (Windows) — read §0 first, then §11 (analyses on the new points, newest), §10 (Yang front + new 5 points), then §9
 
 Read this first in a new Claude Code session, together with `CLAUDE.md`. **Section 8 is the newest**: the
 Driscoll-style analysis (task variance per period, fixed points) and the clustering-free like-to-like wiring test,
@@ -144,6 +144,8 @@ save-at network is weaker only in B0 I→E (≈ 0) and C0 E→E w/b (2.45). I→
 | `presentation/make_frames.py` | `presentation/frames/front_000…059.png` (rotating fanin-only front for `animate`) |
 | `presentation/figs/crop_tv_rows.py [tag]` | `presentation/figs/tv_ei_<point>.png`, `wiring_<point>.png` (default tag `5seed_s4_150k`) |
 | `presentation/figs/{yang2019,song2016}_crops.tex` | vector crops of paper figures (`pdflatex` in `presentation/figs/`; PDFs in `papers/`) |
+| `results/scripts/like2like.py [--run R] [--plot-only\|--recompute]` (§11) | cached like-to-like + matched sparsity: `results/cache/<R>/`, `presentation/figs/talk/like2like_{example_s<seed>,seeds,matched}_<R>.pdf` |
+| `results/scripts/silhouette_seeds.py [--run R] [--basis task\|period] [--plot-only\|--recompute]` (§11) | cached silhouette vs k over seeds: `results/cache/<R>/silhouette_<basis>.csv`, `presentation/figs/talk/silhouette_seeds_<basis>_<R>.pdf`, `results/front/silhouette_k_<basis>_<R>.png` |
 
 Group wiring math (`fig_tv_ei_fanin.wiring`): w̃_ij = |W_ij| / c_i (i presynaptic = row; c = 1 E, n_E/n_I I);
 block mean B_gh over pairs without self-pairs; z vs 500 label shuffles within E and within I; groups < 4 greyed;
@@ -474,12 +476,91 @@ of the front, control = no budgets. Result (5 seeds each, all feasible):
 
 ### 10.4 To do
 
-- **Rerun the analyses on the new run** (like-to-like, silhouette, per-period TV, lesions, E/I modularity). The
-  cached scripts need a `RUNS` entry in `results/scripts/fig_tv_ei_fanin.py` (e.g. `"front": ...front4_5seed_150k_yang`)
-  and the new point names in `POINTS`/`COLORS`; `like2like.py` has `REF = "C0"` (matched sparsity) and
-  `--points control,A3,B0,C0` defaults, which must become `both` and the new names.
+- **Rerun the analyses on the new run** (like-to-like, silhouette, per-period TV, lesions, E/I modularity).
+  **Like-to-like and silhouette done (§11)**; per-period TV heatmaps, lesions and E/I modularity (group wiring) not yet.
 - A committed script (or an `all` set in `fig_front_yang_ms12.py`) that pools all four searches and draws the new
   points on the front; then the front slides (top view, 3D GIF/frames) move to the Yang front.
 - Decide whether `loose` or `control` is the reference on slides (control is off the front by construction).
 - Deck numbers and the E/I report are all still v1 (§0).
 
+## 11. Like-to-like and silhouette on the new front points (2026-11-26, Windows)
+
+Run `runs/moo_zoom/dale_all_woutfree_fanin_front4_5seed_150k_yang` (§10.3), key `"front"` in
+`fig_tv_ei_fanin.RUNS`. Points analysed: control, firing, wiring, both (5 seeds each). **`loose` not analysed yet.**
+The run has **final checkpoints only** (no `step_*` folders, `save_at: []`); the only save-at run is the old v1
+1-seed one.
+
+### 11.1 Cached analysis scripts (built 2026-11-20, extended today)
+
+Pattern: compute -> cache per network -> plot from cache. `--run R` (a `fig_tv_ei_fanin.RUNS` key), `--plot-only`
+(figures from cache, ~15 s, mostly torch import), `--recompute`; otherwise only missing networks are computed.
+
+- `results/scripts/like2like.py`: like-to-like AUC (as `fig_wiring_like2like.network`, unchanged), two modes per
+  network: `trained` (|W|/c > 0.01) and `matched` (strongest synapses, as many as the same-seed reference network:
+  `C0` in old runs, `both` in the front run; `REF` is set from the points). rng seeded per network. Cache
+  `results/cache/<R>/like2like_<point>_s<seed>.npz` + `like2like.csv`. Figures `presentation/figs/talk/
+  like2like_example_s<seed>_<R>.pdf` (slide 15 style), `like2like_seeds_<R>.pdf` (slide 16), `like2like_matched_<R>.pdf`.
+  **Checked:** `--run 5seed` reproduces the old v1 numbers exactly (all AUCs, connected counts, p < 0.05 calls).
+- `results/scripts/silhouette_seeds.py`: silhouette vs k for every seed, E and I, `--basis task|period`, k-means via
+  `fig_tv_ei_fanin.cluster_pop` (unchanged). Cache `results/cache/<R>/silhouette_<basis>.csv`. Figures: talk
+  `silhouette_seeds_<basis>_<R>.pdf` (mean + seed band, dots = chosen k) and **`results/front/silhouette_k_<basis>_<R>.png`**
+  (4 rows = points x 2 columns = E, I; light = seeds, dark = mean, dots = each seed's chosen k, dashed = k the same
+  rule picks on the mean curve, with the reason and the other peaks in the title). **I now goes to k = 20**
+  (`K_MAX`, was 10); only the front per-task cache is recomputed with it; other caches still have I <= 10 until
+  `--recompute`. `fig_tv_ei_fanin.py` (slide-17 heatmaps) still uses I <= 10.
+  **Checked:** v1 seed 4 gives the slide-17 k (E 4/16/4/13, I 3/9/5/5).
+- `results/scripts/talk_style.py`: shared talk style (moved out of `talk_figs.py`); `LABEL` (old and new point
+  names), `RUN_POINTS` (`front` -> control, firing, wiring, both), `run_points(run)`. `talk_figs.like2like` removed.
+- `fig_tv_period.load(point, seed, run="5seed")`: 5seed caches stay in `results/front/`, other runs in
+  `results/cache/<run>/tv_period_*.npz`.
+
+### 11.2 Like-to-like on the new points (5 seeds, mean AUC)
+
+| | control | firing | wiring | both |
+|---|---|---|---|---|
+| E→E | 0.53 | 0.52 | 0.55 | 0.62 |
+| E→I | 0.54 | 0.54 | 0.61 | 0.65 |
+| I→E | 0.45 | 0.49 | 0.57 | 0.60 |
+| I→I | 0.46 | 0.48 | 0.61 | 0.61 |
+| synapses kept | 70% | 61% | 2.7% | 1.8% |
+
+- both: p < 0.05 in 5/5 seeds, every type, but weaker than old C0 (0.68-0.73). Wiring is now also clearly > 0.5
+  (old B0: 0.51-0.56).
+- Control I→E < 0.5 in 5/5 seeds (inhibition to other-computation neurons): holds.
+- Matched sparsity (cut to both's 1.6-1.9%): control and firing stay <= 0.50; **wiring reaches 0.57-0.63, about
+  equal to both** except E→E (0.57 vs 0.62).
+- **Across the 20 wiring-budget networks (yang B0, C0 and front wiring, both) AUC follows sparsity:** Spearman(AUC,
+  fraction kept) -0.89 to -0.97 per type; E→E: B0 (6.4%) 0.51, wiring (2.7%) 0.55, both (1.8%) 0.62, C0 (1.0%) 0.65.
+- **Claim status:** "only both constraints wire like-to-like" is no longer supported: the old C0 vs B0 contrast
+  confounded the firing budget with sparsity (0.8% vs 6.4%). What holds: like-to-like needs sparsity *reached in
+  training under a wiring budget*; post-hoc pruning of dense networks does not produce it.
+- Representative seed for the example figure: **seed 4** (largest both minus mean of the other three, 0.103; seed 1
+  is marginally ahead against control + firing only).
+- Slide-16 caption says "0.7% of synapses"; over active units the v1 C0 networks keep 0.84-1.01%.
+
+### 11.3 Silhouette and k (decision: **per-task variance** is the profile to keep)
+
+- Per task = 20 values per neuron (whole post-fixation trial per task, Yang 2019). Per period = 59 values (each
+  non-fixation epoch of each task: RT tasks 1 row, Go/Anti/DM 2, Dly Go/Anti/DMS/DNMS/DMC/DNMC 3, delayed DM 5;
+  Driscoll 2024). A task's per-task value is the length-weighted mean of its period rows.
+- Per period gives **fewer** E groups (medians drop ~4-8) and lower, flatter silhouettes, because the extra rows are
+  mostly copies (effective dimension 6.3 -> 7.7 for control, seed 4), "which task" explains 44-59% of a neuron's
+  period profile and "which period type" only 14-21% (neurons are task, not period, specialists), and short-epoch
+  variances are noisier. Per-task and per-period clusters agree poorly (ARI 0.16-0.49). Per period stays only for the
+  Driscoll comparisons (heatmaps, lesions). Note: like-to-like similarity uses per-period profiles, slide 17 per task.
+- k rule (unchanged): the highest local peak (higher than both neighbours) with k > 2; no peak -> overall maximum.
+  The last k tested can't be a peak.
+- Per task, front run, k on the mean curve (seeds' k): E control 9 (10,10,9,14,12), firing 11 (17,19,18,14,11),
+  wiring 10 (9,11,11,9,10), both 18 (18,13,7,12,14); I (k <= 20) control 3 (3,3,6,5,3), firing 4 (4,7,4,5,6),
+  wiring 14 (15,19,16,10,4), both 11 (14,10,11,13,11).
+- **The curves are nearly flat past k ~ 6**; the winning peak usually beats the next by < 0.01, so k is a soft
+  choice. Clear cases: E wiring, E control, I control, and I both (clear peak at 11, only visible with k up to 20).
+  I wiring is flat (0.17-0.19), its k means little.
+- **Robust result = the height of the curve:** firing highest (E 0.27, I 0.30 at chosen k), then both, control and
+  wiring lowest, at almost every k. The old claim (highest under a firing budget, especially I; firing-constrained
+  networks have more E groups) holds, with control now picking more E groups (median 10) than on the old points.
+
+### 11.4 To do (from §10.4, still open)
+
+- Per-period TV heatmaps, lesions and E/I modularity (group wiring) on the front points; `loose` not analysed.
+- Deck still shows v1 figures and numbers; none of the `_front` figures are in `main.tex` yet.
