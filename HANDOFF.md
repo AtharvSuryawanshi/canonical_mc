@@ -1,4 +1,4 @@
-# Session handoff, updated 2026-11-20 (Linux) — read §0 first, then §9 (deck polish, newest)
+# Session handoff, updated 2026-11-26 (Linux) — read §0 first, then §10 (Yang front + new 5 points, newest), then §9
 
 Read this first in a new Claude Code session, together with `CLAUDE.md`. **Section 8 is the newest**: the
 Driscoll-style analysis (task variance per period, fixed points) and the clustering-free like-to-like wiring test,
@@ -30,7 +30,10 @@ yang vs v1, same seed): both train. Go/Anti learn faster with the fix (stimulus 
 the same, Dly Go/Anti slower (0.47/0.45 vs 1.00/0.69 at 1k: memory for two rings). Figures
 `results/front/smoke_task_fix_curves.png`, `smoke_task_fix_trials.png`.
 
-**Next (agreed):** retrain on the fixed battery, bigger runs after the smoke test: first 4 points x 5 seeds, 150k,
+**Status 2026-11-26:** the retraining is done (§10): the 4-point Yang run, the Yang NSGA-III front (4 searches,
+573 networks) and 5 new points chosen on that front. The analyses are not yet rerun on the new points.
+
+**Next (agreed 2026-11-19):** retrain on the fixed battery, bigger runs after the smoke test: first 4 points x 5 seeds, 150k,
 fanin (+ one save-at seed), then the front. Then rerun the analyses (tuning breadth, like-to-like AUC, E/I
 modularity, per-period TV, lesions) and compare with v1.
 
@@ -102,8 +105,8 @@ Caveats found today:
 
 - Combined fanin front: 111 networks, 89 feasible, 38 Pareto. Wiring −2.75 (log10) infeasible everywhere.
 - The 150k front is a **point scan**, not NSGA-III: a log-spaced grid over the region the earlier cog20 NSGA-III
-  run (`runs/moo/dale_all_nsga3_budget_p48g3_50k`, pop 48 × 3 gen) found. **A real cog20 fanin 150k NSGA-III run
-  is running on the cluster**; when it lands, it replaces the front slide. Same command without `--points`:
+  run (`runs/moo/dale_all_nsga3_budget_p48g3_50k`, pop 48 × 3 gen) found. (v1. The real NSGA-III front, on the
+  Yang battery, is in §10.) Same command without `--points`:
   `python -m cmc.moo --task-battery all --steps 150000 --w-out-init fanin --g 1.0 --seed 0 --pop-size 48 --n-gen 3
   --n-partitions 8 --rate-budget-min 0.002 --rate-budget-max 0.15 --conn-budget-min 0.002 --conn-budget-max 0.03
   --batched --batch-pop 24 --workers 2`.
@@ -407,3 +410,76 @@ All in `presentation/` unless stated; deck builds (30 pages, no errors). Details
   1.4–1.7× per seed, same init and trials), though A3 keeps fewer synapses (61% vs 70%): fewer but stronger.
   Guess, not tested: with ~250× less firing it needs larger weights to drive its targets.
 - Memory updated: `accuracy-colormap.md` (new), `talk-slide-style.md` (names, wording, two figure types, no bold).
+
+## 10. Yang-battery front and 5 new points on it (2026-11-20 to 11-26)
+
+Everything here is on the fixed battery (`task_version = "yang"`), cog20, 150k, fanin, nothing frozen, g = 1,
+batched, eval as before. Trained on the remote cluster by a Claude session there (`CLUSTER_HANDOFF_NSGA.md` is its
+instruction sheet); results come back through git.
+
+### 10.1 Runs
+
+| run | what | networks | weights? |
+|---|---|---|---|
+| `runs/moo_zoom/dale_all_woutfree_fanin_4pt_5seed_150k_yang` (`793d75c`) | old 4 points (control/A3/B0/C0, old budgets) x 5 seeds | 20 | yes |
+| `runs/moo/..._p48g3_fanin_150k_yang_fullgpu_ms1`, `_ms2` (`26b20e5`) | NSGA-III, NSGA seeds 1, 2, training seed 0, rate budget 0.002-0.15, wiring 0.002-0.03 | 144 + 144 | no |
+| `runs/moo/..._p48g3_fanin_150k_yang_fullgpu_ext_ms3`, `_ext_ms4` (`b427bed`) | same, **extended box**: rate 0.001-0.5, wiring 0.002-0.06, NSGA seeds 3, 4 | 142 + 143 | no |
+| `runs/moo_zoom/dale_all_woutfree_fanin_front4_5seed_150k_yang` (`89a8ddd`) | **the new points**: control + loose / firing / wiring / both, 5 seeds each | 25 | yes |
+
+`results/scripts/fig_front_yang_ms12.py [ext]` pools ms1+ms2 -> `..._ms12/` or ext_ms3+ext_ms4 -> `..._ext_ms34/`
+(runs.csv, front.csv, `front_all.csv` = front with no feasibility cut, front_top.png). **No committed script pools
+all four searches yet**; the numbers below are from scratch analyses (pareto_mask over the 4 runs.csv, feasible =
+worst-task accuracy >= 0.6).
+
+### 10.2 The front (all four searches pooled)
+
+- 573 networks, 532 feasible, 116 on the front; each search contributes 27-32, so the searches agree. Later
+  generations never beat generation 0 (best ~0.99 from the start): most of the box is at ceiling.
+- **Wiring sets accuracy, firing barely does:** a plateau at 0.93-0.99 with a cliff at wiring ~0.003
+  (log -2.5). Spearman over feasible (first box): accuracy vs log wiring 0.63, vs log firing 0.14.
+- **At the lowest wiring, firing buys accuracy:** at wiring 0.0023-0.0034, networks firing 0.38-0.50 still reach
+  0.62-0.92, where low-firing ones fail. The feasibility edge bends down at high firing (only visible with the
+  extended box).
+- dmsnogo is the worst task in about half the networks, then contextdelaydm1/2 and dmsgo.
+- The front is "thick": accuracy differences along the plateau (~0.01-0.02) are seed-noise size, so single-network
+  Pareto membership is noisy; the cliff is the robust feature. Reached firing is ~1.5x the rate budget (IQR
+  1.36-1.65); wiring lands on its budget (projection).
+- **Old points vs this front:** control and B0 are dominated in all seeds (B0 fires 0.75-0.89; a front network
+  reaches 0.958 at firing 0.27, wiring 0.0051). A3 seeds 1, 2 and two C0 seeds are not dominated. That is why
+  new points were chosen on the front (user's narrative: map the front, then pick points on it).
+
+### 10.3 The 5 new points (picked 2026-11-25 on a smoothed surface of the pooled front)
+
+Budgets were read off a thin-plate fit of worst-task accuracy over (log rate budget, log wiring budget), smoothing
+1.0: firing / wiring / both near the ~0.93 contour (equal competence, different binding cost), loose = best part
+of the front, control = no budgets. Result (5 seeds each, all feasible):
+
+| point | rate, wiring budget | worst-task acc mean (min-max) | firing | wiring | synapses kept | gap to front |
+|---|---|---|---|---|---|---|
+| control | none | 0.946 (0.894-0.984) | 0.47 | 0.029 | 70% | dominated (all seeds) |
+| loose | 0.015, 0.028 | 0.979 (0.969-0.992) | 0.023 | 0.028 | 50% | 0.008 |
+| firing | 0.0013, 0.05 | 0.921 (0.886-0.955) | 0.0023 | 0.046 | 61% | 0.042 |
+| wiring | 0.18, 0.0043 | 0.944 (0.923-0.953) | 0.23 | 0.0043 | 2.6% | 0.010 |
+| both | 0.010, 0.0057 | 0.925 (0.897-0.944) | 0.017 | 0.0057 | 1.7% | 0.004 |
+
+- Gap to front = best accuracy of any NSGA network with no higher firing and wiring than the point's 5-seed mean,
+  minus that mean. Seed sd: loose 0.010, wiring 0.012, both 0.019, firing 0.029. So loose, wiring and both are on
+  the front within seed noise (their means are dominated by 1-8 of 532 networks, and some single seeds by none).
+  Firing is 1.4 sd below; its region is sparsely sampled and the best network there (ext_ms3, budget 0.0013/0.053,
+  0.963) is one lucky draw. Selection bias of ~0.01-0.02 was expected.
+- Control's mean (0.946) is lower than in the old Yang 4-point run (0.976) because of seed 4 (0.894); same
+  firing/wiring. Different batches = different trial streams, so seeds are not the same networks across runs.
+- Worst tasks: dmsnogo in most constrained networks; contextdelaydm2 in control.
+- Point names in the run folder: `control`, `loose`, `firing`, `wiring`, `both` (not A3/B0/C0).
+
+### 10.4 To do
+
+- **Rerun the analyses on the new run** (like-to-like, silhouette, per-period TV, lesions, E/I modularity). The
+  cached scripts need a `RUNS` entry in `results/scripts/fig_tv_ei_fanin.py` (e.g. `"front": ...front4_5seed_150k_yang`)
+  and the new point names in `POINTS`/`COLORS`; `like2like.py` has `REF = "C0"` (matched sparsity) and
+  `--points control,A3,B0,C0` defaults, which must become `both` and the new names.
+- A committed script (or an `all` set in `fig_front_yang_ms12.py`) that pools all four searches and draws the new
+  points on the front; then the front slides (top view, 3D GIF/frames) move to the Yang front.
+- Decide whether `loose` or `control` is the reference on slides (control is off the front by construction).
+- Deck numbers and the E/I report are all still v1 (§0).
+
