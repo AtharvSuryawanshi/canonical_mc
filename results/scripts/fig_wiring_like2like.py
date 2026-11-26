@@ -44,15 +44,18 @@ def auc(sim, conn):
     return (r[conn].sum() - n1 * (n1 + 1) / 2) / (n1 * n0)
 
 
-def network(point, seed, rng, keep_frac=None, run="5seed", thresh=THRESH, n_shuffle=N_SHUFFLE):
+def network(point, seed, rng, keep_frac=None, run="5seed", thresh=THRESH, n_shuffle=N_SHUFFLE, basis="period"):
     """keep_frac: if set, 'connected' = the strongest keep_frac of the (active, off-diagonal) synapses instead of
-    |W|/c > thresh, to compare networks at matched sparsity. run: key of fig_tv_ei_fanin.RUNS."""
+    |W|/c > thresh, to compare networks at matched sparsity. run: key of fig_tv_ei_fanin.RUNS. basis: similarity of
+    the per-period profiles (59 rows, default, as before) or of the per-task profiles (20 rows, stored in the
+    checkpoint); the period-type direction analysis always uses the period rows."""
     with contextlib.redirect_stdout(io.StringIO()):
         model, ck, tv_t, tv_p, keys = load(point, seed, run)
     total = tv_t.sum(0)
     units = np.flatnonzero(total > 1e-2 * total.max())
     F = tv_p[:, units] / tv_p[:, units].max(0, keepdims=True)              # (rows, units)
-    S = np.corrcoef(F.T)                                                     # similarity, units x units
+    Fs = F if basis == "period" else tv_t[:, units] / tv_t[:, units].max(0, keepdims=True)
+    S = np.corrcoef(Fs.T)                                                    # similarity, units x units
     Wn = np.abs(model.effective_w_rec().detach().numpy()) / model.ei_row_scale().detach().numpy()[:, None]
     W = Wn[np.ix_(units, units)]                                             # W[pre, post]
     isE = units < model.n_e

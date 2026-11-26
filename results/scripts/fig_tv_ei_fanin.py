@@ -55,7 +55,8 @@ def cluster_pop(norm, k_max):
     return np.array([order.index(c) for c in lab]), K, sil
 
 
-def analyse(ckpt):
+def analyse(ckpt, k_max_I=10):
+    """k_max_I: largest k tried for I (10 as before; 20 matches silhouette_seeds.py since 2026-11-26)."""
     with contextlib.redirect_stdout(io.StringIO()):
         model, _, ck = load_checkpoint(ckpt)
     tv = np.asarray(ck["task_variance"], dtype=float)
@@ -66,7 +67,7 @@ def analyse(ckpt):
              Wn=np.abs(model.effective_w_rec().detach().numpy())
              / model.ei_row_scale().detach().numpy()[:, None])          # standardised |w|, W[pre, post]
     N, N_E = model.n_rnn, model.n_e
-    for pop, sel, k_max in (("E", np.arange(N) < N_E, 20), ("I", np.arange(N) >= N_E, 10)):
+    for pop, sel, k_max in (("E", np.arange(N) < N_E, 20), ("I", np.arange(N) >= N_E, k_max_I)):
         units = np.flatnonzero(active & sel)
         lab, K, sil = cluster_pop(norm[:, units], k_max)
         R[pop] = dict(units=units, lab=lab, K=K, sil=sil[K], sil_curve=sil,

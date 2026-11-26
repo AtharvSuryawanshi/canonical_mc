@@ -1,4 +1,4 @@
-% Test deck. Build: python presentation/make_frames.py, then pdflatex main.tex (in presentation/).
+% Test deck. Build: python results/scripts/front_yang.py frames, then pdflatex main.tex (in presentation/).
 % The animation plays in Acrobat / Okular; other viewers show the first frame.
 \documentclass[aspectratio=169]{beamer}
 \usetheme{default}
@@ -9,8 +9,10 @@
 \usepackage{booktabs}
 \definecolor{Ecol}{HTML}{1F8AD0}  % Song 2016 Fig. 1 colours: E blue, I red
 \definecolor{Icol}{HTML}{E0393E}
+% one-sentence take-away at the bottom of a slide
+\newcommand{\takeaway}[1]{\par\vfill\noindent\colorbox{black!6}{\parbox{\dimexpr\linewidth-2\fboxsep\relax}{\small #1}}}
 
-\title{Multitask Dale's-law RNNs under metabolic and wiring budgets}
+\title{Multitask Dale's-law RNNs under rate and synaptic budgets}
 \author{Atharv Suryawanshi}
 \institute{Msc Neuroscience, GSN}
 \date{\today}
@@ -23,7 +25,8 @@
 
 \begin{frame}{One circuit, many tasks}
   \centering
-  \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{figs/fig1_intro_question.pdf}
+  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{figs/fig1_intro_question.pdf}
+  \takeaway{When one circuit does many tasks, do its neurons share the work, or split into task-specific groups?}
 \end{frame}
 
 \begin{frame}{Yang et al.\ 2019: one network, 20 tasks}
@@ -31,7 +34,7 @@
     \begin{column}{0.48\textwidth}
       \centering
       \includegraphics[width=\linewidth,page=1]{figs/yang2019_crops.pdf}\\[0.8em]
-      \footnotesize 256 Vanilla RNNs trained on 20 cognitive tasks at once:
+      \footnotesize 256 RNN units trained on 20 cognitive tasks at once:
       fixation, two stimulus rings and a rule input in; fixation and a response ring out.
     \end{column}
     \begin{column}{0.48\textwidth}
@@ -41,9 +44,8 @@
       Neurons form clusters, each specialised for a group of related tasks.
     \end{column}
   \end{columns}
-  \vfill
-  {\scriptsize Yang, Joglekar, Song, Newsome \& Wang (2019). Task representations in neural networks trained to
-  perform many cognitive tasks. \emph{Nat.\ Neurosci.} 22, 297--306. Figs 1b, 2a--c.}
+  \takeaway{Trained on many tasks, one network forms groups of neurons for related tasks.}
+  {\tiny Yang, Joglekar, Song, Newsome \& Wang (2019). \emph{Nat.\ Neurosci.} 22, 297--306. Figs 1b, 2a--c.}
 \end{frame}
 
 \begin{frame}{Song, Yang \& Wang 2016: excitatory and inhibitory neurons}
@@ -69,27 +71,41 @@
       \end{itemize}
     \end{column}
   \end{columns}
-  \vfill
-  {\scriptsize Song, Yang \& Wang (2016). Training excitatory-inhibitory recurrent neural networks for cognitive
-  tasks: a simple and flexible framework. \emph{PLoS Comput.\ Biol.} 12(2), e1004792. Fig.~1, Eqs 1--3, 12.}
+  \takeaway{Separate \textcolor{Ecol}{E} and \textcolor{Icol}{I} neurons (80/20): we keep this in all our networks.}
+  {\tiny Song, Yang \& Wang (2016). \emph{PLoS Comput.\ Biol.} 12(2), e1004792. Fig.~1, Eqs 1--3, 12.}
 \end{frame}
 
-\begin{frame}{Real neurons pay for firing and for wiring}
-  \vfill
-  \begin{itemize}\setlength{\itemsep}{1.4em}
-    \item \textbf{Firing costs energy.} Most of the brain's energy goes into spikes and synaptic transmission.\\
-          {\scriptsize\color{gray} Attwell \& Laughlin 2001; Lennie 2003}
-    \item \textbf{Wiring costs space.} Axons and dendrites take up most of the grey matter.\\
-          {\scriptsize\color{gray} Chklovskii, Schikorski \& Stevens 2002}
-    \item \textbf{So what does a circuit look like when it pays for both and still has to solve many tasks?}
-  \end{itemize}
-  \vfill
+\begin{frame}{Real neurons pay for activity and for synapses}
+  \begin{columns}[c]
+    \begin{column}{0.42\textwidth}
+      \footnotesize
+      \begin{itemize}\setlength{\itemsep}{0.6em}
+        \item Activity costs energy: most of the brain's energy goes into spikes and synaptic transmission.\\
+              {\tiny\color{gray} Attwell \& Laughlin 2001; Lennie 2003}
+        \item Synapses cost space and material: axons and dendrites take up most of the grey matter.\\
+              {\tiny\color{gray} Chklovskii, Schikorski \& Stevens 2002}
+        \item No single cost is minimised. The best solutions form a trade-off (Pareto) front, each weighting the
+              objectives differently; there is no single optimum.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.56\textwidth}
+      \centering
+      \includegraphics[width=\linewidth]{figs/fakhar2026_crops.pdf}\\[0.2em]
+      \tiny Brain networks trade wiring cost against communication efficiency: suboptimal networks lie inside,
+      Pareto-optimal ones on the frontier.\\[0.2em]
+      \color{gray} Fakhar \& Astle (2026). \emph{Trends Cogn.\ Sci.} Fig.~1.
+    \end{column}
+  \end{columns}
+  \takeaway{What does a circuit look like when it must solve many tasks and pay both costs, and where on the
+  trade-off does it sit?}
 \end{frame}
 
 \begin{frame}{Setup}
   \centering
-  \includegraphics[width=\textwidth]{figs/fig_setup.pdf}\\[0.8em]
-  \small 256 rate neurons (204 E, 52 I), all 20 Yang tasks trained together in one network, 150k steps.
+  \includegraphics[width=\textwidth,height=0.66\textheight,keepaspectratio]{figs/fig_setup.pdf}\\[0.4em]
+  \small 256 rate neurons (204 \textcolor{Ecol}{E}, 52 \textcolor{Icol}{I}), all 20 Yang tasks trained together
+  in one network, 150k steps.
+  \takeaway{Each network is scored on three things: task accuracy, synaptic cost and rate cost.}
 \end{frame}
 
 \begin{frame}{The network}
@@ -103,262 +119,199 @@
                                 \underbrace{\textcolor{Icol}{-1,\dots,-1}}_{52\ \text{I}})\\[0.6em]
     \hat{\mathbf{y}}_t &= \mathrm{sigmoid}\big(W^{\mathrm{out}}\,\mathbf{r}^{\textcolor{Ecol}{\mathrm{E}}}_t + \mathbf{b}^{\mathrm{out}}\big)
   \end{align*}
-  \vspace{0.4em}
   \footnotesize
   \begin{itemize}
-    \item $\mathrm{softplus}(\Theta) \geq 0$: learned synaptic strengths. $D$: fixed sign of each presynaptic neuron (Dale).
+    \item $\mathrm{softplus}(\Theta) \geq 0$: synaptic strengths. $D$: fixed sign of each presynaptic neuron (Dale).
           $\mathbf{1}-I$: no autapses.
-    \item Readout from E neurons only. $W^{\mathrm{in}}$, $W^{\mathrm{rec}}$, $W^{\mathrm{out}}$ all trained.
-    \item Adam, learning rate $10^{-3}$, batch 32, 150k steps; spectral radius of $W^{\mathrm{rec}}$ set to 1 at init.
+    \item Output read from \textcolor{Ecol}{E} neurons only. Input, recurrent and output synapses all learned
+          (gradient descent, 150k steps).
   \end{itemize}
+  \takeaway{A rate network with Dale's law: each neuron is \textcolor{Ecol}{E} or \textcolor{Icol}{I}, and only
+  \textcolor{Ecol}{E} neurons project to the output.}
 \end{frame}
 
 \begin{frame}{Three objectives}
   \small
   \begin{align*}
     \text{Task:}\quad L_{\text{task}} &= \Big\langle \frac{\sum_{t,k} m_{tk}\,(\hat y_{tk} - y_{tk})^2}{\sum_{t,k} m_{tk}} \Big\rangle_{\text{trials}}\\[0.6em]
-    \text{Firing:}\quad C_{\text{fire}} &= \big\langle\, r_i(t)^2 \,\big\rangle_{\text{trials},\,t,\,i}\\[0.6em]
-    \text{Wiring:}\quad C_{\text{wire}} &= \frac{1}{N(N-1)} \sum_{i \neq j} \frac{|W^{\mathrm{rec}}_{ij}|}{c_j},
+    \text{Rate:}\quad C_{\text{rate}} &= \big\langle\, r_i(t)^2 \,\big\rangle_{\text{trials},\,t,\,i}\\[0.6em]
+    \text{Synaptic:}\quad C_{\text{syn}} &= \frac{1}{N(N-1)} \sum_{i \neq j} \frac{|W^{\mathrm{rec}}_{ij}|}{c_j},
       \qquad c_j = \begin{cases} 1 & j \in \textcolor{Ecol}{\text{E}}\\ n_{\text{E}}/n_{\text{I}} & j \in \textcolor{Icol}{\text{I}} \end{cases}
   \end{align*}
-  \vspace{0.4em}
   \footnotesize
   \begin{itemize}
     \item Task: squared error where the target matters ($m$), each trial weighted equally.
-    \item Firing: mean squared rate over trials, time and neurons.
-    \item Wiring: L1 of the recurrent weights, which pushes weak synapses to zero (fewer connections).
-          I synapses are about 4$\times$ stronger, so we divide by $c_j$; otherwise the L1 cost would prune
-          inhibition first.
+    \item Rate: mean squared rate over trials, time and neurons.
+    \item Synaptic: total recurrent synaptic strength. \textcolor{Icol}{I} synapses are about 4$\times$ stronger,
+          so we divide by $c_j$; otherwise inhibition would be cut first.
   \end{itemize}
+  \takeaway{Three objectives: do the tasks, keep rates low, keep total synaptic strength low.}
 \end{frame}
 
 \begin{frame}{Holding the network to a budget}
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
-      \textbf{Wiring: hard limit}\\[0.3em]
-      \footnotesize This one is not a loss term. After every Adam step we shrink all synapses by the same amount
-      until the cost is back under budget, and the weak ones end up at zero (projection onto the L1 ball).
+      Synaptic cost: hard limit\\[0.3em]
+      \footnotesize After every learning step, the same amount $\theta$ is subtracted from every synapse until the
+      total strength is back at the budget; synapses that reach zero are removed. This is subtractive normalisation
+      (Miller \& MacKay 1994), the rule that drives weak synapses to zero. Here there is one budget for the whole
+      network, not one per neuron.
       \small
       \[
         |W_{ij}| \leftarrow \max\big(|W_{ij}| - \theta,\ 0\big),\quad
-        \theta:\ C_{\text{wire}} = B_{\text{wire}}
+        \theta:\ C_{\text{syn}} = B_{\text{syn}}
       \]
     \end{column}
     \begin{column}{0.48\textwidth}
-      \textbf{Firing: soft limit}\\[0.3em]
-      \footnotesize Firing rates can't be projected like weights, so we add a penalty instead. Its weight $\lambda$
-      goes up while the network is over budget and down while it is under.
+      Rate cost: soft limit\\[0.3em]
+      \footnotesize Rates can't be cut like synapses, so we add a penalty. Its weight $\lambda$ rises while the
+      network is above budget and falls while it is below, like integral control of firing-rate homeostasis
+      towards a set point (Turrigiano 2008; O'Leary et al.\ 2014). The $\rho$ term adds a push-back that acts
+      only above budget and grows with the overshoot ($\rho = 1$).
       \small
       \begin{align*}
-        L &= L_{\text{task}} + \lambda\,C_{\text{fire}} + \tfrac{\rho}{2}\,B_{\text{fire}}\big[\tfrac{C_{\text{fire}}}{B_{\text{fire}}} - 1\big]_+^2\\
-        \log\lambda &\leftarrow \log\lambda + \eta\,\big(\tfrac{C_{\text{fire}}}{B_{\text{fire}}} - 1\big)
+        L &= L_{\text{task}} + \lambda\,C_{\text{rate}} + \tfrac{\rho}{2}\,B_{\text{rate}}\big[\tfrac{C_{\text{rate}}}{B_{\text{rate}}} - 1\big]_+^2\\
+        \log\lambda &\leftarrow \log\lambda + \eta\,\big(\tfrac{C_{\text{rate}}}{B_{\text{rate}}} - 1\big)
       \end{align*}
+      \footnotesize Soft: trained networks end about 1.5$\times$ above their rate budget.
     \end{column}
   \end{columns}
-  \vfill
-  \footnotesize So we never set trade-off weights by hand. Each network gets two ceilings
-  $(B_{\text{fire}}, B_{\text{wire}})$ and is trained to be as accurate as it can under them.
-  \vfill
-  {\scriptsize\color{gray} L1 projection: Duchi et al.\ 2008.}
+  \takeaway{No hand-set trade-off: each network gets two ceilings $(B_{\text{rate}}, B_{\text{syn}})$ and does the
+  tasks as well as it can under them.}
+  {\tiny\color{gray} Miller \& MacKay 1994; Duchi et al.\ 2008 (L1 projection); Turrigiano 2008; O'Leary et al.\ 2014.}
 \end{frame}
 
-\begin{frame}{Mapping the front: NSGA-III (pymoo)}
-  \small
-  \begin{itemize}\setlength{\itemsep}{0.6em}
-    \item \textbf{Minimise} \ $\big(1 - \text{worst-task accuracy},\ \log C_{\text{fire}},\ \log C_{\text{wire}}\big)$,
-          \ subject to worst-task accuracy $\geq 0.6$.
-    \item \textbf{Pareto front}: networks where no objective can improve without another getting worse.
-    \item \textbf{Two nested loops}: NSGA-III chooses the budgets $(B_{\text{fire}}, B_{\text{wire}})$;
-          gradient descent trains the best network under each.
-  \end{itemize}
-  \vspace{0.6em}
-  \begin{center}
-    \footnotesize
-    \fbox{sample budgets} $\rightarrow$ \fbox{train \& evaluate} $\rightarrow$
-    \fbox{rank (non-dominated)} $\rightarrow$ \fbox{keep a spread} $\rightarrow$ \fbox{breed} $\circlearrowleft$
-  \end{center}
-  \vspace{0.4em}
-  \footnotesize
-  \begin{itemize}
-    \item We use the worst task because a network could give up on one task and still average $\sim$0.9.
-    \item Setting budgets instead of weighting the costs also reaches the non-convex parts of the front.
-  \end{itemize}
-  \vfill
-  {\scriptsize\color{gray} Deb \& Jain 2014 (NSGA-III); Blank \& Deb 2020 (pymoo).}
-\end{frame}
-
-\begin{frame}{The front (placeholder: budget point scan)}
+\begin{frame}{Mapping the front: NSGA-III}
   \centering
-  \animategraphics[autoplay,loop,controls,height=0.72\textheight]{10}{figs/talk/frames/front_}{000}{059}\\[0.3em]
-  \scriptsize This is still a scan over fixed budgets (29 points $\times$ 3 seeds + 4 zoom points, 150k steps;
-  111 networks, 89 feasible, 38 on the front). The NSGA-III run will replace it.
+  \begin{columns}[c]
+    \begin{column}{0.66\textwidth}
+      \centering
+      \animategraphics[autoplay,controls,height=0.66\textheight]{12}{figs/talk/frames_nsga/nsga_}{000}{155}
+    \end{column}
+    \begin{column}{0.33\textwidth}
+      \footnotesize
+      Objectives: worst-task accuracy up, rate cost and synaptic cost down.\\[0.6em]
+      Each point is one network, trained under its own pair of budgets.\\[0.6em]
+      Front: networks where no objective can improve without another getting worse.\\[0.6em]
+      NSGA-III keeps the front and a spread along it, then makes new budgets from them.\\[0.6em]
+      \scriptsize\color{gray} One real search, generations 0 and 1 (48 networks each).
+    \end{column}
+  \end{columns}
+  \takeaway{The search chooses the budgets, training does the rest; over generations the population moves onto
+  the front.}
+  {\tiny\color{gray} Deb \& Jain 2014 (NSGA-III); Blank \& Deb 2020 (pymoo).}
+\end{frame}
+
+\begin{frame}{The front}
+  \centering
+  \animategraphics[autoplay,loop,controls,height=0.64\textheight]{10}{figs/talk/frames_yang/front_}{000}{059}\\[0.2em]
+  \scriptsize 4 NSGA-III searches, 573 networks: 532 do every task ($\geq 0.6$), 116 on the front.
+  Stars: the four points (next slide).
+  \takeaway{Accuracy is set mainly by the synaptic budget: a plateau, then a cliff once synaptic cost drops below
+  about $10^{-2.5}$.}
 \end{frame}
 
 \begin{frame}{Four points on the front}
   \begin{columns}[c]
-    \begin{column}{0.44\textwidth}
+    \begin{column}{0.45\textwidth}
       \centering
-      \includegraphics[width=\linewidth]{figs/talk/front_top.pdf}
+      \includegraphics[width=\linewidth]{figs/talk/front_top_front.pdf}
     \end{column}
-    \begin{column}{0.55\textwidth}
-      \scriptsize
-      \setlength{\tabcolsep}{3pt}
-      \begin{tabular}{@{}lcccc@{}}
-        \toprule
-                            & control & firing     & wiring     & both        \\
-                            &         & constraint & constraint & constraints \\
-        \midrule
-        firing budget       & --      & 0.0011 & --     & 0.0115 \\
-        wiring budget       & --      & --     & 0.0054 & 0.0044 \\
-        \midrule
-        worst-task accuracy & 0.96    & 0.85   & 0.87   & 0.88   \\
-        mean accuracy       & 0.99    & 0.98   & 0.99   & 0.98   \\
-        firing cost         & 0.49    & 0.0020 & 0.81   & 0.018  \\
-        wiring cost         & 0.030   & 0.047  & 0.0054 & 0.0044 \\
-        synapses kept       & 70\%    & 61\%   & 6\%    & 0.7\%  \\
-        \midrule
-        \multicolumn{5}{@{}l}{\emph{example network (seed 4, ringed)}} \\
-        worst-task accuracy & 0.95    & 0.78   & 0.89   & 0.89   \\
-        \bottomrule
-      \end{tabular}\\[0.8em]
-      \footnotesize
-      \begin{itemize}
-        \item 5 seeds per point, means shown. Ringed: example network (seed 4), used from here on.
-        \item With the firing constraint, neurons fire $\sim$250$\times$ less than control. With the wiring
-              constraint and with both, 6\% and 0.7\% of synapses are kept.
-        \item Mean accuracy is above 0.95 at all four points.
-      \end{itemize}
+    \begin{column}{0.54\textwidth}
+      \centering
+      \includegraphics[width=\linewidth]{figs/talk/points_summary_front.pdf}\\[0.2em]
+      \scriptsize 5 seeds per point. Dots: single networks (accuracy colour: 0 red, 1 green). Bars: means.
     \end{column}
   \end{columns}
+  \takeaway{Three constrained points with similar accuracy (0.92--0.94) but a different cost limiting each:
+  200$\times$ lower rates, 2--3\% of synapses kept, or both.}
 \end{frame}
 
 \begin{frame}{Do they converge?}
   \centering
-  \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{figs/talk/convergence.pdf}\\[0.3em]
-  \scriptsize These curves come from a separate run of the same four points (one network each, accuracy saved
-  during training), so they are not the example network.
+  \includegraphics[width=\textwidth,height=0.7\textheight,keepaspectratio]{figs/talk/convergence.pdf}\\[0.3em]
+  \scriptsize Old points and old task battery; to be replaced by the new points' training curves.
 \end{frame}
 
-\begin{frame}{Like-to-like wiring}
+\begin{frame}{Like-to-like connectivity}
   \footnotesize
   \begin{columns}[T]
     \begin{column}{0.5\textwidth}
-      \textbf{Similarity} of neurons $i, j$: correlation of their period profiles
+      Task profile of neuron $i$: its task variance (how much its rate varies across trials) in each of the 20
+      tasks, divided by its largest value,
       \[
-        s_{ij} = \mathrm{corr}(x_i, x_j), \qquad x_i \in [0,1]^{59}
+        x_i = \big(x_{i,1}, \dots, x_{i,20}\big), \qquad 0 \le x_{i,a} \le 1 .
       \]
-      \textbf{Connected} $j \to i$ (same $c_j$ as the wiring cost):
-      \[
-        C_{ij} = \mathbb{1}\big[\, |W^{\mathrm{rec}}_{ij}| / c_j > 0.01 \,\big]
-      \]
-      Separately for \textcolor{Ecol}{E}$\to$\textcolor{Ecol}{E}, \textcolor{Ecol}{E}$\to$\textcolor{Icol}{I},
-      \textcolor{Icol}{I}$\to$\textcolor{Ecol}{E}, \textcolor{Icol}{I}$\to$\textcolor{Icol}{I}.
+      $x_{i,a} = 1$: the task neuron $i$ is most involved in; near 0: not involved.\\[0.4em]
+      Similarity of neurons $i, j$: $s_{ij} = \mathrm{corr}(x_i, x_j)$.\\[0.4em]
+      Connected $j \to i$: $|W^{\mathrm{rec}}_{ij}| / c_j > 0.01$, separately for \textcolor{Ecol}{E}$\to$\textcolor{Ecol}{E},
+      \textcolor{Ecol}{E}$\to$\textcolor{Icol}{I}, \textcolor{Icol}{I}$\to$\textcolor{Ecol}{E},
+      \textcolor{Icol}{I}$\to$\textcolor{Icol}{I}.
     \end{column}
     \begin{column}{0.48\textwidth}
-      \textbf{AUC}: are connected pairs more similar than unconnected ones?
+      AUC: the chance that a connected pair is more similar than an unconnected one,
       \[
-        \mathrm{AUC} = P\big(s_{\text{conn}} > s_{\text{unconn}}\big) = \frac{R_1 - n_1(n_1+1)/2}{n_1\, n_0}
+        \mathrm{AUC} = P\big(s_{\text{conn}} > s_{\text{unconn}}\big).
       \]
-      $R_1$: rank sum of the $n_1$ connected pairs among all $n_1 + n_0$.\\[0.4em]
-      \textbf{ROC}: slide a threshold $\theta$ over $s$,
-      \begin{align*}
-        \mathrm{TPR}(\theta) &= P(s_{\text{conn}} > \theta), \quad \mathrm{FPR}(\theta) = P(s_{\text{unconn}} > \theta)\\
-        \mathrm{AUC} &= \textstyle\int_0^1 \mathrm{TPR}\; d\,\mathrm{FPR}
-      \end{align*}
+      ROC: slide a threshold $\theta$ over $s$; $\mathrm{TPR}(\theta) = P(s_{\text{conn}} > \theta)$,
+      $\mathrm{FPR}(\theta) = P(s_{\text{unconn}} > \theta)$; AUC is the area under it.\\[0.4em]
+      0.5: no relation; above 0.5: like-to-like; below 0.5: like-to-unlike. It doesn't depend on how many
+      synapses are kept.\\[0.4em]
+      Significance: shuffle the profiles within \textcolor{Ecol}{E} and within \textcolor{Icol}{I}, synapses fixed,
+      500$\times$.
     \end{column}
   \end{columns}
-  \vspace{0.6em}
-  \begin{itemize}
-    \item AUC 0.5 means no relation, above 0.5 like-to-like, below 0.5 like-to-unlike. It doesn't change with the
-          number of synapses kept, so sparse and dense networks can be compared.
-    \item Null: shuffle profiles within E and within I, wiring fixed, 500$\times$;
-          $p = \big(1 + \#\{|\mathrm{AUC}_{\text{null}} - 0.5| \geq |\mathrm{AUC} - 0.5|\}\big) / 501$.
-  \end{itemize}
+  \takeaway{Question: are neurons that work in the same tasks more likely to be connected?}
 \end{frame}
 
-\begin{frame}{Like-to-like wiring: example network}
+\begin{frame}{Like-to-like connectivity: example network}
   \centering
-  \includegraphics[width=\textwidth,height=0.8\textheight,keepaspectratio]{figs/talk/like2like_s4.pdf}\\[0.2em]
-  \scriptsize x: similarity of the two neurons' task-period profiles. Right of each histogram: ROC; number = AUC
-  (grey: n.s.). Example network (seed 4).
+  \includegraphics[width=\textwidth,height=0.68\textheight,keepaspectratio]{figs/talk/like2like_example_s0_front_task.pdf}\\[0.1em]
+  \scriptsize One network per point (seed 0). Grey: unconnected pairs; line: connected pairs. Small square: ROC
+  (false vs true positive rate); number: AUC, black if $p < 0.05$, grey ``n.s.'' if not.
+  \takeaway{With a synaptic budget, connected neurons have more similar task profiles than unconnected ones; under
+  control and the rate budget the two distributions overlap.}
 \end{frame}
 
-\begin{frame}{Like-to-like wiring: all 20 networks}
+\begin{frame}{Like-to-like connectivity: all 20 networks}
   \centering
-  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/talk/like2like_5seed.pdf}\\[0.2em]
-  \scriptsize Filled: $p < 0.05$. The both-constraints networks are also the sparsest (0.7\% of synapses kept). If we
-  prune the wiring-constraint networks down to that, keeping their strongest synapses, \textcolor{Ecol}{E}$\to$\textcolor{Ecol}{E}
-  stays at AUC 0.52 (both constraints: 0.68).
-  So sparsity alone doesn't explain it (post hoc, 5 seeds).
+  \includegraphics[width=\textwidth,height=0.66\textheight,keepaspectratio]{figs/talk/like2like_seeds_front_task.pdf}\\[0.2em]
+  \scriptsize Top: ROC, mean over 5 seeds (band: seed range). Bottom: AUC per network, filled if $p < 0.05$; grey
+  lines join the same seed. Synapses kept: control 70\%, rate 61\%, synaptic 2.7\%, both 1.8\%. Cutting control
+  and rate-constraint networks to 1.8\% afterwards (strongest synapses kept) gives AUC $\leq 0.54$.
+  \takeaway{Like-to-like connectivity comes with the synaptic budget, and is strongest where the fewest synapses are left
+  (both constraints, AUC 0.61--0.66). Pruning a dense network afterwards does not produce it.}
 \end{frame}
 
 \begin{frame}{Task variance and the number of groups}
   \begin{columns}[c]
-    \begin{column}{0.36\textwidth}
+    \begin{column}{0.34\textwidth}
       \footnotesize
-      \textbf{Task variance} (Yang et al.\ 2019)
+      Task variance (Yang et al.\ 2019)
       \[
         \mathrm{TV}_{i,a} = \big\langle \mathrm{Var}_{\text{trials}}\, r_i(t) \big\rangle_{t\,>\,\text{fixation}}
       \]
-      neuron $i$, task $a$. Each neuron divided by its maximum over tasks: a task profile.\\[0.6em]
-      \textbf{Groups}: k-means on the profiles, \textcolor{Ecol}{E} and \textcolor{Icol}{I} separately.\\[0.6em]
-      \textbf{Silhouette}
-      \[
-        s = \frac{b - a}{\max(a, b)}
-      \]
-      $a$: mean distance to its own group, $b$: to the nearest other group.
-      $k$ = best local maximum with $k > 2$.
+      neuron $i$, task $a$; each neuron divided by its maximum (its task profile).\\[0.5em]
+      Groups: k-means on the profiles, \textcolor{Ecol}{E} and \textcolor{Icol}{I} separately.\\[0.5em]
+      Silhouette $s = (b - a)/\max(a, b)$; $a$: mean distance to its own group, $b$: to the nearest other group.
+      Chosen $k$: the highest peak with $k > 2$.
     \end{column}
-    \begin{column}{0.62\textwidth}
+    \begin{column}{0.64\textwidth}
       \centering
-      \includegraphics[width=\linewidth]{figs/talk/silhouette.pdf}\\[0.4em]
-      \scriptsize Example network (seed 4). Dot: chosen $k$.
+      \includegraphics[width=\linewidth]{figs/talk/silhouette_seeds_task_front.pdf}\\[0.2em]
+      \scriptsize 5 seeds per point. Line: mean; band: seed range; dots: each seed's chosen $k$.
     \end{column}
   \end{columns}
+  \takeaway{Under a rate budget the groups are the most distinct (highest silhouette, \textcolor{Ecol}{E} and
+  \textcolor{Icol}{I}) and the most numerous. The exact $k$ is soft: the curves are flat.}
 \end{frame}
 
-\begin{frame}{E and I groups: control vs.\ firing constraint}
+\begin{frame}{Groups of neurons at the four points}
   \centering
-  \includegraphics[width=\textwidth,height=0.8\textheight,keepaspectratio]{figs/talk/tv_control_A3.pdf}\\[0.2em]
-  \scriptsize Each column one neuron, sorted by group. Example network (seed 4).
-\end{frame}
-
-\begin{frame}{E and I groups: wiring constraint vs.\ both constraints}
-  \centering
-  \includegraphics[width=\textwidth,height=0.8\textheight,keepaspectratio]{figs/talk/tv_B0_C0.pdf}\\[0.2em]
-  \scriptsize Each column one neuron, sorted by group. Example network (seed 4).
-\end{frame}
-
-\begin{frame}{Task similarity and wiring: control}
-  \centering
-  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/wiring_control.png}\\[0.2em]
-  \scriptsize Left: task similarity $r$ between group profiles. Right: wiring row $\to$ column group, $z$ vs 500 shuffles
-  of group labels (grey: group $<4$ neurons).\\
-  This network (seed 4): $\rho_{\text{I}\to\text{E}} = -0.69$, $\rho_{\text{E}\to\text{I}} = -0.13$, E$\to$E within/between 1.07. \quad All 5 seeds: $\rho_{\text{I}\to\text{E}}$ $-0.69$ to $-0.31$; $\rho_{\text{E}\to\text{I}}$ $-0.13$ to $+0.05$; E$\to$E 1.05--1.15.
-\end{frame}
-
-\begin{frame}{Task similarity and wiring: firing constraint}
-  \centering
-  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/wiring_A3.png}\\[0.2em]
-  \scriptsize Left: task similarity $r$ between group profiles. Right: wiring row $\to$ column group, $z$ vs 500 shuffles
-  of group labels (grey: group $<4$ neurons).\\
-  This network (seed 4): $\rho_{\text{I}\to\text{E}} = +0.09$, $\rho_{\text{E}\to\text{I}} = 0.00$, E$\to$E within/between 1.04. \quad All 5 seeds: $\rho_{\text{I}\to\text{E}}$ $-0.05$ to $+0.09$; $\rho_{\text{E}\to\text{I}}$ $-0.15$ to $+0.14$; E$\to$E 1.02--1.09.
-\end{frame}
-
-\begin{frame}{Task similarity and wiring: wiring constraint}
-  \centering
-  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/wiring_B0.png}\\[0.2em]
-  \scriptsize Left: task similarity $r$ between group profiles. Right: wiring row $\to$ column group, $z$ vs 500 shuffles
-  of group labels (grey: group $<4$ neurons).\\
-  This network (seed 4): $\rho_{\text{I}\to\text{E}} = +0.17$, $\rho_{\text{E}\to\text{I}} = +0.33$, E$\to$E within/between 1.22. \quad All 5 seeds: $\rho_{\text{I}\to\text{E}}$ $-0.05$ to $+0.45$; $\rho_{\text{E}\to\text{I}}$ $-0.03$ to $+0.40$; E$\to$E 1.15--5.89.
-\end{frame}
-
-\begin{frame}{Task similarity and wiring: both constraints}
-  \centering
-  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/wiring_C0.png}\\[0.2em]
-  \scriptsize Left: task similarity $r$ between group profiles. Right: wiring row $\to$ column group, $z$ vs 500 shuffles
-  of group labels (grey: group $<4$ neurons).\\
-  This network (seed 4): $\rho_{\text{I}\to\text{E}} = +0.16$, $\rho_{\text{E}\to\text{I}} = +0.59$, E$\to$E within/between 7.77. \quad All 5 seeds: $\rho_{\text{I}\to\text{E}}$ $+0.07$ to $+0.39$; $\rho_{\text{E}\to\text{I}}$ $+0.36$ to $+0.62$; E$\to$E 2.84--7.77.
+  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/talk/tv_s0_front.pdf}\\[0.1em]
+  \scriptsize One network per point (seed 0, the most typical of the 5). Columns: neurons, sorted by group.
+  \takeaway{Under a rate budget \textcolor{Ecol}{E} neurons take part in fewer tasks (3.1 vs 5.0 per neuron, every
+  seed) and split into more groups. A synaptic budget alone leaves them as broad as control (4.7).}
 \end{frame}
 
 % ---------------------------------------------------------------- experimental (draft, not decided)
@@ -366,27 +319,59 @@
 \begin{frame}
   \centering
   {\Large Experimental}\\[0.6em]
-  \small\color{gray} Draft slides: task periods and lesions (Driscoll et al.\ 2024)
+  \small\color{gray} Draft slides: synapses between groups, task periods and lesions (old points, v1 task battery)
+\end{frame}
+
+\begin{frame}{Task similarity and synapses: control \hfill{\scriptsize\color{gray}experimental}}
+  \centering
+  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/wiring_control.png}\\[0.2em]
+  \scriptsize Left: task similarity $r$ between group profiles. Right: synapses row $\to$ column group, $z$ vs 500 shuffles
+  of group labels (grey: group $<4$ neurons).\\
+  This network (seed 4): $\rho_{\text{I}\to\text{E}} = -0.69$, $\rho_{\text{E}\to\text{I}} = -0.13$, E$\to$E within/between 1.07. \quad All 5 seeds: $\rho_{\text{I}\to\text{E}}$ $-0.69$ to $-0.31$; $\rho_{\text{E}\to\text{I}}$ $-0.13$ to $+0.05$; E$\to$E 1.05--1.15.
+\end{frame}
+
+\begin{frame}{Task similarity and synapses: rate constraint \hfill{\scriptsize\color{gray}experimental}}
+  \centering
+  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/wiring_A3.png}\\[0.2em]
+  \scriptsize Left: task similarity $r$ between group profiles. Right: synapses row $\to$ column group, $z$ vs 500 shuffles
+  of group labels (grey: group $<4$ neurons).\\
+  This network (seed 4): $\rho_{\text{I}\to\text{E}} = +0.09$, $\rho_{\text{E}\to\text{I}} = 0.00$, E$\to$E within/between 1.04. \quad All 5 seeds: $\rho_{\text{I}\to\text{E}}$ $-0.05$ to $+0.09$; $\rho_{\text{E}\to\text{I}}$ $-0.15$ to $+0.14$; E$\to$E 1.02--1.09.
+\end{frame}
+
+\begin{frame}{Task similarity and synapses: synaptic constraint \hfill{\scriptsize\color{gray}experimental}}
+  \centering
+  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/wiring_B0.png}\\[0.2em]
+  \scriptsize Left: task similarity $r$ between group profiles. Right: synapses row $\to$ column group, $z$ vs 500 shuffles
+  of group labels (grey: group $<4$ neurons).\\
+  This network (seed 4): $\rho_{\text{I}\to\text{E}} = +0.17$, $\rho_{\text{E}\to\text{I}} = +0.33$, E$\to$E within/between 1.22. \quad All 5 seeds: $\rho_{\text{I}\to\text{E}}$ $-0.05$ to $+0.45$; $\rho_{\text{E}\to\text{I}}$ $-0.03$ to $+0.40$; E$\to$E 1.15--5.89.
+\end{frame}
+
+\begin{frame}{Task similarity and synapses: both constraints \hfill{\scriptsize\color{gray}experimental}}
+  \centering
+  \includegraphics[width=\textwidth,height=0.74\textheight,keepaspectratio]{figs/wiring_C0.png}\\[0.2em]
+  \scriptsize Left: task similarity $r$ between group profiles. Right: synapses row $\to$ column group, $z$ vs 500 shuffles
+  of group labels (grey: group $<4$ neurons).\\
+  This network (seed 4): $\rho_{\text{I}\to\text{E}} = +0.16$, $\rho_{\text{E}\to\text{I}} = +0.59$, E$\to$E within/between 7.77. \quad All 5 seeds: $\rho_{\text{I}\to\text{E}}$ $+0.07$ to $+0.39$; $\rho_{\text{E}\to\text{I}}$ $+0.36$ to $+0.62$; E$\to$E 2.84--7.77.
 \end{frame}
 
 \begin{frame}{Task variance per task period \hfill{\scriptsize\color{gray}experimental}}
   \begin{columns}[c]
     \begin{column}{0.6\textwidth}
       \scriptsize
-      We split each task into its \textbf{periods} $p \in \{$stimulus 1, memory 1, stimulus 2, memory 2,
+      We split each task into its periods $p \in \{$stimulus 1, memory 1, stimulus 2, memory 2,
       response$\}$, leave out fixation, and get 59 (task, period) rows.
       \[
         \mathrm{TV}_{i,(a,p)} = \frac{1}{|T_p|}\sum_{t \in T_p} \mathrm{Var}_{\text{trials}}\, r_i(t)
       \]
       Length-weighted mean over a task's periods = per-task TV (to $3\cdot10^{-7}$).\\[0.4em]
-      \textbf{Normalise}: each active neuron (total TV $> 1\%$ of max) divided by its max over the rows,
+      Normalise: each active neuron (total TV $> 1\%$ of max) divided by its max over the rows,
       $x_i \in [0,1]^{59}$.\\[0.4em]
-      \textbf{Ward clustering} of neurons (columns) and of task periods (rows): merge the pair that least increases
+      Ward clustering of neurons (columns) and of task periods (rows): merge the pair that least increases
       the within-cluster variance,
       \[
         \Delta(A,B) = \frac{|A|\,|B|}{|A|+|B|}\,\big\lVert \mu_A - \mu_B \big\rVert^2 .
       \]
-      $k$ per axis: highest silhouette over $k = 3,\dots,39$. \ \textbf{Sparsity}: fraction of entries $< 0.15$.\\[0.5em]
+      $k$ per axis: highest silhouette over $k = 3,\dots,39$. \ Sparsity: fraction of entries $< 0.15$.\\[0.5em]
       \tiny\color{gray} Differences from Driscoll et al.: active rule ($>1\%$ vs $>10^{-3}$), random trials instead of a
       stimulus grid, $k$ by silhouette instead of a fixed cut height; E and I clustered together.
     \end{column}
@@ -398,34 +383,34 @@
   \end{columns}
 \end{frame}
 
-\begin{frame}{Task periods: control vs.\ firing constraint \hfill{\scriptsize\color{gray}experimental}}
+\begin{frame}{Task periods: control vs.\ rate constraint \hfill{\scriptsize\color{gray}experimental}}
   \centering
   \includegraphics[height=0.8\textheight]{../results/front/tv_period_driscoll_control_s4.png}\hspace{3em}
   \includegraphics[height=0.8\textheight]{../results/front/tv_period_driscoll_A3_s4.png}\\[0.2em]
   \scriptsize Example network (seed 4). Sparsity \textcolor{Ecol}{E} / \textcolor{Icol}{I}: control 0.43 / 0.39,
-  firing constraint 0.79 / 0.62. Row label colour = period type.
+  rate constraint 0.79 / 0.62. Row label colour = period type.
 \end{frame}
 
-\begin{frame}{Task periods: wiring vs.\ both constraints \hfill{\scriptsize\color{gray}experimental}}
+\begin{frame}{Task periods: synaptic vs.\ both constraints \hfill{\scriptsize\color{gray}experimental}}
   \centering
   \includegraphics[height=0.8\textheight]{../results/front/tv_period_driscoll_B0_s4.png}\hspace{3em}
   \includegraphics[height=0.8\textheight]{../results/front/tv_period_driscoll_C0_s4.png}\\[0.2em]
-  \scriptsize Example network (seed 4). Sparsity \textcolor{Ecol}{E} / \textcolor{Icol}{I}: wiring constraint 0.48 / 0.48,
+  \scriptsize Example network (seed 4). Sparsity \textcolor{Ecol}{E} / \textcolor{Icol}{I}: synaptic constraint 0.48 / 0.48,
   both constraints 0.69 / 0.63. Row label colour = period type.
 \end{frame}
 
 \begin{frame}{Lesions on task-period groups \hfill{\scriptsize\color{gray}experimental}}
   \footnotesize
-  \textbf{Groups}: per-period task variance (59 rows, each neuron divided by its max), Ward clustering,
+  Groups: per-period task variance (59 rows, each neuron divided by its max), Ward clustering,
   \textcolor{Ecol}{E} and \textcolor{Icol}{I} separately, fixed $k$: 14 \textcolor{Ecol}{E} groups
   (5 task families $\times$ stimulus / memory / response; DM has no memory period), 5 \textcolor{Icol}{I} groups
   (the task families).\\[0.6em]
-  \textbf{Lesion} group $g$: $r_i(t) = 0$ for all $i \in g$ at every time step (Driscoll et al.\ 2024).\\[0.6em]
-  \textbf{Damage} on task $a$, relative to the intact network (10 eval seeds $\times$ 64 trials, no noise):
+  Lesion group $g$: $r_i(t) = 0$ for all $i \in g$ at every time step (Driscoll et al.\ 2024).\\[0.6em]
+  Damage on task $a$, relative to the intact network (10 eval seeds $\times$ 64 trials, no noise):
   \[
     \Delta_{g,a} = \frac{\mathrm{acc}_{g,a} - \mathrm{acc}_a}{\mathrm{acc}_a}
   \]
-  \textbf{Module contrast}: does lesioning $g$ hurt a set of tasks $M$ more than a reference set?
+  Module contrast: does lesioning $g$ hurt a set of tasks $M$ more than a reference set?
   \[
     C_{g,M} = \big\langle \Delta_{g,a} \big\rangle_{a \in M} - \big\langle \Delta_{g,a} \big\rangle_{a \in \mathrm{ref}(M)},
     \qquad C < 0:\ M \text{ hurt more}
@@ -442,7 +427,7 @@
 \begin{frame}{Lesions on task-period groups: four points \hfill{\scriptsize\color{gray}experimental}}
   \centering
   \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{../results/front/lesion_period_s4_ward_contrast_grid.png}\\[0.2em]
-  \scriptsize Mean change per lesion: control $-0.16$, firing constraint $-0.05$, wiring constraint $-0.16$,
+  \scriptsize Mean change per lesion: control $-0.16$, rate constraint $-0.05$, synaptic constraint $-0.16$,
   both constraints $-0.13$. Groups with $|C| \geq 0.2$: 6, 5, 9 and 9 of 19. Results change with $k$.
 \end{frame}
 

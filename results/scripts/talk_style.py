@@ -11,9 +11,9 @@ import matplotlib.pyplot as plt
 REPO = Path(__file__).resolve().parents[2]
 OUT = REPO / "presentation/figs/talk"
 
-NAMES = {"control": "Control", "A3": "Firing constraint", "B0": "Wiring constraint", "C0": "Both constraints"}
+NAMES = {"control": "Control", "A3": "Rate constraint", "B0": "Synaptic constraint", "C0": "Both constraints"}
 # labels of every point name (old 4-point runs first, so list(LABEL).index of an old point is unchanged)
-LABEL = {**NAMES, "firing": "Firing constraint", "wiring": "Wiring constraint", "both": "Both constraints",
+LABEL = {**NAMES, "firing": "Rate constraint", "wiring": "Synaptic constraint", "both": "Both constraints",
          "loose": "Loose budgets"}
 # default points per run (fig_tv_ei_fanin.RUNS keys); runs not listed: the old four
 RUN_POINTS = {"front": ["control", "firing", "wiring", "both"]}

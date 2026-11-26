@@ -1,0 +1,10 @@
+% Vector crop of Fakhar & Astle 2026 (Trends Cogn. Sci.) Fig. 1 (Pareto trade-off landscape), from papers/Fakhar2026.pdf.
+% Build (in presentation/figs): pdflatex fakhar2026_crops.tex
+% trim = left bottom right top, in bp from the edges of the 603.8 x 782.4 page.
+\documentclass[multi=cropfig,border=0pt]{standalone}
+\usepackage{graphicx}
+\newenvironment{cropfig}{}{}
+\newcommand{\paper}{../../papers/Fakhar2026.pdf}
+\begin{document}
+\begin{cropfig}\includegraphics[page=3,trim=45 138 190 478,clip]{\paper}\end{cropfig}
+\end{document}

@@ -224,6 +224,44 @@ def tv(A=None):
         save(fig, f"tv_{pair[0]}_{pair[1]}")
 
 
+# ---------------------------------------------------------------- slide 18: groups of the 4 front points, one seed
+
+def tv_front(seed=0, points=("control", "firing", "wiring", "both")):
+    """2 x 2 figure, one panel per point (E and I heatmaps side by side), front run, k as on slide 17 (I up to 20)."""
+    from talk_style import LABEL
+    A = {p: analyse(RUNS["front"] / p / f"seed_{seed:02d}.pt", k_max_I=20) for p in points}
+    fig = plt.figure(figsize=(W, 4.4))
+    outer = fig.add_gridspec(2, 2, wspace=0.08, hspace=0.32, left=0.13, right=0.995, top=0.93, bottom=0.07)
+    for n, p in enumerate(points):
+        R = A[p]
+        nE, nI = len(R["E"]["units"]), len(R["I"]["units"])
+        inner = outer[n // 2, n % 2].subgridspec(1, 2, width_ratios=[nE, nI * 1.6], wspace=0.04)
+        for pop, gi in zip("EI", (0, 1)):
+            ax = fig.add_subplot(inner[gi])
+            P = R[pop]
+            o = np.argsort(P["lab"], kind="stable")
+            im = ax.imshow(R["norm"][:, P["units"][o]], cmap="hot", aspect="auto", interpolation="nearest",
+                           vmin=0, vmax=1)
+            labs = P["lab"][o]
+            for c in range(1, P["K"]):
+                ax.axvline(np.flatnonzero(labs == c)[0] - 0.5, color="white", lw=0.35)
+            ax.set_xticks([])
+            ax.set_yticks(range(len(R["tasks"])))
+            ax.set_yticklabels([rule_name[t] for t in R["tasks"]] if (n % 2 == 0 and pop == "E") else [],
+                               fontsize=5.5)
+            ax.tick_params(length=0, pad=1.5)
+            ax.spines[:].set_visible(False)
+            ax.set_title(f"{pop}: {P['K']} groups", fontsize=7.5, color=E_COL if pop == "E" else I_COL, pad=2)
+            if pop == "E":
+                ax.text(0.0, 1.16, LABEL[p], transform=ax.transAxes, fontsize=9.5, color=COLORS[p])
+    cax = fig.add_axes([0.75, 0.015, 0.2, 0.012])
+    cb = fig.colorbar(im, cax=cax, orientation="horizontal", ticks=[0, 1])
+    cb.ax.tick_params(labelsize=6.5, length=2, pad=1)
+    cax.set_title("task variance / neuron max", fontsize=6.5, pad=1.5, loc="left")
+    save(fig, f"tv_s{seed}", "front")
+    print({p: (A[p]["E"]["K"], A[p]["I"]["K"]) for p in points})
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if "--run" in args:
@@ -236,4 +274,4 @@ if __name__ == "__main__":
         A = _analyse_all()
     for w in which:
         {"frames": frames, "front": front, "convergence": convergence,
-         "silhouette": lambda: silhouette(A), "tv": lambda: tv(A)}[w]()
+         "silhouette": lambda: silhouette(A), "tv": lambda: tv(A), "tv_front": tv_front}[w]()

@@ -79,7 +79,7 @@ def compute(run, points, seeds, basis, recompute):
 
 def plot(run, df, points, seeds, basis):
     df = df[df.point.isin(points) & df.seed.isin(seeds)]
-    fig, axes = plt.subplots(1, 2, figsize=(3.5, 1.9), sharey=True, gridspec_kw=dict(wspace=0.1, width_ratios=[1.6, 1]))
+    fig, axes = plt.subplots(1, 2, figsize=(5.2, 2.4), sharey=True, gridspec_kw=dict(wspace=0.08))
     for ax, pop in zip(axes, "EI"):
         d = df[df["pop"] == pop]
         for i, p in enumerate(points):
@@ -88,13 +88,14 @@ def plot(run, df, points, seeds, basis):
             ax.plot(t.index, t.mean(1), color=COLORS[p], lw=1.1, label=LABEL[p])
             c = d[(d.point == p) & d.chosen.astype(bool)].sort_values("seed")
             jit = (i - (len(points) - 1) / 2) * 0.12
-            ax.plot(c.k + jit, c.silhouette, "o", color=COLORS[p], ms=3.2, mec="k", mew=0.4, zorder=3)
-        ax.set_title(f"{pop} neurons", color=E_COL if pop == "E" else I_COL)
-        ax.set_xticks(range(2, K_MAX[pop] + 1, 4 if pop == "E" else 2))
-    axes[0].set_ylabel("silhouette")
-    fig.supxlabel("number of groups k", fontsize=8, y=-0.1)
-    fig.legend(*axes[0].get_legend_handles_labels(), loc="lower center", ncol=2, frameon=False,
-               bbox_to_anchor=(0.5, 0.98), fontsize=6.5)
+            ax.plot(c.k + jit, c.silhouette, "o", color=COLORS[p], ms=4, mec="k", mew=0.4, zorder=3)
+        ax.set_title(f"{pop} neurons", color=E_COL if pop == "E" else I_COL, fontsize=11)
+        ax.set_xticks(range(2, K_MAX[pop] + 1, 4))
+        ax.tick_params(labelsize=9)
+        ax.set_xlabel("number of groups k", fontsize=10)
+    axes[0].set_ylabel("silhouette", fontsize=10)
+    fig.legend(*axes[0].get_legend_handles_labels(), loc="lower center", ncol=4, frameon=False,
+               bbox_to_anchor=(0.5, 0.97), fontsize=8, handlelength=1.2, columnspacing=1)
     save(fig, f"silhouette_seeds_{basis}", run)
 
     print(f"chosen k ({basis} variance), seeds {seeds}:")

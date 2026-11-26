@@ -41,8 +41,12 @@ def cache_dir(run):
     return d
 
 
+BASIS = "period"                                    # set in __main__ (--basis); period caches keep their old names
+
+
 def cache_path(run, point, seed):
-    return cache_dir(run) / f"like2like_{point}_s{seed}.npz"
+    tag = "" if BASIS == "period" else f"{BASIS}_"
+    return cache_dir(run) / f"like2like_{tag}{point}_s{seed}.npz"
 
 
 def read_cache(run, point, seed):
@@ -59,7 +63,7 @@ def compute_one(run, point, seed, keep, thresh, n_shuffle):
     for m, mode in enumerate(MODES):
         rng = np.random.default_rng([seed, list(LABEL).index(point), m])      # per network: recompute one alone
         k = None if mode == "trained" else keep
-        res = network(point, seed, rng, keep_frac=k, run=run, thresh=thresh, n_shuffle=n_shuffle)
+        res = network(point, seed, rng, keep_frac=k, run=run, thresh=thresh, n_shuffle=n_shuffle, basis=BASIS)
         if mode == "trained" and keep is None:
             keep = float(res["conn"])
         C[mode] = res["C"]
@@ -104,7 +108,7 @@ def compute(run, points, seeds, thresh, n_shuffle, recompute):
 def load_all(run, points, seeds):
     R = {(p, s): read_cache(run, p, s) for p in points for s in seeds}
     df = pd.DataFrame([r for c in R.values() for r in c["stats"]])
-    df.to_csv(cache_dir(run) / "like2like.csv", index=False)
+    df.to_csv(cache_dir(run) / ("like2like.csv" if BASIS == "period" else f"like2like_{BASIS}.csv"), index=False)
     return R, df
 
 
@@ -122,8 +126,8 @@ def stat(df, p, s, q, mode="trained"):
 def plot_example(run, R, df, points, seed):
     """Slide 15: one network per point, histogram of similarity (connected vs unconnected) + ROC per type."""
     bins = np.linspace(-1, 1, 21)
-    fig = plt.figure(figsize=(W, 3.0))
-    outer = fig.add_gridspec(4, len(points), hspace=0.3, wspace=0.12, left=0.06, right=0.995, top=0.9, bottom=0.1)
+    fig = plt.figure(figsize=(W, 3.4))
+    outer = fig.add_gridspec(4, len(points), hspace=0.35, wspace=0.12, left=0.09, right=0.995, top=0.9, bottom=0.16)
     for r, q in enumerate(QUADS):
         col = E_COL if q[0] == "E" else I_COL
         for j, p in enumerate(points):
@@ -137,7 +141,7 @@ def plot_example(run, R, df, points, seed):
             hc = ax.hist(s[cc], bins, density=True, histtype="step", color=col, lw=1.1)[0]
             ax.set_xlim(-1, 1); ax.set_ylim(0, max(hu.max(), hc.max()) * 1.1)
             ax.set_yticks([]); ax.spines["left"].set_visible(False)
-            ax.set_xticks([-1, 0, 1]); ax.tick_params(labelsize=6, length=2, pad=1)
+            ax.set_xticks([-1, 0, 1]); ax.tick_params(labelsize=7, length=2, pad=1)
             if r < 3:
                 ax.set_xticklabels([])
             f, t = roc(s, cc)
@@ -147,15 +151,18 @@ def plot_example(run, R, df, points, seed):
             ax_roc.set_xlim(0, 1); ax_roc.set_ylim(0, 1); ax_roc.set_xticks([]); ax_roc.set_yticks([])
             ax_roc.set_box_aspect(1)
             ax_roc.spines[["top", "right"]].set_visible(True)
-            ax_roc.set_title(f"{st.auc:.2f}" + ("" if sig else " n.s."), fontsize=7, pad=1.5,
+            ax_roc.set_title(f"{st.auc:.2f}" + ("" if sig else " n.s."), fontsize=7.5, pad=1.5,
                              color="k" if sig else "0.45")
             if r == 0:
                 ax.text(0.7, 1.32, LABEL[p], transform=ax.transAxes, ha="center", fontsize=9, color=COLORS[p])
             if j == 0:
                 ax.set_ylabel(q, rotation=0, ha="right", va="center", fontsize=9, labelpad=4)
+    fig.supxlabel("similarity of the two neurons' task profiles (correlation)", fontsize=9, y=0.075)
+    fig.supylabel("fraction of pairs", fontsize=9, x=0.005)
     h = [plt.Rectangle((0, 0), 1, 1, color=UNCONN), plt.Line2D([], [], color="k", lw=1.1)]
-    fig.legend(h, ["unconnected pairs", "connected pairs (E: blue, I: red)"], loc="lower right", ncol=2,
-               frameon=False, bbox_to_anchor=(0.995, -0.03), fontsize=7)
+    fig.legend(h, ["unconnected pairs", "connected pairs (E: blue, I: red)"], loc="lower center", ncol=2,
+               frameon=False, bbox_to_anchor=(0.5, -0.01), fontsize=7.5)
+
     save(fig, f"like2like_example_s{seed}", run)
 
 
@@ -202,11 +209,14 @@ def plot_seeds(run, R, df, points, seeds):
         ax.set_ylim(0.4, 0.85); ax.set_yticks([0.5, 0.6, 0.7, 0.8])
         ax.set_xticks([])
         if k == 0:
-            ax.set_ylabel("AUC")
+            ax.set_ylabel("AUC (one dot per network)")
         else:
             ax.set_yticklabels([])
-    fig.legend(*axes[0, 0].get_legend_handles_labels(), loc="lower center", ncol=4, frameon=False,
-               bbox_to_anchor=(0.5, 0.99))
+    h, lab = axes[0, 0].get_legend_handles_labels()
+    h += [plt.Line2D([], [], marker="o", ls="", color="0.3", ms=4),
+          plt.Line2D([], [], marker="o", ls="", mfc="white", mec="0.3", ms=4)]
+    lab += ["p < 0.05", "n.s."]
+    fig.legend(h, lab, loc="lower center", ncol=3, frameon=False, bbox_to_anchor=(0.5, 0.97), fontsize=7.5)
     save(fig, "like2like_seeds", run)
 
 
@@ -258,6 +268,8 @@ if __name__ == "__main__":
     ap.add_argument("--seeds", default="0-4")
     ap.add_argument("--points", default=None, help="default: the run's points (talk_style.RUN_POINTS)")
     ap.add_argument("--example-seed", type=int, default=4)
+    ap.add_argument("--basis", default="period", choices=["period", "task"],
+                    help="neuron similarity from per-period (59) or per-task (20) task-variance profiles")
     ap.add_argument("--n-shuffle", type=int, default=N_SHUFFLE)
     ap.add_argument("--thresh", type=float, default=THRESH)
     g = ap.add_mutually_exclusive_group()
@@ -266,11 +278,13 @@ if __name__ == "__main__":
     a = ap.parse_args()
     points, seeds = (a.points.split(",") if a.points else run_points(a.run)), seed_list(a.seeds)
     REF = next(r for r in REFS if r in points)
+    BASIS = a.basis
     if not a.plot_only:
         compute(a.run, points, seeds, a.thresh, a.n_shuffle, a.recompute)
     R, df = load_all(a.run, points, seeds)
+    tag = a.run if BASIS == "period" else f"{a.run}_{BASIS}"           # figure-name suffix
     if a.example_seed in seeds:
-        plot_example(a.run, R, df, points, a.example_seed)
-    plot_seeds(a.run, R, df, points, seeds)
-    plot_matched(a.run, df, points, seeds)
+        plot_example(tag, R, df, points, a.example_seed)
+    plot_seeds(tag, R, df, points, seeds)
+    plot_matched(tag, df, points, seeds)
     summary(df, points)
