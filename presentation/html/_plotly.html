@@ -1,0 +1,10 @@
+<script src="assets/plotly.min.js"></script>
+<script>
+  // plotly plots sit on hidden slides at load time: resize them when their slide is shown
+  window.addEventListener("load", function () {
+    if (!window.Reveal) return;
+    const fit = s => s && s.querySelectorAll(".js-plotly-plot").forEach(p => Plotly.Plots.resize(p));
+    Reveal.on("slidechanged", e => setTimeout(() => fit(e.currentSlide), 60));
+    Reveal.on("ready", e => fit(e.currentSlide));
+  });
+</script>

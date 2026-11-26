@@ -6,6 +6,12 @@
       "runtimeExecutable": "conda",
       "runtimeArgs": ["run", "--no-capture-output", "-n", "cmc_env", "marimo", "run", "notebooks/cog20_front_explorer.py", "--headless", "--port", "2718", "--no-token"],
       "port": 2718
+    },
+    {
+      "name": "html-deck",
+      "runtimeExecutable": "conda",
+      "runtimeArgs": ["run", "--no-capture-output", "-n", "cmc_env", "python", "-m", "http.server", "8765", "--directory", "presentation/html"],
+      "port": 8765
     }
   ]
 }

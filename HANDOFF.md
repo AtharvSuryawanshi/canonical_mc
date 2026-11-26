@@ -1,4 +1,4 @@
-# Session handoff, updated 2026-11-26 (Windows) — read §0 first, then §11 (analyses on the new points, newest), §10 (Yang front + new 5 points), then §9
+# Session handoff, updated 2026-11-26 (Windows) — read §0 first, then §12 (deck revision + HTML deck, newest), §11 (analyses on the new points), §10 (Yang front + new 5 points), then §9
 
 Read this first in a new Claude Code session, together with `CLAUDE.md`. **Section 8 is the newest**: the
 Driscoll-style analysis (task variance per period, fixed points) and the clustering-free like-to-like wiring test,
@@ -563,4 +563,81 @@ Pattern: compute -> cache per network -> plot from cache. `--run R` (a `fig_tv_e
 ### 11.4 To do (from §10.4, still open)
 
 - Per-period TV heatmaps, lesions and E/I modularity (group wiring) on the front points; `loose` not analysed.
-- Deck still shows v1 figures and numbers; none of the `_front` figures are in `main.tex` yet.
+- ~~Deck still shows v1 figures and numbers~~: done in §12 (slides 1–18 use the front run; the experimental
+  slides after the divider are still v1).
+
+## 12. Deck revision after supervisor feedback, and an HTML version (2026-11-26, Windows)
+
+Commits `64ecc14`, `424492b` (+ the HTML deck commit). Beamer deck: `presentation/main.tex` (29 slides). HTML deck:
+`presentation/html/` (same slides, different look). **Keep both in sync by hand** (no shared source).
+
+### 12.1 Supervisor feedback, as applied
+
+- **Nomenclature (no ML terms):** rate cost / synaptic cost; points **Control, Rate constraint, Synaptic
+  constraint, Both constraints** (never short names); "like-to-like connectivity" (not "wiring"); title "Multitask
+  Dale's-law RNNs under rate and synaptic budgets". `talk_style.LABEL` carries the names for all talk figures.
+  "Firing-rate homeostasis" and quoted paper captions keep their words.
+- **Every content slide ends with a take-away** (`\takeaway{...}` in main.tex, `.take` in the HTML).
+- **No bold in figure labels.** Bigger fonts: a global pass is still to do.
+- Slide-by-slide (PDF page numbers):
+  - 3 "256 RNN units" (no "vanilla");
+  - 5 Fakhar & Astle 2026 Fig. 1 (Pareto trade-off landscape; vector crop `figs/fakhar2026_crops.tex`,
+    `papers/Fakhar2026.pdf`);
+  - 6 Figma `Fig_setup` recoloured (E blue, I red; bars "Synaptic cost" / "Rate cost"), re-exported;
+  - 9 synaptic limit = subtractive normalisation (Miller & MacKay 1994; one budget for the whole network); rate
+    limit = integral control of firing-rate homeostasis (Turrigiano 2008; O'Leary et al. 2014); the ρ/2 term is the
+    augmented-Lagrangian push-back in `BudgetConstraint` (ρ = 1, acts only above budget); networks end ~1.5× above
+    their rate budget (median 1.51, IQR 1.36–1.65 over the 4 searches);
+  - 10 NSGA-III animation from the real ms1 search (`results/scripts/anim_nsga3.py` → `figs/talk/frames_nsga/`,
+    156 frames): initialise → train → check ≥ 0.6 → rank → breed, generations 0 and 1;
+  - 11 rotating 3D front of the 4 pooled searches (`results/scripts/front_yang.py frames` → `figs/talk/frames_yang/`);
+  - 12 top view with the 4 points + per-point summary (accuracy dots red→green, log cost bars, % synapses kept);
+  - 13 convergence: still the old save-at run (waiting for new intermediate checkpoints of the 4 points);
+  - 14 like-to-like schematic from real neurons (`results/scripts/fig_like2like_schematic.py`: connected pair
+    r = +0.76 (90th percentile, not the extreme), unconnected pair r = −0.10, histogram of all E→E pairs, ROC with
+    AUC 0.63; both constraints, seed 0) + definitions;
+  - 15–16 like-to-like on **per-task** profiles (`like2like.py --basis task`), example seed 0 (strongest contrast);
+    axis labels, significance legend, point names on the AUC x axis;
+  - 17 silhouette vs k from 3 to 20 (E and I), chosen k as dashed lines (highest peak of the 5-seed mean);
+  - 18 one 2×2 figure of the 4 points' group heatmaps, seed 0 (most typical of the 5 by chosen k and silhouette;
+    `talk_figs.py tv_front`); conclusion: rate-budget E neurons take part in 3.1 tasks each vs 5.0 (control),
+    synaptic 4.7, both 3.4 (every seed);
+  - the "Experimental" divider follows slide 18; the 4 group-synapse slides and the Driscoll/lesion slides (old
+    points, v1) sit behind it.
+
+### 12.2 New or changed scripts
+
+| script | what |
+|---|---|
+| `results/scripts/front_yang.py [frames top summary]` | pooled Yang front (ms1, ms2, ext_ms3, ext_ms4; 573 / 532 / 116): 3D frames, `front_top_front.pdf`, `points_summary_front.pdf` |
+| `results/scripts/anim_nsga3.py [--dpi]` | NSGA-III animation frames (slide 10) |
+| `results/scripts/fig_like2like_schematic.py` | slide-14 schematic |
+| `results/scripts/fig_nsga3_scheme.py` | static 4-panel NSGA-III draft (not in the deck) |
+| `results/scripts/like2like.py --basis task\|period` | per-task similarity (caches `like2like_task_*`, `like2like_task.csv`); period caches keep their names |
+| `results/scripts/silhouette_seeds.py` | I now k = 2–20; `plot_panels` → `results/front/silhouette_k_<basis>_<run>.png` (4 points × E/I) |
+| `results/scripts/fig_tv_ei_fanin.py` | `analyse(ckpt, k_max_I=10)`; `RUNS["front"]` |
+| `presentation/figs/talk_figs.py tv_front` | slide-18 figure |
+
+### 12.3 HTML deck (`presentation/html/`)
+
+- Quarto + reveal.js; one self-contained `slides.html` (~40 MB; MathJax, plotly, figures and GIFs inlined), works
+  offline in any browser (F full screen, S notes, O overview). Light minimal style (`style.css`).
+- **Faithful to main.pdf** (user's rule): same slide order, titles, text, equations, figures, captions, take-aways
+  and nomenclature. Extras: a Summary slide before the Experimental divider (numbers from slides 11, 16, 18) and two
+  optional appendix slides tagged "extra" (interactive plotly 3D front, like-to-like AUC table).
+- Build (from the repo root, cmc_env; plotly was pip-installed into cmc_env, not in requirements.txt):
+  `python presentation/html/build_assets.py` (PDF → SVG, paper crops → PNG because pdftocairo crashes on them,
+  frames → GIFs), `python presentation/html/build_figs.py` (plotly extras, `assets/plotly.min.js`),
+  `quarto render presentation/html/slides.qmd`.
+- Gotchas found: `#` or `###` markdown headings inside a slide make reveal.js split slides (use HTML `<h1>`/`<h3>`,
+  `slide-level: 2`); plotly in iframes fails in the one-file deck (Chrome refuses data-URL frames > 2 MB), so plots
+  are inline divs resized on `slidechanged` (`_plotly.html`); `::: {}` makes no wrapper div (name it); the browser
+  pane caches `slides.html` (add `?v=N`). Local preview: `.claude/launch.json` "html-deck" (port 8765).
+
+### 12.4 Still open
+
+- Global font/label-size pass on the talk figures (supervisor).
+- Slide 13: new intermediate checkpoints of the 4 points (user will provide).
+- Slide 10/12 figures were drafts for discussion (NSGA-III animation, points summary).
+- Experimental slides: still old points, v1 battery.
+- §11.4: per-period TV, lesions, E/I group wiring on the front points; `loose` not analysed.
