@@ -592,7 +592,13 @@ Commits `64ecc14`, `424492b` (+ the HTML deck commit). Beamer deck: `presentatio
     156 frames): initialise → train → check ≥ 0.6 → rank → breed, generations 0 and 1;
   - 11 rotating 3D front of the 4 pooled searches (`results/scripts/front_yang.py frames` → `figs/talk/frames_yang/`);
   - 12 top view with the 4 points + per-point summary (accuracy dots red→green, log cost bars, % synapses kept);
-  - 13 convergence: still the old save-at run (waiting for new intermediate checkpoints of the 4 points);
+  - 13 convergence on the front points (`talk_figs.py convergence_front` → `convergence_front.pdf`), from the save-at
+    run `runs/moo_zoom/dale_all_woutfree_fanin_front4_1seed_150k_yang_saveat` (seed 0, same 5 budgets as the 5-seed
+    run, batched; checkpoints at 1k, 5k, 10k, 25k, 50k, 75k, 100k, 125k + final 150k). Seed 0 final accuracies
+    match the 5-seed run's seed 0 within GPU noise (not bit-identical). All four reach every task ≥ 0.6 by 100k
+    (control 25k, synaptic 50k, both 50k, rate 100k); with the rate constraint DNMS (dmsnogo) sits at 0.5 from 25k
+    to 75k. Mean accuracy is flat by ~75k; worst task still rising at 150k for rate (0.90 → 0.96) and both
+    (0.85 → 0.95). The loose point is in the run but not on the slide;
   - 14 like-to-like schematic from real neurons (`results/scripts/fig_like2like_schematic.py`: connected pair
     r = +0.76 (90th percentile, not the extreme), unconnected pair r = −0.10, histogram of all E→E pairs, ROC with
     AUC 0.63; both constraints, seed 0) + definitions;
@@ -637,7 +643,7 @@ Commits `64ecc14`, `424492b` (+ the HTML deck commit). Beamer deck: `presentatio
 ### 12.4 Still open
 
 - Global font/label-size pass on the talk figures (supervisor).
-- Slide 13: new intermediate checkpoints of the 4 points (user will provide).
+- ~~Slide 13: new intermediate checkpoints of the 4 points~~ done (one seed, see 12.1).
 - Slide 10/12 figures were drafts for discussion (NSGA-III animation, points summary).
 - Experimental slides: still old points, v1 battery.
 - §11.4: per-period TV, lesions, E/I group wiring on the front points; `loose` not analysed.

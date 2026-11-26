@@ -8,6 +8,7 @@ Writes presentation/figs/talk/*.pdf (the original figures are not touched). Data
   frames      fig_front_top_fanin150k.load, rotating 3D front for slide 11         -> frames/front_000..059.png
   front       fig_front_top_fanin150k (load, budget_means, accuracy_surface)    -> front_top.pdf
   convergence save-at run runs_by_step.csv (as fig_acc_vs_steps_grid.py)          -> convergence.pdf
+  convergence_front  same, front points, 1-seed save-at run (slide 13)            -> convergence_front.pdf
   (slides 15-16, like-to-like wiring: results/scripts/like2like.py, cached)
   silhouette  fig_tv_ei_fanin.analyse, 5-seed run, seed 4                         -> silhouette.pdf
               (--run yang: the fixed-task 5-seed run                              -> silhouette_yang.pdf)
@@ -148,6 +149,37 @@ def convergence():
     save(fig, "convergence")
 
 
+SAVEAT = REPO / "runs/moo_zoom/dale_all_woutfree_fanin_front4_1seed_150k_yang_saveat"   # same budgets as the 5-seed front run
+
+
+def convergence_front(points=("control", "firing", "wiring", "both")):
+    """Slide 13 on the front points: one seed, evaluated at the save-at checkpoints (1k ... 125k) and at the end (150k).
+    Same layout as convergence()."""
+    from talk_style import LABEL
+    d = pd.read_csv(SAVEAT / "runs_by_step.csv")
+    tasks = [c for c in d.columns if c.startswith("acc_")]
+    fig, axes = plt.subplots(1, 4, figsize=(W, 1.9), sharey=True, gridspec_kw=dict(wspace=0.3))
+    for ax, p in zip(axes, points):
+        m = d[d.point == p].sort_values("step")
+        k = m.step.to_numpy() / 1000
+        for t in tasks:
+            ax.plot(k, m[t], color="0.75", lw=0.6)
+        ax.plot(k, m["mean_acc"], color="k", lw=1.6, marker="o", ms=2, label="mean over tasks")
+        ax.plot(k, m["min_task_acc"], color="crimson", lw=1.6, marker="o", ms=2, label="worst task")
+        ax.text(k[-1], m["min_task_acc"].iloc[-1] - 0.07, f"{m['min_task_acc'].iloc[-1]:.2f}", color="crimson",
+                fontsize=7, ha="center", va="top")
+        ax.set_xlim(-5, 160)
+        ax.axhline(FEASIBLE_MIN_TASK_ACC, color="0.4", ls=":", lw=0.8)
+        ax.set_title(LABEL[p], color=COLORS[p], fontsize=8)
+        ax.set_ylim(0, 1.02); ax.set_yticks([0, 0.5, 1]); ax.set_xticks([0, 50, 100, 150])
+        ax.set_xlabel("training steps (k)")
+    axes[0].set_ylabel("accuracy")
+    axes[0].plot([], [], color="0.75", lw=0.6, label="each task")
+    fig.legend(*axes[0].get_legend_handles_labels(), loc="lower center", ncol=3, frameon=False,
+               bbox_to_anchor=(0.5, 1.0))
+    save(fig, "convergence", run="front")
+
+
 # ---------------------------------------------------------------- slides 17-19: task variance groups
 
 RUN = "5seed"          # which run silhouette / tv use: "5seed" (v1 tasks) or "yang" (--run yang); yang outputs get _yang
@@ -273,5 +305,5 @@ if __name__ == "__main__":
     if {"silhouette", "tv"} & set(which):
         A = _analyse_all()
     for w in which:
-        {"frames": frames, "front": front, "convergence": convergence,
+        {"frames": frames, "front": front, "convergence": convergence, "convergence_front": convergence_front,
          "silhouette": lambda: silhouette(A), "tv": lambda: tv(A), "tv_front": tv_front}[w]()

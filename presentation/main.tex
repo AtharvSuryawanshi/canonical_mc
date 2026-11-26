@@ -229,8 +229,11 @@
 
 \begin{frame}{Do they converge?}
   \centering
-  \includegraphics[width=\textwidth,height=0.7\textheight,keepaspectratio]{figs/talk/convergence.pdf}\\[0.3em]
-  \scriptsize Old points and old task battery; to be replaced by the new points' training curves.
+  \includegraphics[width=\textwidth,height=0.7\textheight,keepaspectratio]{figs/talk/convergence_front.pdf}\\[0.3em]
+  \scriptsize One seed per point, same budgets as the 5 seeds; evaluated at saved checkpoints (1k--125k steps) and at
+  the end (150k). Dotted: 0.6, every task must reach it.
+  \takeaway{All four points do every task by 100k steps. The worst task is the slow one: with the rate constraint,
+  DNMS stays at chance (0.5) until 75k.}
 \end{frame}
 
 \begin{frame}{Like-to-like connectivity}

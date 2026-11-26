@@ -25,7 +25,7 @@ SVG = {  # source pdf (relative to presentation/) -> pages to convert
     "figs/fig1_intro_question.pdf": [1], "figs/yang2019_crops.pdf": [1, 2], "figs/song2016_crops.pdf": [1],
     "figs/fakhar2026_crops.pdf": [1], "figs/fig_setup.pdf": [1], "figs/driscoll2024_crops.pdf": [1],
     "figs/talk/front_top_front.pdf": [1], "figs/talk/points_summary_front.pdf": [1],
-    "figs/talk/convergence.pdf": [1], "figs/talk/like2like_schematic_front.pdf": [1],
+    "figs/talk/convergence_front.pdf": [1], "figs/talk/like2like_schematic_front.pdf": [1],
     "figs/talk/like2like_example_s0_front_task.pdf": [1], "figs/talk/like2like_seeds_front_task.pdf": [1],
     "figs/talk/silhouette_seeds_task_front.pdf": [1], "figs/talk/tv_s0_front.pdf": [1],
 }
