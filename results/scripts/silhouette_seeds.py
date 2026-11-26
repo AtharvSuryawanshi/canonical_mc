@@ -13,7 +13,8 @@ Profile (--basis):
 
 Cache: results/cache/<run>/silhouette_<basis>.csv (point, seed, pop, k, silhouette, chosen, n_units); networks
 already in it are not recomputed. Figure: presentation/figs/talk/silhouette_seeds_<basis>_<run>.pdf (per point: mean
-over seeds with min-max band, each seed's chosen k as a dot).
+over seeds with min-max band, each seed's chosen k as a dot) and silhouette_k_<basis>_<run>.pdf (slide 18: every
+seed's curve, the mean, chosen k; a row per point, E and I columns).
 """
 import argparse
 import contextlib
@@ -172,6 +173,55 @@ def plot_panels(run, df, points, seeds, basis):
     print("->", out)
 
 
+def plot_talk(run, df, points, seeds, basis):
+    """Talk version of plot_panels (slide 18): a row per point, a column per population (E, I), k = 3-20 shown, each
+    panel its own y range (tight around the curves, so the peaks are visible). Light: each seed's silhouette curve, its
+    chosen k as a dot; dark: the mean over seeds; dashed + large dot: the k the same rule picks on the mean (computed
+    with k = 2 included, as cluster_pop does, then k = 2 is not drawn)."""
+    from matplotlib.ticker import MaxNLocator
+    df = df[df.point.isin(points) & df.seed.isin(seeds)]
+    fig, axes = plt.subplots(len(points), 2, figsize=(8.4, 6.0), sharex=True,
+                             gridspec_kw=dict(hspace=0.28, wspace=0.18))
+    for r, p in enumerate(points):
+        col = COLORS[p]
+        for c, pop in enumerate("EI"):
+            ax = axes[r, c]
+            d = df[(df["pop"] == pop) & (df.point == p)]
+            t_all = d.pivot(index="k", columns="seed", values="silhouette")
+            k, _ = pick_k(t_all.mean(1).to_dict())
+            t = t_all[t_all.index >= 3]
+            for s_ in t.columns:
+                ax.plot(t.index, t[s_], color=col, alpha=0.28, lw=1)
+                ks = d[(d.seed == s_) & d.chosen.astype(bool)].k
+                ax.plot(ks, t.loc[ks, s_], "o", color=col, alpha=0.55, ms=4.5, mec="none")
+            mean = t.mean(1)
+            ax.plot(mean.index, mean, color=col, lw=2.6)
+            ax.axvline(k, color="0.15", lw=1, ls="--", zorder=1)
+            ax.plot([k], [mean[k]], "o", color=col, ms=8, mec="white", mew=1.2, zorder=4)
+            right = k < 16                                         # label right of the line, unless near the edge
+            ax.text(k + (0.3 if right else -0.3), 0.9, f"k = {k}", fontsize=10, color="0.15", va="center",
+                    ha="left" if right else "right", transform=ax.get_xaxis_transform())
+            lo, hi = np.nanmin(t.to_numpy()), np.nanmax(t.to_numpy())
+            ax.set_ylim(lo - 0.06 * (hi - lo), hi + 0.2 * (hi - lo))  # room on top for the k label
+            ax.yaxis.set_major_locator(MaxNLocator(3))
+            ax.set_xlim(2.5, K_MAX[pop] + 0.5)
+            ax.set_xticks([3, 5, 10, 15, 20])
+            ax.tick_params(labelsize=9.5)
+            if r == 0:
+                ax.set_title(f"{pop} neurons", fontsize=12.5, color=E_COL if pop == "E" else I_COL, pad=6)
+            if c == 0:
+                ax.set_ylabel(LABEL[p].replace(" constraint", "\nconstraint"),
+                              color=col, fontsize=10.5, rotation=0, ha="right", va="center", labelpad=8)
+            if r == len(points) - 1:
+                ax.set_xlabel("number of groups k", fontsize=10.5)
+    fig.text(-0.06, 0.5, "silhouette", rotation=90, va="center", ha="left", fontsize=10.5)
+    h = [plt.Line2D([], [], color="0.5", alpha=0.4, lw=1), plt.Line2D([], [], color="0.3", lw=2.4),
+         plt.Line2D([], [], marker="o", ls="", color="0.5", alpha=0.6), plt.Line2D([], [], color="0.15", ls="--")]
+    fig.legend(h, ["one seed", f"mean of {len(seeds)} seeds", "k chosen by that seed", "k chosen on the mean"],
+               loc="upper center", ncol=4, frameon=False, bbox_to_anchor=(0.55, 1.03), fontsize=10)
+    save(fig, f"silhouette_k_{basis}", run)
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", default="yang", choices=sorted(RUNS))
@@ -187,3 +237,4 @@ if __name__ == "__main__":
     df = pd.read_csv(path) if a.plot_only else compute(a.run, points, seeds, a.basis, a.recompute)
     plot(a.run, df, points, seeds, a.basis)
     plot_panels(a.run, df, points, seeds, a.basis)
+    plot_talk(a.run, df, points, seeds, a.basis)

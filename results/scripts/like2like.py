@@ -178,13 +178,15 @@ def _dots(ax, df, points, seeds, q, mode, xs, dx=0.0, open_all=False, jw=0.12):
 
 
 def plot_seeds(run, R, df, points, seeds):
-    """Slide 16: all networks; mean ROC (band: seed range) and AUC per network (filled: p < 0.05)."""
+    """Slide 16: all networks, 2 x 2 (E->x on top, I->x below): per connection type its mean ROC (band: seed range)
+    and next to it the AUC per network (filled: p < 0.05). E and I in the titles in their colours."""
     grid = np.linspace(0, 1, 101)
-    fig, axes = plt.subplots(2, 4, figsize=(W, 3.4), gridspec_kw=dict(height_ratios=[1, 0.9], hspace=0.45,
-                                                                      wspace=0.25))
+    fig = plt.figure(figsize=(8.2, 5.2))
+    outer = fig.add_gridspec(2, 2, wspace=0.34, hspace=0.85, left=0.07, right=0.995, top=0.9, bottom=0.2)
     xs = np.arange(len(points))
     for k, q in enumerate(QUADS):
-        ax = axes[0, k]
+        inner = outer[k // 2, k % 2].subgridspec(1, 2, width_ratios=[1, 0.95], wspace=0.32)
+        ax = fig.add_subplot(inner[0])
         for p in points:
             T = []
             for s in seeds:
@@ -193,35 +195,39 @@ def plot_seeds(run, R, df, points, seeds):
                 T.append(np.interp(grid, *roc(c["S"][mk], c["C"]["trained"][mk])))
             T = np.array(T)
             ax.fill_between(grid, T.min(0), T.max(0), color=COLORS[p], alpha=0.18, lw=0)
-            ax.plot(grid, T.mean(0), color=COLORS[p], lw=1.3, label=LABEL[p])
-        ax.plot([0, 1], [0, 1], color="0.3", ls=":", lw=0.6)
+            ax.plot(grid, T.mean(0), color=COLORS[p], lw=1.8, label=LABEL[p])
+        ax.plot([0, 1], [0, 1], color="0.3", ls=":", lw=0.7)
         ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.set_box_aspect(1)
-        ax.set_xticks([0, 1]); ax.set_yticks([0, 1])
-        ax.set_title(q, fontsize=10)
-        ax.set_xlabel("FPR", labelpad=-6)
-        if k == 0:
-            ax.set_ylabel("TPR", labelpad=-4)
-        ax = axes[1, k]
+        ax.set_xticks([0, 1]); ax.set_yticks([0, 1]); ax.tick_params(labelsize=10.5)
+        ax.set_xlabel("FPR", labelpad=-9, fontsize=11)
+        ax.set_ylabel("TPR", labelpad=-7, fontsize=11)
+        ax.set_title("ROC", fontsize=10.5, color="0.4", pad=3)
+        ax = fig.add_subplot(inner[1])
         for s in seeds:
-            ax.plot(xs, [stat(df, p, s, q).auc for p in points], color="0.85", lw=0.6, zorder=1)
+            ax.plot(xs, [stat(df, p, s, q).auc for p in points], color="0.85", lw=0.7, zorder=1)
         _dots(ax, df, points, seeds, q, "trained", xs)
-        ax.axhline(0.5, color="0.3", ls=":", lw=0.6)
-        ax.set_ylim(0.4, 0.85); ax.set_yticks([0.5, 0.6, 0.7, 0.8])
+        ax.axhline(0.5, color="0.3", ls=":", lw=0.7)
+        ax.set_ylim(0.4, 0.75); ax.set_yticks([0.5, 0.6, 0.7]); ax.tick_params(labelsize=10.5)
+        ax.set_box_aspect(1.05)
         ax.set_xticks(xs)
         ax.set_xticklabels([LABEL[p].replace(" constraints", "").replace(" constraint", "") for p in points],
-                           rotation=45, ha="right", rotation_mode="anchor", fontsize=7)
+                           rotation=45, ha="right", rotation_mode="anchor", fontsize=10.5)
         for t, p in zip(ax.get_xticklabels(), points):
             t.set_color(COLORS[p])
         ax.tick_params(axis="x", length=0, pad=2)
-        if k == 0:
-            ax.set_ylabel("AUC (one dot per network)")
-        else:
-            ax.set_yticklabels([])
-    h, lab = axes[0, 0].get_legend_handles_labels()
-    h += [plt.Line2D([], [], marker="o", ls="", color="0.3", ms=4),
-          plt.Line2D([], [], marker="o", ls="", mfc="white", mec="0.3", ms=4)]
+        ax.set_title("AUC per network", fontsize=10.5, color="0.4", pad=3)
+        # connection type over the pair: pre (E blue / I red) -> post
+        pos = outer[k // 2, k % 2].get_position(fig)
+        xc, yt = (pos.x0 + pos.x1) / 2, pos.y1 + 0.068
+        for t, ha, dx in ((q[0], "right", -0.014), ("→", "center", 0), (q[-1], "left", 0.014)):
+            fig.text(xc + dx, yt, t, ha=ha, va="bottom", fontsize=15,
+                     color=E_COL if t == "E" else I_COL if t == "I" else "0.2")
+    h = [plt.Line2D([], [], color=COLORS[p], lw=1.5) for p in points]
+    lab = [LABEL[p] for p in points]
+    h += [plt.Line2D([], [], marker="o", ls="", color="0.3", ms=4.5),
+          plt.Line2D([], [], marker="o", ls="", mfc="white", mec="0.3", ms=4.5)]
     lab += ["p < 0.05", "n.s."]
-    fig.legend(h, lab, loc="lower center", ncol=3, frameon=False, bbox_to_anchor=(0.5, 0.97), fontsize=7.5)
+    fig.legend(h, lab, loc="lower center", ncol=3, frameon=False, bbox_to_anchor=(0.5, -0.04), fontsize=10.5)
     save(fig, "like2like_seeds", run)
 
 

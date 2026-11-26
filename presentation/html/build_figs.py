@@ -3,8 +3,11 @@
   _front3d.qmd            rotatable 3D front (4 NSGA-III searches pooled), hover = one network; the 4 points as stars
   _auc.qmd                like-to-like AUC table, 4 connection types x 4 points (mean over 5 seeds), colour-coded
   assets/plotly.min.js    plotly.js, loaded once by the deck (inlined by Quarto: works offline)
+  assets/nsga_data.js     data for the NSGA-III animation (nsga_anim.js): generations 0 and 1 of the ms1 search
+  assets/front_data.js    data for the rotating front (front_anim.js): 4 searches pooled, the 4 points, the surface
+  assets/l2l_data.js      data for the like-to-like animation (l2l_anim.js): the slide-15 example network
 
-    python presentation/html/build_figs.py        (cmc_env, repo root; plotly)
+    python presentation/html/build_figs.py [nsga] [front] [l2l]   (cmc_env, repo root; plotly; names = only those)
 """
 import sys
 from pathlib import Path
@@ -94,7 +97,85 @@ def auc_table():
     print("->", HERE / "_auc.qmd")
 
 
+def nsga_data():
+    """Generations 0 and 1 of the real ms1 search, as anim_nsga3.py uses them: budgets (before training), reached
+    costs (after), worst-task accuracy and its RdYlGn colour, feasibility, front of gen 0 and of gens 0 + 1."""
+    import json
+    from anim_nsga3 import front1, load
+    d = load()
+    g0 = d[d.generation == 0].reset_index(drop=True)
+    both = d[d.generation <= 1].reset_index(drop=True)
+    f0, fb = front1(g0), front1(both)
+    rows = []
+    for i, r in both.iterrows():
+        rows.append(dict(g=int(r.generation), bx=round(r.bx, 4), by=round(r.by, 4), rx=round(r.rx, 4),
+                         ry=round(r.ry, 4), acc=round(r.acc, 4), col=colors.to_hex(RDYLGN(r.acc)),
+                         ok=bool(r.acc >= 0.6), f0=bool(i < len(g0) and f0[i]), fb=bool(fb[i])))
+    (OUT / "nsga_data.js").write_text("window.NSGA_DATA = " + json.dumps(rows, separators=(",", ":")) + ";\n",
+                                      encoding="utf-8")
+    print("->", OUT / "nsga_data.js", f"({len(rows)} networks, front gen 0: {int(f0.sum())}, gens 0+1: {int(fb.sum())})")
+
+
+def front_data(n=44):
+    """The pooled Yang front for front_anim.js: every network (log costs, worst-task accuracy, kind 0 = fails a task,
+    1 = feasible, 2 = on the front), the 4 points (5-seed mean and seeds), the smoothed accuracy surface that the top
+    view (front_yang.top) contours, on an n x n grid (null outside the hull), and the RdYlGn lookup table."""
+    import json
+    from front_yang import surface
+    d, z = load_front(), load_points()
+    kind = np.where(d.pareto, 2, np.where(d.feasible, 1, 0))
+    nets = [[round(a, 4), round(b, 4), round(c, 4), int(k)] for a, b, c, k in zip(d.x, d.y, d.z, kind)]
+    pts = []
+    for p in POINTS:
+        g = z[z.point == p]
+        pts.append(dict(name=LABEL[p], col=COL[p], x=round(g.x.mean(), 4), y=round(g.y.mean(), 4),
+                        z=round(g.z.mean(), 4), seeds=[[round(a, 4), round(b, 4), round(c, 4)]
+                                                       for a, b, c in zip(g.x, g.y, g.z)]))
+    xx, yy, zz = surface(d, n=n)
+    grid = [[None if np.isnan(v) else round(float(v), 4) for v in row] for row in zz]
+    out = dict(nets=nets, points=pts, xs=[round(v, 4) for v in xx[0]], ys=[round(v, 4) for v in yy[:, 0]],
+               zz=grid, lut=[colors.to_hex(RDYLGN(i / 100)) for i in range(101)],
+               counts=dict(n=len(d), feasible=int(d.feasible.sum()), front=int(d.pareto.sum())))
+    (OUT / "front_data.js").write_text("window.FRONT_DATA = " + json.dumps(out, separators=(",", ":")) + ";\n",
+                                       encoding="utf-8")
+    print("->", OUT / "front_data.js", out["counts"], "x", d.x.min().round(2), d.x.max().round(2),
+          "y", d.y.min().round(2), d.y.max().round(2), "z", d.z.min().round(2))
+
+
+def l2l_data(run="front", point="both", seed=0):
+    """Like-to-like on one network, as fig_like2like_schematic.py (E->E pairs, per-task profiles): the connected and
+    the unconnected example pair (profiles, r), histograms of r for connected and unconnected pairs, and the ROC as a
+    threshold on r sweeps from +1 to -1."""
+    import json
+    from fig_like2like_schematic import network, pick_pairs
+    from fig_wiring_like2like import auc
+    tasks, X, S, C, E = network(run, point, seed)
+    pc, pu = pick_pairs(S, C, X)
+    off = ~np.eye(len(S), dtype=bool)
+    r, c = S[off], C[off]
+    bins = np.linspace(-1, 1, 41)
+    hc = np.histogram(r[c], bins)[0] / c.sum()
+    hu = np.histogram(r[~c], bins)[0] / (~c).sum()
+    th = np.linspace(1, -1, 201)
+    out = dict(
+        pairs=[dict(a=[round(v, 3) for v in X[:, i]], b=[round(v, 3) for v in X[:, j]], r=round(float(S[i, j]), 2),
+                    conn=bool(k == 0)) for k, (i, j) in enumerate((pc, pu))],
+        bins=[round(v, 3) for v in bins], hc=[round(v, 5) for v in hc], hu=[round(v, 5) for v in hu],
+        th=[round(v, 3) for v in th], tpr=[round(float((r[c] >= t).mean()), 4) for t in th],
+        fpr=[round(float((r[~c] >= t).mean()), 4) for t in th], auc=round(float(auc(r, c)), 2),
+        n_conn=int(c.sum()), n_unconn=int((~c).sum()), n_e=len(E), label=f"{LABEL[point]}, seed {seed}")
+    (OUT / "l2l_data.js").write_text("window.L2L_DATA = " + json.dumps(out, separators=(",", ":")) + ";\n",
+                                     encoding="utf-8")
+    print("->", OUT / "l2l_data.js", f"AUC {out['auc']}, {out['n_conn']} connected / {out['n_unconn']} unconnected "
+          f"E->E pairs, examples r = {out['pairs'][0]['r']}, {out['pairs'][1]['r']}")
+
+
 def main():
+    only = sys.argv[1:]
+    if only:
+        for name in only:
+            {"nsga": nsga_data, "front": front_data, "l2l": l2l_data}[name]()
+        return
     from plotly.offline import get_plotlyjs
     OUT.mkdir(exist_ok=True)
     (OUT / "plotly.min.js").write_text(get_plotlyjs(), encoding="utf-8")
@@ -103,6 +184,9 @@ def main():
     d, z = load_front(), load_points()
     front3d(d, z)
     auc_table()
+    nsga_data()
+    front_data()
+    l2l_data()
 
 
 if __name__ == "__main__":

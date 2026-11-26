@@ -158,7 +158,7 @@ def convergence_front(points=("control", "firing", "wiring", "both")):
     from talk_style import LABEL
     d = pd.read_csv(SAVEAT / "runs_by_step.csv")
     tasks = [c for c in d.columns if c.startswith("acc_")]
-    fig, axes = plt.subplots(1, 4, figsize=(W, 1.9), sharey=True, gridspec_kw=dict(wspace=0.3))
+    fig, axes = plt.subplots(1, 4, figsize=(8.4, 2.1), sharey=True, gridspec_kw=dict(wspace=0.12))
     for ax, p in zip(axes, points):
         m = d[d.point == p].sort_values("step")
         k = m.step.to_numpy() / 1000
@@ -172,8 +172,8 @@ def convergence_front(points=("control", "firing", "wiring", "both")):
         ax.axhline(FEASIBLE_MIN_TASK_ACC, color="0.4", ls=":", lw=0.8)
         ax.set_title(LABEL[p], color=COLORS[p], fontsize=8)
         ax.set_ylim(0, 1.02); ax.set_yticks([0, 0.5, 1]); ax.set_xticks([0, 50, 100, 150])
-        ax.set_xlabel("training steps (k)")
     axes[0].set_ylabel("accuracy")
+    fig.supxlabel("training steps (thousands)", fontsize=8, y=-0.06)
     axes[0].plot([], [], color="0.75", lw=0.6, label="each task")
     fig.legend(*axes[0].get_legend_handles_labels(), loc="lower center", ncol=3, frameon=False,
                bbox_to_anchor=(0.5, 1.0))
@@ -259,37 +259,51 @@ def tv(A=None):
 # ---------------------------------------------------------------- slide 18: groups of the 4 front points, one seed
 
 def tv_front(seed=0, points=("control", "firing", "wiring", "both")):
-    """2 x 2 figure, one panel per point (E and I heatmaps side by side), front run, k as on slide 17 (I up to 20)."""
+    """Normalized task variance analysis (slide 19), 2 x 2, one panel per point: E and I heatmaps side by side
+    (tasks x neurons, neurons sorted by group), a coloured strip under each marking the groups (as Yang et al. 2019,
+    Fig. 2), front run, k as on slide 18 (I up to 20). Wide, for the full slide width."""
+    from matplotlib.colors import ListedColormap
     from talk_style import LABEL
     A = {p: analyse(RUNS["front"] / p / f"seed_{seed:02d}.pt", k_max_I=20) for p in points}
-    fig = plt.figure(figsize=(W, 4.4))
-    outer = fig.add_gridspec(2, 2, wspace=0.08, hspace=0.32, left=0.13, right=0.995, top=0.93, bottom=0.07)
+    groups = ListedColormap(plt.get_cmap("tab20").colors)
+    fig = plt.figure(figsize=(12.5, 5.4))
+    outer = fig.add_gridspec(2, 2, wspace=0.05, hspace=0.3, left=0.075, right=0.995, top=0.92, bottom=0.1)
     for n, p in enumerate(points):
         R = A[p]
         nE, nI = len(R["E"]["units"]), len(R["I"]["units"])
-        inner = outer[n // 2, n % 2].subgridspec(1, 2, width_ratios=[nE, nI * 1.6], wspace=0.04)
+        inner = outer[n // 2, n % 2].subgridspec(2, 2, width_ratios=[nE, nI * 1.6], height_ratios=[20, 1.1],
+                                                 wspace=0.04, hspace=0.06)
         for pop, gi in zip("EI", (0, 1)):
-            ax = fig.add_subplot(inner[gi])
+            ax = fig.add_subplot(inner[0, gi])
             P = R[pop]
             o = np.argsort(P["lab"], kind="stable")
             im = ax.imshow(R["norm"][:, P["units"][o]], cmap="hot", aspect="auto", interpolation="nearest",
                            vmin=0, vmax=1)
             labs = P["lab"][o]
             for c in range(1, P["K"]):
-                ax.axvline(np.flatnonzero(labs == c)[0] - 0.5, color="white", lw=0.35)
+                ax.axvline(np.flatnonzero(labs == c)[0] - 0.5, color="white", lw=0.5)
             ax.set_xticks([])
             ax.set_yticks(range(len(R["tasks"])))
             ax.set_yticklabels([rule_name[t] for t in R["tasks"]] if (n % 2 == 0 and pop == "E") else [],
-                               fontsize=5.5)
+                               fontsize=7.5)
             ax.tick_params(length=0, pad=1.5)
             ax.spines[:].set_visible(False)
-            ax.set_title(f"{pop}: {P['K']} groups", fontsize=7.5, color=E_COL if pop == "E" else I_COL, pad=2)
+            ax.set_title(f"{pop}: {P['K']} groups", fontsize=10, color=E_COL if pop == "E" else I_COL, pad=3)
             if pop == "E":
-                ax.text(0.0, 1.16, LABEL[p], transform=ax.transAxes, fontsize=9.5, color=COLORS[p])
-    cax = fig.add_axes([0.75, 0.015, 0.2, 0.012])
-    cb = fig.colorbar(im, cax=cax, orientation="horizontal", ticks=[0, 1])
-    cb.ax.tick_params(labelsize=6.5, length=2, pad=1)
-    cax.set_title("task variance / neuron max", fontsize=6.5, pad=1.5, loc="left")
+                ax.text(0.0, 1.13, LABEL[p], transform=ax.transAxes, fontsize=12.5, color=COLORS[p])
+            sx = fig.add_subplot(inner[1, gi])                      # group strip
+            sx.imshow(labs[None, :] % 20, cmap=groups, vmin=0, vmax=19, aspect="auto", interpolation="nearest")
+            for c in range(1, P["K"]):
+                sx.axvline(np.flatnonzero(labs == c)[0] - 0.5, color="white", lw=0.5)
+            sx.set_xticks([]); sx.set_yticks([])
+            sx.spines[:].set_visible(False)
+            if n % 2 == 0 and pop == "E":
+                sx.set_ylabel("group", rotation=0, ha="right", va="center", fontsize=7.5, labelpad=3)
+    cax = fig.add_axes([0.82, 0.035, 0.16, 0.014])
+    cb = fig.colorbar(im, cax=cax, orientation="horizontal", ticks=[0, 0.5, 1])
+    cb.ax.tick_params(labelsize=8, length=2, pad=1)
+    cb.outline.set_visible(False)
+    cax.set_title("normalized task variance", fontsize=9, pad=2, loc="left")
     save(fig, f"tv_s{seed}", "front")
     print({p: (A[p]["E"]["K"], A[p]["I"]["K"]) for p in points})
 

@@ -640,6 +640,69 @@ Commits `64ecc14`, `424492b` (+ the HTML deck commit). Beamer deck: `presentatio
   are inline divs resized on `slidechanged` (`_plotly.html`); `::: {}` makes no wrapper div (name it); the browser
   pane caches `slides.html` (add `?v=N`). Local preview: `.claude/launch.json` "html-deck" (port 8765).
 
+### 12.3a HTML deck now ahead of main.tex (2026-11-26, Linux)
+
+- **Work in the HTML deck from now on** (user's choice); main.tex is no longer kept in sync.
+- Slide 9 ("Holding the network to a budget") split into **"Synaptic budget: a hard limit"** and **"Rate budget: a
+  soft limit"**, each with an animation on the left (`presentation/html/budget_anim.js`, plain SVG + JS, restarts when
+  the slide is shown) and a table defining every symbol on the right.
+  - Synaptic: 16 synapses; each cycle a learning step grows some, the total gauge goes over budget, the same θ
+    (orange slice) is cut from every bar (exact L1 projection), bars below θ are removed (×); 3 cycles, 16 → 12 kept.
+  - Rate: toy model (one rate, task wants 3× budget) with the training rule (η 0.01, EMA 0.9, λ0 0.01): ρ = 1 vs
+    ρ = 0. Without ρ, λ winds up late (~450 steps at 3×), overshoots (0.83 vs 0.6 needed) and the rate dips to 0.61×
+    budget; with ρ the rate drops at once and settles on budget without undershoot.
+- The old line "trained networks end about 1.5× above their rate budget" was wrong as stated: in training the rate
+  cost sits on the budget (front run: within ±0.3% for firing/both; wiring and loose stay 7–15% under, λ → 0). The
+  1.5–1.8× is the evaluation's metabolic cost (its own per-task trial batches). Slide now says it settles on budget.
+- Slide 11 (NSGA-III): the GIF is replaced by a live canvas animation (`presentation/html/nsga_anim.js`, data
+  `assets/nsga_data.js` from `build_figs.py nsga`, same ms1 generations 0 + 1 and the same story as
+  `anim_nsga3.py`): sharp at any size, full frame rate, drop lines and floor shadows for depth, real tick values
+  (rate 0.003–0.1, synaptic 0.002–0.02), step boxes as HTML. ~27 s loop. `assets/nsga.gif` is no longer used
+  (deck 41 → 28 MB). Note: the Claude browser pane runs at ~11–15 fps, so it looks choppy only there.
+- Slide 12 (the front): the rotating GIF is replaced by `front_anim.js` (data `assets/front_data.js`, `build_figs.py
+  front`): square budget plane, the smoothed accuracy surface (same thin-plate fit as the slide-13 top view) as a
+  translucent RdYlGn mesh, front networks coloured, other networks grey, failures as × on the floor, the 4 points as
+  stars (5-seed means) with drop lines; slow swing between azimuth −72° and −18° (28 s period) instead of a full
+  turn (full turns put an axis edge-on and the labels collide); drag to turn by hand. HTML legend + colour bar.
+  Shared 3D code (projection, box, ticks, fit, slide-visibility loop) is in `presentation/html/plot3d.js`, used by
+  `nsga_anim.js` and `front_anim.js`. `assets/front_yang.gif` is no longer used.
+- Slide 13 (four points), `front_yang.py top summary` redone (matplotlib): top view with 3 ticks per axis, 0.05
+  accuracy bands, networks as light marks (none removed), legend above, stars with white halo and short names.
+  Right panel: one line per network (5 per point), its 20 tasks grey and its worst task coloured, vertical line +
+  number = mean worst-task accuracy, plus the most common worst task (control Ctx Dly DM 2 3/5, rate DNMS 2/5 (tie
+  with Ctx Dly DM 2), synaptic DNMS 3/5, both DNMS 4/5); rate and synaptic cost
+  as bars (mean; log axis, bars start at the visible left axis) with each network as a dot, % synapses kept.
+  main.tex still includes these PDFs, so its slide changes too.
+- Slide 14 (convergence): `talk_figs.py convergence_front` now 8.4 × 2.1 in, one shared x label; full slide width.
+- Slide 15 (like-to-like): the static schematic is replaced by `l2l_anim.js` (data `assets/l2l_data.js`,
+  `build_figs.py l2l`, same network and pairs as `fig_like2like_schematic.py`: both constraints, seed 0, E→E,
+  per-task profiles; 531 connected / 37,689 unconnected pairs, AUC 0.63). Four definition cards on top (task variance
+  ⟨Var_trials r_i(t)⟩_t as in Yang 2019 and `runner.activity_summary`; normalized task variance = TV / max over tasks;
+  r = corr; AUC). Animation in 5 steps (~34 s loop): connected pair (r +0.76), unconnected pair next to it (r −0.10),
+  histograms of r, a threshold sweeping from +1 to −1 that traces the ROC, area = AUC.
+- Slide 17 (like-to-like, all 20 networks): `like2like.plot_seeds` now 2 × 2 (E→x top, I→x bottom), 7.6 × 5.2 in,
+  per connection type the mean ROC next to the AUC per network, larger fonts, E/I in the titles blue/red. Slide:
+  figure left (490 px high, `.nostretch`, otherwise Quarto's auto-stretch overrides the size), caption text right.
+- Slide 18 (number of groups): new `silhouette_seeds.plot_talk` → `figs/talk/silhouette_k_task_front.pdf`: a row
+  per point, E and I columns, every seed light, mean dark, each seed's chosen k
+  as a dot, dashed + label + big dot = k picked on the mean. k = 3–20 drawn (k is still picked with k = 2 included,
+  so control I can sit at 3), each panel its own y range. Math reduced to a small reminder card (TV is on slide 15).
+- Slide 19, renamed "Normalized task variance analysis at the four points": `talk_figs.tv_front` now 12.5 × 5.4 in
+  with a coloured group strip under each heatmap (tab20, as Yang 2019 Fig. 2), colour bar "normalized task variance".
+  Slide 17 figure: gap between the left and right pairs widened (outer wspace 0.34).
+- Slides 18 and 19 swapped (heatmaps first as the observation, then silhouette vs k).
+- New slide 20 "Does a rate budget make neurons more selective?": `results/scripts/selectivity_rate.py` →
+  `figs/talk/selectivity_front.pdf`; 25 networks (4 points + loose, loose silhouettes now in
+  `results/cache/front/silhouette_task.csv`), x = rate cost, y = tasks per neuron (norm TV > 0.5) and silhouette
+  mean over k = 3–20; E and I rows; lines join point means per synaptic level. Spearman with rate cost, E: tasks +0.91
+  (unconstrained synapses) / +0.73 (sparse), silhouette −0.89 / −0.66; I: only with sparse synapses (+0.88 / −0.89),
+  unconstrained +0.36 n.s. **Caveat:** with only strongly active neurons (total TV > 10% of max) E tasks per neuron
+  becomes control 5.12, rate 4.43, loose 4.11 (unconstrained Spearman +0.58): part of the rate point's low breadth is
+  weakly active neurons, and rate is no longer below loose.
+- Quarto 1.9.38 installed on Linux in `~/opt/quarto-1.9.38`, linked as `~/.local/bin/quarto` (no sudo needed).
+  Rebuilding the assets here changes the SVGs slightly (different pdftocairo); paper crops convert to SVG here but
+  slides.qmd still uses the PNGs.
+
 ### 12.4 Still open
 
 - Global font/label-size pass on the talk figures (supervisor).
