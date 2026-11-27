@@ -167,3 +167,21 @@
 .reveal mjx-container[display="true"] { margin: 0.4em 0 !important; }
 .reveal .eq { font-size: 24px; }
 .reveal .eq-big { font-size: 30px; }
+
+/* task simulator (slide "Setup", trial_sim.js) */
+.reveal .trial-sim { margin: -10px 0 0 0; }
+.reveal .sim-ctl { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
+.reveal .sim-tasks { display: flex; gap: 14px; flex-wrap: wrap; }
+.reveal .sim-group { display: flex; gap: 4px; flex-wrap: wrap; }
+.reveal .sim-row2 { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.reveal .sim-points, .reveal .sim-transport { display: flex; gap: 6px; align-items: center; }
+.reveal .sim-btn { font: inherit; font-size: 13px; line-height: 1; padding: 6px 9px; border-radius: 999px; border: 1px solid var(--line);
+                   background: white; color: var(--ink); cursor: pointer; }
+.reveal .sim-btn:hover { border-color: #b8b8bd; }
+.reveal .sim-btn.on { background: var(--accent); border-color: var(--accent); color: white; }
+.reveal .sim-pt.on { background: var(--pc); border-color: var(--pc); }
+.reveal .sim-pt { color: var(--pc); }
+.reveal .sim-play { min-width: 84px; }
+.reveal .sim-step { min-width: 32px; }
+.reveal .sim-clock { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 160px; }
+.reveal .sim-svg { display: block; user-select: none; }

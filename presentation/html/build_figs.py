@@ -170,11 +170,84 @@ def l2l_data(run="front", point="both", seed=0):
           f"E->E pairs, examples r = {out['pairs'][0]['r']}, {out['pairs'][1]['r']}")
 
 
+def _pick_units(tv, idx, n):
+    """n units of idx with distinct preferred tasks where possible: for each task in turn, the unit of idx whose
+    normalized task variance peaks on that task and that has the largest variance there."""
+    tv = tv[:, idx]
+    pref, peak = tv.argmax(0), tv.max(0)
+    chosen, order = [], np.argsort(-peak)
+    for t in np.argsort(-tv.max(1)):                               # tasks, most strongly represented first
+        cand = [u for u in order if pref[u] == t and u not in chosen]
+        if cand:
+            chosen.append(cand[0])
+        if len(chosen) == n:
+            break
+    chosen += [u for u in order if u not in chosen][:n - len(chosen)]
+    return [int(idx[u]) for u in chosen]
+
+
+def trials_data(run="front", seed=0, eval_seed=1, n_e=16, n_i=4):
+    """Task simulator (slide "Setup", trial_sim.js): one noise-free trial per task (the same trial for every point),
+    run through the seed-0 network of each of the 4 points. Kept per point: the outputs and the rates of 16 E and 4 I
+    neurons (80/20, chosen with distinct preferred tasks), each neuron scaled by its own max over all 20 trials;
+    synapses among them (|W|/c > 0.01). Values as integers 0-100."""
+    import contextlib
+    import io
+    import json
+    import torch
+    from cmc.task import generate_trials, rule_name
+    from cmc.train_cog import eval_config_from, load_checkpoint, trial_to_tensors
+    from fig_tv_ei_fanin import RUNS
+    q = lambda a: np.clip(np.rint(np.asarray(a) * 100), 0, 100).astype(int).tolist()
+    tasks, nets = None, {}
+    runs = pd.read_csv(RUNS[run] / "runs.csv").set_index(["point", "seed"])
+    for p in POINTS:
+        with contextlib.redirect_stdout(io.StringIO()):
+            model, config, ck = load_checkpoint(RUNS[run] / p / f"seed_{seed:02d}.pt")
+        tasks = tasks or list(ck["active_tasks"])
+        ne = model.n_e
+        tv = np.asarray(ck["task_variance"], float)
+        units = _pick_units(tv, np.arange(ne), n_e) + _pick_units(tv, np.arange(ne, tv.shape[1]), n_i)
+        Wn = (np.abs(model.effective_w_rec().detach().numpy()) / model.ei_row_scale().detach().numpy()[:, None])
+        W = Wn[np.ix_(units, units)]                                         # W[pre, post]
+        rates, outs, trials = [], [], []
+        with torch.no_grad():
+            for rule in tasks:
+                trial = generate_trials(rule, eval_config_from(config, eval_seed, easy_task=True), 1, noise_on=False)
+                x, _, _, _ = trial_to_tensors(trial, "cpu")
+                h, _, y = model.simulate(x, noise_level=0.0)
+                rates.append(h[0][:, units].numpy())
+                outs.append(y[0].numpy())
+                trials.append(trial)
+        top = np.max([r.max(0) for r in rates], axis=0)
+        nets[p] = dict(label=LABEL[p], n_e=n_e, n_i=n_i,
+                       pref=[rule_name[tasks[int(tv[:, u].argmax())]] for u in units],
+                       syn=[[int(a), int(b)] for a, b in zip(*np.nonzero((W > 1e-2) & ~np.eye(len(units), dtype=bool)))],
+                       rates=[q(r / np.maximum(top, 1e-9)) for r in rates], out=[q(o) for o in outs],
+                       acc=[round(float(runs.loc[(p, seed), f"acc_{t}"]), 3) for t in tasks],
+                       rate_cost=float(runs.loc[(p, seed), "metabolic_cost"]),
+                       syn_cost=float(runs.loc[(p, seed), "wiring_cost"]),
+                       kept=round(float(runs.loc[(p, seed), "conn_frac"]), 4))
+    T = []
+    for rule, tr in zip(tasks, trials):
+        n = tr.config["n_eachring"]
+        ep = {k: [int(a or 0), int(tr.tdim if b is None else b)] for k, (a, b) in tr.epochs.items()}
+        loc = tr.y_loc[:, 0]
+        T.append(dict(rule=rule, name=rule_name[rule], tdim=int(tr.tdim), epochs=ep,
+                      fix=q(tr.x[:, 0, 0]), ring1=q(tr.x[:, 0, 1:1 + n]), ring2=q(tr.x[:, 0, 1 + n:1 + 2 * n]),
+                      fix_target=q(tr.y[:, 0, 0] > 0.5), target=[round(float(v), 3) for v in loc]))
+    out = dict(dt=int(trials[0].dt), tasks=T, points=list(POINTS), nets=nets)
+    (OUT / "trial_data.js").write_text("window.TRIAL_DATA = " + json.dumps(out, separators=(",", ":")) + ";\n",
+                                       encoding="utf-8")
+    kb = (OUT / "trial_data.js").stat().st_size / 1e3
+    print("->", OUT / "trial_data.js", f"{kb:.0f} kB; synapses shown:", {p: len(v["syn"]) for p, v in nets.items()})
+
+
 def main():
     only = sys.argv[1:]
     if only:
         for name in only:
-            {"nsga": nsga_data, "front": front_data, "l2l": l2l_data}[name]()
+            {"nsga": nsga_data, "front": front_data, "l2l": l2l_data, "trials": trials_data}[name]()
         return
     from plotly.offline import get_plotlyjs
     OUT.mkdir(exist_ok=True)

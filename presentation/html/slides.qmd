@@ -131,10 +131,11 @@ sit?
 
 ## Setup
 
-![](assets/fig_setup.svg){.fig style="height:420px"}
+<script src="assets/trial_data.js"></script>
+<script src="trial_sim.js"></script>
 
-<p class="caption">256 rate neurons (204 <span class="E">E</span>, 52 <span class="I">I</span>), all 20 Yang tasks
-trained together in one network, 150k steps.</p>
+::: trial-sim
+:::
 
 ::: take
 Each network is scored on three things: task accuracy, synaptic cost and rate cost.
@@ -396,6 +397,7 @@ $$\mathrm{AUC} = P(r_{\text{conn}} > r_{\text{unconn}})$$
 ::: {.anim-l2l}
 <div class="anim-svg"></div>
 <div class="anim-cap"></div>
+<span class="fragment l2l-frag"></span><span class="fragment l2l-frag"></span><span class="fragment l2l-frag"></span>
 :::
 
 ::: take
@@ -477,20 +479,60 @@ The exact $k$ is soft: the curves are flat.
 ![](assets/selectivity_front.svg){.fig .nostretch style="height:490px"}
 :::
 ::: {.grow .defs style="margin-top:36px;margin-right:24px"}
-<p>25 networks: the 4 points and the loose point, 5 seeds each. Lines join the point means at the same synaptic level:
-solid, unconstrained synapses (control, loose, rate); dashed, sparse synapses (synaptic, both).</p>
-<p>Tasks per neuron: tasks where the neuron's normalized task variance is above 0.5. Silhouette: mean over
-$k = 3$–$20$, so no $k$ has to be chosen.</p>
-<p><span class="E">E</span>: lower rate cost, fewer tasks per neuron and more distinct groups, at both synaptic levels
-(Spearman with rate cost: tasks +0.91 and +0.73; silhouette −0.89 and −0.66).</p>
-<p><span class="I">I</span>: the same only with sparse synapses (+0.88, −0.89); with unconstrained synapses
-tasks per neuron does not follow the rate cost (+0.36, n.s.).</p>
+<p>20 networks: the 4 points, 5 seeds each.</p>
+<p>Tasks per neuron: tasks where the neuron's normalized task variance is above 0.5. Silhouette: the best
+over $k = 3$–$20$, per network. For <span class="E">E</span> it peaks at $k$ = 11–19 with a rate budget, at $k = 3$
+(the edge) in control.</p>
+<p><span class="E">E</span>: lower rate cost, fewer tasks per neuron and more distinct groups (Spearman with rate
+cost over the 20 networks: tasks +0.90, silhouette −0.72).</p>
+<p><span class="I">I</span>: weaker (tasks +0.52, silhouette −0.64).</p>
 :::
 :::
 
 ::: take
-A rate budget makes <span class="E">E</span> neurons more task-selective, step by step as the budget tightens: the
-groups become more distinct. A claim about selectivity, not about a number of groups.
+A rate budget makes <span class="E">E</span> neurons more task-selective: the lower the rate cost, the fewer tasks per
+neuron and the more distinct the groups. A claim about selectivity, not about a number of groups.
+:::
+
+## Lesions: does a rate budget make functions separable?
+
+::: {.grid2 .defs}
+::: {.gcol}
+<p>Selectivity describes activity. The causal test: take neurons away and see which tasks fail (Yang et al. 2019;
+Driscoll et al. 2024).</p>
+<p>Group for task $a$: the $m$ neurons with the largest task variance on $a$, <span class="E">E</span> and
+<span class="I">I</span> separately. Same $m$ in every network, no clustering.</p>
+<p>Lesion (mean-clamp): $r_i(t) \to \bar r_i(t)$ for every $i$ in the group, the intact network's trial-average for
+that task and time step. Removes the task information the neurons carry, keeps their mean drive (silencing,
+$r_i = 0$, also removes the drive).</p>
+:::
+::: {.gcol}
+<p>Damage on task $b$: $d_{a,b} = \max(0,\ \mathrm{acc}_b - \mathrm{acc}_b^{\,\text{lesioned}})$, all 20 tasks.</p>
+$$\text{family specificity} = \frac{\big\langle d_{a,b} \big\rangle_{b \in F(a),\ b \neq a}}
+{\big\langle d_{a,b} \big\rangle_{b \notin F(a)}}$$
+<p>$F(a)$: the family of task $a$ (Yang et al. 2019): Go, Anti, DM, Dly DM, Matching. 1 = the damage spreads evenly.</p>
+<p>Control: 20 random groups of the same size (Prince et al. 2024). Sizes: <span class="E">E</span> $m$ = 2–40 (1–20%
+of 204), <span class="I">I</span> $m$ = 1–10 (2–19% of 52). 4 points × 5 seeds; 5 eval seeds × 64 trials, no
+noise.</p>
+:::
+:::
+
+::: take
+If a rate budget separates functions, removing one task's neurons should hurt its own family and spare the others.
+:::
+
+## Lesions: <span class="E">E</span> and <span class="I">I</span> groups, all 20 networks
+
+![](assets/lesion_dose_front.svg){.fig .nostretch style="height:470px"}
+
+<p class="caption">Mean-clamped groups of increasing size. Thin: one network; thick: mean over 5 seeds; dotted: random
+groups of the same size.</p>
+
+::: take
+Under a rate budget, <span class="E">E</span> lesion damage stays inside the task family (specificity 3.3–4.3 vs ≤ 2.0;
+all 5 networks above all 5 control at every size, p = 0.008). Damage on the own family equals control's: the difference
+is less leakage. <span class="I">I</span> lesions: no point beats control; the synaptic constraint is less
+specific with small groups (1.1–1.2 vs 1.8, p = 0.008).
 :::
 
 ## Summary

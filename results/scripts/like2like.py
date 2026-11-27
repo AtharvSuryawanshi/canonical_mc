@@ -10,6 +10,7 @@ within I (fig_wiring_like2like.network, unchanged). Two modes per network:
     python results/scripts/like2like.py --run yang --plot-only   # figures from the cache only (seconds)
     python results/scripts/like2like.py --run yang --recompute   # redo every cache
     options: --seeds 0-4  --points control,A3,B0,C0  --example-seed 4  --n-shuffle 500  --thresh 0.01
+             --basis period|task  --sim pearson|spearman (spearman caches/csv get a _spearman tag)  --no-plots
 
 Cache: results/cache/<run>/like2like_<point>_s<seed>.npz (similarity S, E/I labels, connected masks of both modes,
 stats) and results/cache/<run>/like2like.csv (one row per point, seed, mode, type). The per-period task variance it
@@ -42,10 +43,11 @@ def cache_dir(run):
 
 
 BASIS = "period"                                    # set in __main__ (--basis); period caches keep their old names
+SIM = "pearson"                                     # set in __main__ (--sim); spearman caches get a _spearman tag
 
 
 def cache_path(run, point, seed):
-    tag = "" if BASIS == "period" else f"{BASIS}_"
+    tag = ("" if BASIS == "period" else f"{BASIS}_") + ("" if SIM == "pearson" else f"{SIM}_")
     return cache_dir(run) / f"like2like_{tag}{point}_s{seed}.npz"
 
 
@@ -63,7 +65,8 @@ def compute_one(run, point, seed, keep, thresh, n_shuffle):
     for m, mode in enumerate(MODES):
         rng = np.random.default_rng([seed, list(LABEL).index(point), m])      # per network: recompute one alone
         k = None if mode == "trained" else keep
-        res = network(point, seed, rng, keep_frac=k, run=run, thresh=thresh, n_shuffle=n_shuffle, basis=BASIS)
+        res = network(point, seed, rng, keep_frac=k, run=run, thresh=thresh, n_shuffle=n_shuffle, basis=BASIS,
+                      sim=SIM)
         if mode == "trained" and keep is None:
             keep = float(res["conn"])
         C[mode] = res["C"]
@@ -108,7 +111,8 @@ def compute(run, points, seeds, thresh, n_shuffle, recompute):
 def load_all(run, points, seeds):
     R = {(p, s): read_cache(run, p, s) for p in points for s in seeds}
     df = pd.DataFrame([r for c in R.values() for r in c["stats"]])
-    df.to_csv(cache_dir(run) / ("like2like.csv" if BASIS == "period" else f"like2like_{BASIS}.csv"), index=False)
+    name = "like2like" + ("" if BASIS == "period" else f"_{BASIS}") + ("" if SIM == "pearson" else f"_{SIM}")
+    df.to_csv(cache_dir(run) / f"{name}.csv", index=False)
     return R, df
 
 
@@ -286,14 +290,19 @@ if __name__ == "__main__":
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--plot-only", action="store_true")
     g.add_argument("--recompute", action="store_true")
+    ap.add_argument("--sim", default="pearson", choices=["pearson", "spearman"])
+    ap.add_argument("--no-plots", action="store_true", help="compute + csv + summary only")
     a = ap.parse_args()
     points, seeds = (a.points.split(",") if a.points else run_points(a.run)), seed_list(a.seeds)
     REF = next(r for r in REFS if r in points)
-    BASIS = a.basis
+    BASIS, SIM = a.basis, a.sim
     if not a.plot_only:
         compute(a.run, points, seeds, a.thresh, a.n_shuffle, a.recompute)
     R, df = load_all(a.run, points, seeds)
-    tag = a.run if BASIS == "period" else f"{a.run}_{BASIS}"           # figure-name suffix
+    tag = (a.run if BASIS == "period" else f"{a.run}_{BASIS}") + ("" if SIM == "pearson" else f"_{SIM}")  # fig suffix
+    if a.no_plots:
+        summary(df, points)
+        raise SystemExit
     if a.example_seed in seeds:
         plot_example(tag, R, df, points, a.example_seed)
     plot_seeds(tag, R, df, points, seeds)

@@ -28,6 +28,7 @@ SVG = {  # source pdf (relative to presentation/) -> pages to convert
     "figs/talk/convergence_front.pdf": [1], "figs/talk/like2like_schematic_front.pdf": [1],
     "figs/talk/like2like_example_s0_front_task.pdf": [1], "figs/talk/like2like_seeds_front_task.pdf": [1],
     "figs/talk/silhouette_seeds_task_front.pdf": [1], "figs/talk/tv_s0_front.pdf": [1],
+    "figs/talk/selectivity_front.pdf": [1], "figs/talk/lesion_dose_front.pdf": [1],
 }
 PNG = ["figs/wiring_control.png", "figs/wiring_A3.png", "figs/wiring_B0.png", "figs/wiring_C0.png",
        "../results/front/tv_period_driscoll_control_s4.png", "../results/front/tv_period_driscoll_A3_s4.png",

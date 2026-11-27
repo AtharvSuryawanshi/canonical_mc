@@ -710,3 +710,73 @@ Commits `64ecc14`, `424492b` (+ the HTML deck commit). Beamer deck: `presentatio
 - Slide 10/12 figures were drafts for discussion (NSGA-III animation, points summary).
 - Experimental slides: still old points, v1 battery.
 - §11.4: per-period TV, lesions, E/I group wiring on the front points; `loose` not analysed.
+
+## 13. Lesions and connectivity-motif pilots on the front points (2026-11-27, Windows)
+
+All on the front run `runs/moo_zoom/dale_all_woutfree_fanin_front4_5seed_150k_yang` (control / rate / synaptic /
+both, 5 seeds). Candidate claims, literature and open questions: `reports/IDEAS.md` (A3, B1 lesions, B3 motifs).
+
+### 13.1 Lesions (`results/scripts/lesion_clusters.py`, `results/scripts/lesion_taskgroups.py`)
+
+- **Step 1, cluster lesions** (`lesion_clusters.py`, seed 0): silence each per-task TV cluster (k-means groups of slide
+  19, E and I), accuracy change on the 20 tasks, 10 random groups of the same size. Rate network: half the lesions do
+  nothing, the rest hit the group's own task; control / synaptic: broad damage, about as large as random groups.
+  Cluster sizes differ per network, so the main analysis uses fixed-size groups instead. Silencing an I cluster does as
+  much damage as a random I group (disinhibition).
+- **Fixed-size task groups** (`lesion_taskgroups.py`): for each task, the m neurons with the largest raw task variance
+  (E, or I with `--pop I`); lesion = silenced (`zero`, r = 0) or mean-clamped (`mean`, rates held at the intact
+  network's trial-average per time step, same task and eval batch: removes the task information, keeps the mean
+  drive); 20 random groups of m active neurons as control; 5 eval seeds x 64 noise-free trials. Damage
+  d = max(0, -accuracy change). **Family specificity** = damage on the other tasks of the group's family / damage on
+  the other families (Yang 2019's 5 families: Go, Anti, DM, Dly DM, Matching).
+  - m = 10 E, both lesion types, seeds 0-4: own-task / other-task damage, silenced control 2.4+-0.3, rate 5.2+-1.0,
+    synaptic 1.9+-0.2, both 2.4+-0.2; mean-clamped 2.1 / 4.7 / 2.2 / 2.6. Rate vs control p = 0.008 (Mann-Whitney,
+    every rate network above every control network) for both lesion types. Family specificity silenced 1.7 / **4.4** /
+    1.3 / 1.8, mean-clamped 1.6 / **4.3** / 1.4 / 1.9.
+  - **E dose-response**, mean-clamped, m = 2/5/10/20/40 (1-20% of 204), seeds 0-4: family specificity control
+    1.7/1.7/1.6/1.6/1.6, rate **3.7/3.8/4.3/4.2/3.3**, synaptic 1.4/1.4/1.4/1.4/1.3, both 2.0/2.0/1.9/1.7/1.6; rate vs
+    control p = 0.008 at every m. Damage on the group's own family is the same for rate and control at every m (m = 40:
+    0.29 vs 0.27); the difference is damage on other families (m = 40: rate 0.09, control 0.17, synaptic 0.20, both
+    0.21). The seed-0 peak at m = 20 does not hold across seeds (no "unit size" claim).
+  - **I dose-response**, mean-clamped, m = 1/2/5/10 (2-19% of 52), seeds 0-4: family specificity control
+    1.8/1.8/1.4/1.2, rate 2.1/1.8/1.6/1.2, synaptic 1.1/1.2/1.2/1.2, both 1.9/1.6/1.4/1.2. No point above control
+    (rate p >= 0.1); synaptic below control at m = 1, 2 (p = 0.008), equal at 10, flat while the others fall. Top-m I
+    groups hurt more than random I groups (I neurons carry task information, unlike under silencing). The rate
+    point's higher own-task damage on seeds 0-2 does not hold over 5 seeds (0.074 vs 0.054, p = 0.22). The rate
+    budget's lesion specificity is an E-population property.
+  - Both constraints is never more specific than control, though its E neurons are nearly as selective as the rate
+    point's; its rate cost is 8x the rate point's (open: rate budget too loose, or sparse synapses coupling tasks).
+  - Figures: `results/front/lesion_clusters_s0.png`, `lesion_taskgroups_s<seed>.png`, `lesion_taskgroups_seeds.png`,
+    `lesion_dose_s<seed>[_I].png`, `lesion_dose_seeds_mean[_I].png` (+ CSVs in `results/cache/front/`); talk figure
+    `presentation/figs/talk/lesion_dose_front.pdf` (`--talk`).
+  - Commands (from `results/scripts`, cmc_env python):
+    `lesion_taskgroups.py --point <p> --seed <s> [--pop I] --m 2,5,20,40 --modes mean --threads 3` (one network,
+    cached), `--dose --seeds 0-4 [--pop I]` (summary + figure), `--seeds 0-4` (m = 10 summary), `--talk`.
+  - Run time: ~2 min per group size per seed for the 4 points (4 jobs x 3 threads, laptop on mains power). On
+    battery ~2.5x slower; 8 parallel jobs are no faster than 4.
+
+### 13.2 Other analysis
+
+- Like-to-like with Spearman instead of Pearson similarity (`like2like.py --sim spearman`, CSV
+  `like2like_task_spearman.csv`): AUCs agree with Pearson (rank correlation 0.98 over 80 values). Deck unchanged.
+- `selectivity_rate.py`: silhouette is now the best over k = 3-20 per network (slide 20).
+- **Reciprocity pilot** (`results/scripts/motif_reciprocity.py`, ~45 s): connected = |W|/c > 0.01; ratio =
+  P(a<->b) / (P(a->b) P(b->a)); null (senders shuffled per target) ~1. E<->E control 1.02, rate 1.09, synaptic 3.5,
+  both 5.0; I<->I 1.02 / 1.04 / 5.1 / 5.1; E<->I (back inhibition) 0.98 / 0.97 / 0.02 / 0.28. Control and rate are
+  56-68% connected at this threshold, so binary ratios are ~1 by construction there.
+- **Triad census pilot** (`results/scripts/motif_triads.py`, ~90 s, needs networkx, added to requirements.txt): E->E,
+  vs Song et al. 2005's pair null. Synaptic: feed-forward triangle 030T 1.8x (154 vs 85), cycle 030C 1.8x, 120x
+  2.5-2.7x, 210 5.4x; both: 030T 2.9x, 120x 5-9x (tiny counts); open triads ~1. Untested: whether reciprocity and
+  triangles are more than a by-product of like-to-like (compare within equal task similarity).
+- The October motif results (`cmc/motifs.py`, `reports/archive/PRESENTATION_motifs_2026-10-07.md`) were core5 / v1
+  battery and are not comparable.
+
+### 13.3 HTML deck
+
+- Slide 6 (Setup): interactive trial simulator (`presentation/html/trial_sim.js`, data `assets/trial_data.js` from
+  `build_figs.py trials`): task buttons by family, the 4 points, play / pause / step, timeline slider; inputs, 16 E + 4
+  I neurons filling blue / red with their rate, outputs with the read-out, cost bars.
+- Slide 15 (like-to-like): neutral neurons, blue synapse / grey no synapse; three click steps (connected pair +
+  histogram, unconnected pair + histogram, threshold sweep + ROC).
+- Slide 20: loose point and the sparse / unconstrained lines removed; silhouette = best over k = 3-20.
+- New slides 21-22 after slide 20: lesion method, then the E / I dose-response figure (4 points x 5 seeds).

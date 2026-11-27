@@ -1,17 +1,16 @@
-// Like-to-like connectivity, step by step (slide "Like-to-like connectivity"), on one real network
-// (assets/l2l_data.js, build_figs.py l2l). SVG + requestAnimationFrame, no libraries.
-//   1-2  two pairs of neurons side by side: normalized task variance over the 20 tasks, connected (similar) and
-//        unconnected pair, r
-//   3    every E->E pair gives one r: histograms for connected and unconnected pairs
-//   4    a threshold on r sweeps from +1 to -1; the fractions above it trace the ROC
-//   5    the area under the ROC = AUC
+// Like-to-like connectivity, one click per step (slide "Like-to-like connectivity"), on one real network
+// (assets/l2l_data.js, build_figs.py l2l). SVG + requestAnimationFrame, no libraries. The step is the number of
+// visible reveal.js fragments ".l2l-frag" on the slide (three empty spans in slides.qmd), so arrow keys / clicks
+// step forward and back.
+//   0    slide shown: empty axes
+//   1    connected pair (synapse, the two profiles, r) + the histogram of r over all connected E->E pairs
+//   2    unconnected pair + the histogram of all unconnected E->E pairs
+//   3    a threshold on r sweeps from +1 to -1, the fractions above it trace the ROC; then area = AUC
 (function () {
   const NS = "http://www.w3.org/2000/svg";
-  const E = "#1F8AD0", LIGHT = "#9CCBEA", INK = "#1d1d1f", MUTED = "#6e6e73", GREY = "#b8b8bd", LINE = "#d1d1d6";
+  const E = "#1F8AD0", NEUTRAL = "#48484a", INK = "#1d1d1f", MUTED = "#6e6e73", GREY = "#b8b8bd", LINE = "#d1d1d6";
   const FONT = 'Inter, "Segoe UI", -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif';
-  const PH = [ // start time (s) of each phase; the loop ends at END
-    { t: 0, step: 1 }, { t: 6, step: 2 }, { t: 11.5, step: 3 }, { t: 17, step: 4 }, { t: 27, step: 5 }];
-  const END = 34;
+  const SWEEP = 8.5, AREA = 9;   // step 3: sweep duration, start of the AUC area (s)
 
   const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
   const ease = t => { t = clamp(t, 0, 1); return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
@@ -41,28 +40,29 @@
     const pairs = COLS.map((col, k) => {
       const p = D.pairs[k], g = el(A, "g", { opacity: 0 }), x0 = col.x0, x1 = x0 + CW;
       const tri = (x, c, name) => {
-        el(g, "path", { d: `M ${x} 46 L ${x + 16} 74 L ${x - 16} 74 Z`, fill: c, stroke: INK, "stroke-width": 1 });
-        txt(g, x, 69, name, { "text-anchor": "middle", fill: c === E ? "white" : INK, "font-size": 13 });
+        el(g, "path", { d: `M ${x} 46 L ${x + 16} 74 L ${x - 16} 74 Z`, fill: "white", stroke: INK, "stroke-width": 1.4 });
+        txt(g, x, 69, name, { "text-anchor": "middle", fill: INK, "font-size": 13 });
       };
-      tri(x0 + 18, E, col.names[0]); tri(x1 - 18, LIGHT, col.names[1]);
+      tri(x0 + 18, null, col.names[0]); tri(x1 - 18, null, col.names[1]);
       const link = el(g, "g", {});
       if (p.conn) {
-        el(link, "line", { x1: x0 + 40, x2: x1 - 44, y1: 64, y2: 64, stroke: INK, "stroke-width": 2 });
-        el(link, "path", { d: `M ${x1 - 36} 64 L ${x1 - 48} 58 L ${x1 - 48} 70 Z`, fill: INK });
+        el(link, "line", { x1: x0 + 40, x2: x1 - 44, y1: 64, y2: 64, stroke: E, "stroke-width": 2.6 });
+        el(link, "path", { d: `M ${x1 - 36} 64 L ${x1 - 48} 58 L ${x1 - 48} 70 Z`, fill: E });
       } else {
         el(link, "line", { x1: x0 + 40, x2: x1 - 38, y1: 64, y2: 64, stroke: GREY, "stroke-width": 1.5,
                            "stroke-dasharray": "4 4" });
       }
-      txt(link, x0 + CW / 2, 52, p.conn ? "synapse" : "no synapse", { "text-anchor": "middle", "font-size": 13 });
+      txt(link, x0 + CW / 2, 52, p.conn ? "synapse" : "no synapse", { "text-anchor": "middle", "font-size": 13,
+                                                                         fill: p.conn ? E : MUTED });
       const r = txt(g, x0 + CW / 2, 104, `${p.conn ? "connected" : "unconnected"}, r = ${p.r >= 0 ? "+" : ""}${p.r.toFixed(2)}`,
                     { "text-anchor": "middle", fill: p.conn ? E : INK, "font-size": 15 });
-      const prof = [[E, col.names[0], 130], [LIGHT, col.names[1], 238]].map(([c, name, y0]) => {
+      const prof = [[NEUTRAL, col.names[0], 130], [NEUTRAL, col.names[1], 238]].map(([c, name, y0]) => {
         const H = 86, w = CW / nT;
         el(g, "line", { x1: x0, x2: x1, y1: y0 + H, y2: y0 + H, stroke: INK, "stroke-width": 1 });
         txt(g, x0 + 1, y0 - 3, `neuron ${name}`, { "font-size": 12 });
         const bars = [];
         for (let i = 0; i < nT; i++)
-          bars.push(el(g, "rect", { x: x0 + i * w + w * 0.12, width: w * 0.76, fill: c, stroke: c === LIGHT ? INK : c,
+          bars.push(el(g, "rect", { x: x0 + i * w + w * 0.12, width: w * 0.76, fill: c, stroke: c,
                                     "stroke-width": 0.4 }));
         return { bars, y0, H };
       });
@@ -89,11 +89,11 @@
     txt(B, (bx0 + bx1) / 2, by1 + 46, "similarity r of the two profiles", { "text-anchor": "middle", "font-size": 14 });
     txt(B, bx0 - 12, (by0 + by1) / 2, "fraction of pairs", { "text-anchor": "middle", "font-size": 13,
                                                               transform: `rotate(-90 ${bx0 - 12} ${(by0 + by1) / 2})` });
-    const legB = el(B, "g", { opacity: 0 });
-    el(legB, "rect", { x: bx0, y: 37, width: 14, height: 10, fill: GREY });
-    txt(legB, bx0 + 20, 47, `unconnected (${D.n_unconn.toLocaleString("en")})`, { "font-size": 13 });
-    el(legB, "line", { x1: bx0, x2: bx0 + 14, y1: 62, y2: 62, stroke: E, "stroke-width": 2.6 });
-    txt(legB, bx0 + 20, 67, `connected (${D.n_conn})`, { "font-size": 13, fill: E });
+    const legC = el(B, "g", { opacity: 0 }), legU = el(B, "g", { opacity: 0 });
+    el(legC, "line", { x1: bx0, x2: bx0 + 14, y1: 42, y2: 42, stroke: E, "stroke-width": 2.6 });
+    txt(legC, bx0 + 20, 47, `connected (${D.n_conn})`, { "font-size": 13, fill: E });
+    el(legU, "rect", { x: bx0, y: 57, width: 14, height: 10, fill: GREY });
+    txt(legU, bx0 + 20, 67, `unconnected (${D.n_unconn.toLocaleString("en")})`, { "font-size": 13 });
     // example markers on the r axis
     const marks = D.pairs.map(p => {
       const g = el(B, "g", { opacity: 0 });
@@ -102,8 +102,8 @@
     });
     const thr = el(B, "g", { opacity: 0 });
     const thrLine = el(thr, "line", { y1: by0 - 6, y2: by1, stroke: INK, "stroke-width": 2 });
-    const fracC = txt(B, bx1, 67, "", { "text-anchor": "end", fill: E, "font-size": 14 });
-    const fracU = txt(B, bx1, 47, "", { "text-anchor": "end", "font-size": 14 });
+    const fracC = txt(B, bx1, 47, "", { "text-anchor": "end", fill: E, "font-size": 14 });
+    const fracU = txt(B, bx1, 67, "", { "text-anchor": "end", "font-size": 14 });
 
     // ---------------------------------------------------------------- panel C: ROC
     const C = el(svg, "g", {});
@@ -124,15 +124,16 @@
     txt(C, cx0 + cs / 2, cy1 + 40, "unconnected pairs above threshold", { "text-anchor": "middle", "font-size": 13 });
     txt(C, cx0 - 26, cy0 + cs / 2, "connected pairs above threshold", { "text-anchor": "middle", "font-size": 13,
                                                                      fill: E, transform: `rotate(-90 ${cx0 - 26} ${cy0 + cs / 2})` });
+    const sgn = v => (v >= 0 ? "+" : "") + v.toFixed(2);
     const CAPS = {
-      1: `Each neuron has a profile: its normalized task variance in each of the 20 tasks. A connected pair with similar profiles: r = ${D.pairs[0].r >= 0 ? "+" : ""}${D.pairs[0].r.toFixed(2)}.`,
-      2: `An unconnected pair with different profiles: r = ${D.pairs[1].r.toFixed(2)}.`,
-      3: "Every E→E pair gives one r. Connected pairs (blue) sit further right than unconnected pairs (grey).",
-      4: "Slide a threshold on r: the fractions of connected and of unconnected pairs above it trace the ROC.",
-      5: `Area under the ROC: AUC = ${D.auc.toFixed(2)}, the chance that a connected pair is more similar than an unconnected one (0.5: no relation).`,
+      0: "Each neuron has a profile: its normalized task variance in each of the 20 tasks.",
+      1: `A connected pair with similar profiles: r = ${sgn(D.pairs[0].r)}. Blue: r of every connected E→E pair.`,
+      2: `An unconnected pair with different profiles: r = ${sgn(D.pairs[1].r)}. Grey: r of every unconnected E→E pair, further left.`,
+      3: "Slide a threshold on r: the fractions of connected and of unconnected pairs above it trace the ROC.",
+      4: `Area under the ROC: AUC = ${D.auc.toFixed(2)}, the chance that a connected pair is more similar than an unconnected one (0.5: no relation).`,
     };
 
-    function showPair(k, a) { // a: 0..1 build-up of pair k (it stays once built)
+    function showPair(k, a) { // a: 0..1 build-up of pair k
       const P = pairs[k], p = P.p;
       P.g.setAttribute("opacity", a > 0 ? 1 : 0);
       P.prof.forEach((pf, m) => {
@@ -146,64 +147,64 @@
       P.r.setAttribute("opacity", ease(a * 2 - 0.9));
     }
 
-    function draw(t) {
-      let ph = 0;
-      while (ph + 1 < PH.length && t >= PH[ph + 1].t) ph++;
-      const step = PH[ph].step, local = t - PH[ph].t;
-      if (cap.dataset.s !== String(step)) {
-        cap.dataset.s = String(step);
-        cap.innerHTML = `<span class="anim-step">${step}</span>${CAPS[step]}`;
+    function draw(step, t) { // t: seconds since this step began (large = finished)
+      const c = step === 3 && t >= AREA ? 4 : step;
+      if (cap.dataset.s !== String(c)) {
+        cap.dataset.s = String(c);
+        cap.innerHTML = (step ? `<span class="anim-step">${step}</span>` : "") + CAPS[c];
       }
-      // panel A
-      showPair(0, step === 1 ? local / 3 : 1);
-      showPair(1, step < 2 ? 0 : step === 2 ? local / 3 : 1);
-      // panel B: histograms grow in step 3
-      const g = step < 3 ? 0 : step === 3 ? ease(local / 2.5) : 1;
-      D.hu.forEach((v, k) => { const y = Yh(v * g); huBars[k].setAttribute("y", y); huBars[k].setAttribute("height", by1 - y); });
+      // panel A: the two pairs
+      showPair(0, step < 1 ? 0 : step === 1 ? t / 3 : 1);
+      showPair(1, step < 2 ? 0 : step === 2 ? t / 3 : 1);
+      // panel B: connected curve with step 1, unconnected bars with step 2
+      const gc = step < 1 ? 0 : step === 1 ? ease((t - 1.2) / 2) : 1;
+      const gu = step < 2 ? 0 : step === 2 ? ease((t - 1.2) / 2) : 1;
+      D.hu.forEach((v, k) => { const y = Yh(v * gu); huBars[k].setAttribute("y", y); huBars[k].setAttribute("height", by1 - y); });
       let d = `M ${X(D.bins[0])} ${by1}`;
-      D.hc.forEach((v, k) => { const y = Yh(v * g); d += ` L ${X(D.bins[k])} ${y} L ${X(D.bins[k + 1])} ${y}`; });
+      D.hc.forEach((v, k) => { const y = Yh(v * gc); d += ` L ${X(D.bins[k])} ${y} L ${X(D.bins[k + 1])} ${y}`; });
       hcPath.setAttribute("d", d + ` L ${X(1)} ${by1}`);
-      hcPath.setAttribute("opacity", g > 0 ? 1 : 0);
-      legB.setAttribute("opacity", g);
-      const mo = step < 3 ? 0 : step === 3 ? ease(local / 1.5 - 1) : 1;
-      marks.forEach(m => m.setAttribute("opacity", mo));
-      // threshold sweep in step 4, kept at the end in step 5
-      const s = step < 4 ? -1 : step === 4 ? clamp(local / 8.5, 0, 1) : 1;
-      const n = s < 0 ? -1 : Math.round(s * (D.th.length - 1));
-      if (n >= 0) {
-        const r = D.th[n], x = X(r);
-        thr.setAttribute("opacity", step === 4 ? 1 : 1 - ease((t - PH[4].t) / 1));
+      hcPath.setAttribute("opacity", gc > 0 ? 1 : 0);
+      legC.setAttribute("opacity", gc); legU.setAttribute("opacity", gu);
+      marks[0].setAttribute("opacity", gc); marks[1].setAttribute("opacity", gu);
+      // step 3: threshold sweep -> ROC, then the area
+      if (step === 3) {
+        const n = Math.round(clamp(t / SWEEP, 0, 1) * (D.th.length - 1)), x = X(D.th[n]);
+        const sweeping = t < AREA;
+        thr.setAttribute("opacity", sweeping ? 1 : 1 - ease(t - AREA));
         thrLine.setAttribute("x1", x); thrLine.setAttribute("x2", x);
-        shade.setAttribute("x", x); shade.setAttribute("width", bx1 - x); shade.setAttribute("opacity", step === 4 ? 0.07 : 0);
-        fracC.textContent = step === 4 ? `connected above: ${Math.round(100 * D.tpr[n])}%` : "";
-        fracU.textContent = step === 4 ? `unconnected above: ${Math.round(100 * D.fpr[n])}%` : "";
+        shade.setAttribute("x", x); shade.setAttribute("width", bx1 - x); shade.setAttribute("opacity", sweeping ? 0.07 : 0);
+        fracC.textContent = sweeping ? `connected above: ${Math.round(100 * D.tpr[n])}%` : "";
+        fracU.textContent = sweeping ? `unconnected above: ${Math.round(100 * D.fpr[n])}%` : "";
         let pd = "";
         for (let k = 0; k <= n; k++) pd += (k ? "L" : "M") + RX(D.fpr[k]).toFixed(1) + " " + RY(D.tpr[k]).toFixed(1);
         rocPath.setAttribute("d", pd);
         rocDot.setAttribute("cx", RX(D.fpr[n])); rocDot.setAttribute("cy", RY(D.tpr[n]));
-        rocDot.setAttribute("opacity", step === 4 ? 1 : 0);
+        rocDot.setAttribute("opacity", sweeping ? 1 : 0);
+        let ad = `M ${RX(0)} ${RY(0)}`;
+        D.fpr.forEach((f, k) => { ad += ` L ${RX(f).toFixed(1)} ${RY(D.tpr[k]).toFixed(1)}`; });
+        area.setAttribute("d", ad + ` L ${RX(1)} ${RY(0)} Z`);
+        area.setAttribute("opacity", 0.2 * ease((t - AREA) / 1.2));
+        aucTxt.textContent = `AUC = ${D.auc.toFixed(2)}`;
+        aucTxt.setAttribute("opacity", ease((t - AREA) / 1.2 - 0.3));
       } else {
         thr.setAttribute("opacity", 0); shade.setAttribute("opacity", 0);
         fracC.textContent = ""; fracU.textContent = "";
         rocPath.setAttribute("d", ""); rocDot.setAttribute("opacity", 0);
+        area.setAttribute("opacity", 0); aucTxt.setAttribute("opacity", 0);
       }
-      // area in step 5
-      if (step === 5) {
-        let ad = `M ${RX(0)} ${RY(0)}`;
-        D.fpr.forEach((f, k) => { ad += ` L ${RX(f).toFixed(1)} ${RY(D.tpr[k]).toFixed(1)}`; });
-        area.setAttribute("d", ad + ` L ${RX(1)} ${RY(0)} Z`);
-        area.setAttribute("opacity", 0.2 * ease(local / 1.2));
-        aucTxt.textContent = `AUC = ${D.auc.toFixed(2)}`;
-        aucTxt.setAttribute("opacity", ease(local / 1.2 - 0.3));
-      } else { area.setAttribute("opacity", 0); aucTxt.setAttribute("opacity", 0); }
-      svg.setAttribute("opacity", clamp(Math.min(t / 0.4, (END - t) / 0.5), 0, 1));
     }
 
-    let t0 = null;
+    // step = visible fragments; a new step animates from its start; going back (or arriving from a later slide)
+    // shows it finished
     const section = root.closest("section");
+    let cur = -1, t0 = 0, done = false;
     (function frame(now) {
       const shown = !section || section.classList.contains("present");
-      if (shown) { if (t0 === null) t0 = now; draw(((now - t0) / 1000) % END); } else t0 = null;
+      if (shown) {
+        const step = section ? Math.min(section.querySelectorAll(".l2l-frag.visible").length, 3) : 3;
+        if (step !== cur) { done = cur === -1 ? step > 0 : step < cur; cur = step; t0 = now; }
+        draw(step, done ? 1e3 : (now - t0) / 1000);
+      } else cur = -1;
       requestAnimationFrame(frame);
     })(performance.now());
   }
