@@ -535,6 +535,89 @@ is less leakage. <span class="I">I</span> lesions: no point beats control; the s
 specific with small groups (1.1–1.2 vs 1.8, p = 0.008).
 :::
 
+## Connectivity motifs: 2 and 3 neurons
+
+::: {.motif-grid}
+::: motif-card
+![](assets/motif_ee_recip.svg){.nostretch}
+[<span class="E">E</span>↔<span class="E">E</span> reciprocal]{.kicker}
+$$\textstyle\sum_{e<f} a_{fe}\,a_{ef}$$
+:::
+::: motif-card
+![](assets/motif_ii_recip.svg){.nostretch}
+[<span class="I">I</span>↔<span class="I">I</span> reciprocal]{.kicker}
+$$\textstyle\sum_{u<v} a_{vu}\,a_{uv}$$
+:::
+::: motif-card
+![](assets/motif_ei_recip.svg){.nostretch}
+[<span class="E">E</span>↔<span class="I">I</span> reciprocal]{.kicker}
+$$\textstyle\sum_{e,u} a_{ue}\,a_{eu}$$
+:::
+::: motif-card
+![](assets/motif_lateral.svg){.nostretch}
+[Lateral inhibition]{.kicker}
+$$\textstyle\sum_{e \neq f}\sum_{u} a_{ue}\,a_{fu}$$
+:::
+::: motif-card
+![](assets/motif_ffi.svg){.nostretch}
+[Feedforward inhibition]{.kicker}
+$$\textstyle\sum_{e \neq f} a_{fe}\sum_{u} a_{ue}\,a_{fu}$$
+:::
+::: motif-card
+![](assets/motif_disinh.svg){.nostretch}
+[Disinhibition]{.kicker}
+$$\textstyle\sum_{u \neq v}\sum_{e} a_{vu}\,a_{ev}$$
+:::
+::: motif-card
+![](assets/motif_e_cycle.svg){.nostretch}
+[<span class="E">E</span> cycle]{.kicker}
+$$\tfrac{1}{3}\textstyle\sum_{e,f,g} a_{fe}\,a_{gf}\,a_{eg}$$
+:::
+::: motif-card
+![](assets/motif_e_fftri.svg){.nostretch}
+[<span class="E">E</span> feedforward triangle]{.kicker}
+$$\textstyle\sum_{e,f,g} a_{fe}\,a_{gf}\,a_{ge}$$
+:::
+::: motif-card
+![](assets/motif_loop_inh.svg){.nostretch}
+[Inhibition onto the sender]{.kicker}
+$$\textstyle\sum_{e \neq f}\sum_{u} a_{fe}\,a_{uf}\,a_{eu}$$
+:::
+:::
+
+::: {.motif-null}
+::: {}
+<p>$a_{ij}$: synapse $j \to i$. Counting: $a_{ij} = 1$ if $|W_{ij}|/c_j > 0.01$; weighted: $a_{ij} = |W_{ij}|/c_j$
+(each motif counts with the product of its weights). $e, f, g$: <span class="E">E</span> neurons; $u, v$:
+<span class="I">I</span> neurons.</p>
+:::
+::: {}
+$$\text{ratio} = \frac{N_{\text{obs}}}{\langle N_{\text{shuffled}} \rangle}$$
+:::
+::: {}
+<p>Shuffle: each neuron's <span class="E">E</span> inputs come from random <span class="E">E</span> senders, its
+<span class="I">I</span> inputs from random <span class="I">I</span> senders; in-degrees and weights kept, 100×.</p>
+:::
+:::
+
+::: take
+Question: beyond how many inputs each neuron gets, do the budgets favour particular wiring patterns among 2 and 3
+neurons? 1 = chance (Song et al. 2005).
+:::
+
+## Connectivity motifs: all 20 networks
+
+![](assets/motif_typed_front.svg){.fig .nostretch style="height:478px"}
+
+<p class="caption">Bars: mean over 5 seeds; dots: one network; log scale, values below 0.01 drawn at 0.01. Control and
+rate networks are 55–73% connected, so counting cannot move far from 1 (ceiling 1/p); the weighted version can.</p>
+
+::: take
+Synaptic budget: <span class="E">E</span>↔<span class="E">E</span> 3.5–8×, <span class="I">I</span>↔<span class="I">I</span>
+~5×, <span class="E">E</span> triangles 2–4× chance, as in cortex. Inhibition that returns to an
+<span class="E">E</span> neuron feeding it is nearly absent (0.0–0.4×). Control and rate: within 30% of chance.
+:::
+
 ## Summary
 
 ::: {.grid3 .found .vcenter}

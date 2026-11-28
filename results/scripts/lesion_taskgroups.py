@@ -290,14 +290,16 @@ def dose(seed, sizes=(2, 5, 10, 20, 40), mode="mean", pop="E"):
 
 def talk_fig(seeds=range(5), mode="mean"):
     """Talk figure (presentation/figs/talk/lesion_dose_front.pdf): columns E / I groups, rows family specificity and
-    damage on other families (dotted: random groups); thin = one network, thick = mean over seeds."""
+    damage on other families (dotted: random groups); thin = one network, thick = mean over seeds. Reads the
+    dose_seeds CSVs (lesion_dose_seeds_<mode>[_I].csv), so the per-network caches are not needed."""
+    import pandas as pd
     from talk_style import W, save
     pops = {"E": ((2, 5, 10, 20, 40), 204), "I": ((1, 2, 5, 10), 52)}
-    fig, axes = plt.subplots(2, 2, figsize=(W, 3.6), gridspec_kw=dict(hspace=0.25, wspace=0.12), sharex="col", sharey="row")
+    fig, axes = plt.subplots(2, 2, figsize=(W, 3.6), gridspec_kw=dict(hspace=0.25, wspace=0.22), sharex="col")
     for c, (pop, (sizes, n)) in enumerate(pops.items()):
+        d = pd.read_csv(CACHE / f"lesion_dose_seeds_{mode}{'' if pop == 'E' else '_' + pop}.csv")
         for p in POINTS:
-            S = {(s, m): family_scores(load(p, s, m, pop), mode) for s in seeds for m in sizes
-                 if path(p, s, m, pop).exists()}
+            S = {(r.seed, r.m): r._asdict() for r in d[d.point == p].itertuples() if r.seed in seeds and r.m in sizes}
             for r, k in enumerate(("ratio", "other")):
                 ax = axes[r, c]
                 for s in seeds:

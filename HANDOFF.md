@@ -780,3 +780,53 @@ both, 5 seeds). Candidate claims, literature and open questions: `reports/IDEAS.
   histogram, unconnected pair + histogram, threshold sweep + ROC).
 - Slide 20: loose point and the sparse / unconstrained lines removed; silhouette = best over k = 3-20.
 - New slides 21-22 after slide 20: lesion method, then the E / I dose-response figure (4 points x 5 seeds).
+
+## 14. Typed connectivity motifs on the front points; slide 22 axes (2026-11-28, Linux)
+
+### 14.1 Typed 2- and 3-neuron motifs (`results/scripts/motif_typed.py`, ~60 s, CSV `results/cache/front/motif_typed.csv`)
+
+Generalises the §13.2 pilots (`motif_reciprocity.py`, `motif_triads.py`) to E/I-typed motifs, 4 points x 5 seeds.
+- M[a, b] = 1 if a -> b (rows of W_rec are presynaptic, `h @ W`). Counting: |W|/c > 0.01 (as like-to-like);
+  weighted: |W|/c, so each motif instance counts with the product of its weights.
+- Each count is a sum of edge products = a matrix product: E<->E 1/2 sum(EE * EE^T), E<->I sum(EI * IE^T), lateral
+  E1->I->E2 off-diagonal sum of EI @ IE, feedforward inhibition sum(EE * (EI @ IE)), disinhibition I1->I2->E
+  sum(II @ IE), E cycle tr(EE^3)/3, E feedforward triangle sum((EE @ EE) * EE), inhibition onto the sender
+  E1->E2->I->E1 tr(EE @ EI @ IE). Counting only: "pure" lateral (no I->E1) and disinhibition (no I1->E), printed.
+- Null: per target, its E senders shuffled among E and its I senders among I (keeps every neuron's E / I in-degree
+  and in-weights; out-degree not kept), 100x. Ratio = observed / mean shuffled; significant = outside 95% of shuffles.
+
+Ratios, mean over 5 seeds (control / rate / synaptic / both):
+
+| motif | counting | weighted |
+|---|---|---|
+| E<->E reciprocal | 1.02 / 1.09 / **3.5** / **4.8** | 1.09 / 1.15 / **8.0** / **6.3** |
+| I<->I reciprocal | 1.02 / 1.04 / **5.2** / **5.4** | 1.14 / 1.29 / **5.3** / 3.4 (2/5 seeds) |
+| E<->I reciprocal (feedback inhibition) | 0.98 / 0.97 / **0.02** / **0.29** | 0.91 / 0.94 / **0.00** / 0.73 |
+| lateral inhibition E1->I->E2 | 1.00 / 1.01 / 1.06 / 1.22 | 1.00 / 1.05 / 1.03 / 1.08 |
+| feedforward inhibition | 1.00 / 1.00 / **0.33** / **0.24** | 1.00 / 0.94 / **0.18** / **0.19** |
+| disinhibition I1->I2->E | 1.00 / 0.99 / 1.10 / 1.14 | 1.03 / 0.99 / 1.13 / 1.01 |
+| E cycle | 1.00 / 1.03 / **2.0** / **3.1** | 1.01 / 1.04 / **3.8** / 2.6 |
+| E feedforward triangle | 1.01 / 1.04 / **2.0** / **3.0** | 1.15 / 1.19 / **3.8** / 2.7 |
+| inhibition onto the sender | 1.00 / 1.00 / **0.21** / **0.43** | 0.99 / 1.01 / **0.05** / 0.46 |
+
+- Synaptic budget: cortex-like E<->E reciprocity (Song 2005 ~4x), I<->I reciprocity and E triangles; every motif in
+  which inhibition returns to an E neuron that drives it, or that it is fed by, is depleted (0.0-0.4x), which is
+  *not* cortex-like (E<->PV reciprocal connections and feedforward inhibition are common in cortex). Lateral
+  inhibition and disinhibition only 1.1-1.25x.
+- Control / rate are 55-73% connected, so counted ratios are bounded by 1/p (~1.4); weighted shows the same
+  direction, weakly but in all seeds (E<->E 1.09 / 1.15, I<->I 1.14 / 1.29, E triangles 1.15 / 1.19, feedback
+  inhibition 0.91 / 0.94).
+- Both constraints: same direction as synaptic, noisier (1-3% connected, a few strong synapses dominate the sums).
+- Caveats: out-degree not preserved by the null; E reciprocity / triangles may partly follow from like-to-like;
+  small 3-neuron counts at 2-3% density.
+- Commands (from `results/scripts`): `motif_typed.py` (table; `--recompute` to redo the CSV), `--talk` (figure
+  `presentation/figs/talk/motif_typed_front.pdf` + the 9 motif icons `presentation/html/assets/motif_<key>.svg`).
+
+### 14.2 HTML deck
+
+- Slide 22 (lesion dose-response): each panel has its own y range (I panels were unreadable on the E scale).
+  `lesion_taskgroups.py --talk` now reads `results/cache/front/lesion_dose_seeds_mean[_I].csv`, so it no longer
+  needs the per-network lesion caches (those were only on the Windows machine and are not in git).
+- New slides 23-24 after slide 22: motif definitions (icon + formula per motif, counting / weighted / shuffle null),
+  then the counting and weighted bar plots (log observed / shuffled, seed dots, icons under the axis).
+  `build_assets.py` converts `motif_typed_front.pdf`.

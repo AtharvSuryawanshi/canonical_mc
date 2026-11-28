@@ -185,3 +185,15 @@
 .reveal .sim-step { min-width: 32px; }
 .reveal .sim-clock { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 160px; }
 .reveal .sim-svg { display: block; user-select: none; }
+
+/* connectivity motifs (slide 23) */
+.reveal .motif-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin: 0 6px; }
+.reveal .motif-card { flex: 0 0 calc(20% - 10px); box-sizing: border-box; background: var(--card); border-radius: 12px;
+                      padding: 6px 8px 2px 8px; text-align: center; min-width: 0; }
+.reveal .motif-card img { height: 104px; margin: 0 auto 2px auto !important; display: block; }
+.reveal .motif-card .kicker { font-size: 15px; margin: 0; color: var(--ink); text-transform: none; letter-spacing: 0; }
+.reveal .motif-card mjx-container[display="true"] { margin: 0.15em 0 0.1em 0 !important; font-size: 88% !important; }
+.reveal .motif-null { display: grid; grid-template-columns: 1.25fr 0.7fr 1.25fr; gap: 18px; align-items: center;
+                      background: var(--card); border-radius: 12px; padding: 8px 18px; margin: 12px 6px 0 6px; }
+.reveal .motif-null p { font-size: 15px; line-height: 1.35; color: #3a3a3c; margin: 0; }
+.reveal .motif-null mjx-container[display="true"] { margin: 0 !important; font-size: 135% !important; }
